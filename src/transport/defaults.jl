@@ -1,7 +1,6 @@
 # Default optimised parameter configurations
 # Best-fit parameters from BIPOP-CMA-ES optimisation against Nancy observations
-# NOTE: Optimisation still in progress — these are intermediate checkpoint values.
-# Current best OU score: 75.1% combined (FMS=0.379, Shape=0.843, Extent=1.0, TOA=1.0)
+# Current best OU score: 76.8% combined (FMS=0.370, Shape=0.860, Extent=1.0, TOA=1.0)
 
 export nancy_optimised_config
 
@@ -41,39 +40,39 @@ function nancy_optimised_config()
     )
 
     # Bimodal particle size distribution (fine + coarse modes)
-    # Fine mode: d_median = 111.5 μm, σ_g = 3.14
-    # Coarse mode: d_median = 220.7 μm, σ_g = 3.00
-    # Fine fraction: 55.2%
+    # Fine mode: d_median = 127.6 μm, σ_g = 2.67
+    # Coarse mode: d_median = 141.9 μm, σ_g = 2.52
+    # Fine fraction: 86.5%
     particle_size_config = (
-        d_median_fine_μm = 111.46,
-        sigma_g_fine = 3.137,
-        d_median_coarse_μm = 220.70,
-        sigma_g_coarse = 3.004,
-        frac_fine = 0.5517,
+        d_median_fine_μm = 127.552,
+        sigma_g_fine = 2.669,
+        d_median_coarse_μm = 141.861,
+        sigma_g_coarse = 2.523,
+        frac_fine = 0.8652,
     )
 
     # Release layer fractions (NOAA 1984 three-layer model)
-    # Lower (0–3,800 m): 1.0%, Middle (3,800–6,100 m): 18.0%, Upper (6,100–12,500 m): 81.0%
+    # Lower (0–3,800 m): 5.6%, Middle (3,800–6,100 m): 35.1%, Upper (6,100–12,500 m): 59.3%
     layer_fractions = (
-        lower = 0.01,
-        middle = 0.1804,
-        upper = 1.0 - 0.01 - 0.1804,
+        lower = 0.05617,
+        middle = 0.35074,
+        upper = 1.0 - 0.05617 - 0.35074,
     )
 
-    # Physics scaling factors (from BIPOP-CMA-ES OU checkpoint)
+    # Physics scaling factors (from BIPOP-CMA-ES OU, 76.8%)
     physics_scales = (
-        sigma_w_scale = 4.394,          # Vertical diffusivity
-        sigma_h_scale = 1.978,          # Horizontal diffusivity
-        h_diff_scale = 0.3331,          # Horizontal diffusion in BL
-        tl_scale = 2.298,              # Lagrangian timescale
-        vd_scale = 2.479,               # Dry deposition velocity
-        vgrav_scale = 0.5797,           # Gravitational settling
-        omega_scale = 2.155,            # Vertical velocity
-        mixing_height_scale = 1.144,    # BL mixing height
-        tmix_scale = 7.396,             # Mixing timescale
-        surface_height_scale = 0.7905,  # Surface height
-        roughness_scale = 1.038,        # Surface roughness
-        smooth_sigma = 2.099,           # Gaussian smoothing (grid cells)
+        sigma_w_scale = 4.028,              # Vertical diffusivity
+        sigma_h_scale = 2.220,              # Horizontal diffusivity
+        h_diff_scale = 0.2055,              # Horizontal diffusion in BL
+        tl_scale = 4.458,                   # Lagrangian timescale
+        vd_scale = 4.397,                   # Dry deposition velocity
+        vgrav_scale = 0.5532,               # Gravitational settling
+        omega_scale = 2.557,                # Vertical velocity
+        mixing_height_scale = 4.105,        # BL mixing height
+        tmix_scale = 1.290,                 # Mixing timescale
+        surface_height_scale = 1.554,       # Surface height
+        roughness_scale = 1.174,            # Surface roughness
+        smooth_sigma = 2.172,               # Gaussian smoothing (grid cells)
     )
 
     return (
@@ -81,6 +80,6 @@ function nancy_optimised_config()
         particle_size_config = particle_size_config,
         layer_fractions = layer_fractions,
         physics_scales = physics_scales,
-        activity_Bq = 36.21e15,
+        activity_Bq = 48.418e15,
     )
 end
