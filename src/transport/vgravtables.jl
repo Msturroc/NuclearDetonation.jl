@@ -9,7 +9,7 @@
 #
 # - `SutherlandViscosity`: A more modern, physically accurate model based on
 #   Sutherland's formula. This is the default.
-# - `FortranViscosity`: A simplified model that exactly replicates the
+# - `ReferenceViscosity`: A simplified model that exactly replicates the
 #   formulae used in the reference implementation, used for validation.
 #
 # Key functions:
@@ -24,7 +24,7 @@ const G_GRAVITY_M_S2 = 9.80665
 const R_SPECIFIC_J_KG_K = 287.058
 
 export build_vgrav_tables, vgrav_corrected, cunningham_factor, VGravTables
-export AbstractViscosityModel, FortranViscosity, SutherlandViscosity
+export AbstractViscosityModel, ReferenceViscosity, SutherlandViscosity
 
 """
     VGravTables
@@ -57,12 +57,12 @@ This is the default model for new simulations.
 struct SutherlandViscosity <: AbstractViscosityModel end
 
 """
-    FortranViscosity()
+    ReferenceViscosity()
 
 Selects the simplified air viscosity and density formulae used in the
 reference implementation. Use this model for validation.
 """
-struct FortranViscosity <: AbstractViscosityModel end
+struct ReferenceViscosity <: AbstractViscosityModel end
 
 
 # ==============================================================================
@@ -73,7 +73,7 @@ struct FortranViscosity <: AbstractViscosityModel end
 # ==============================================================================
 
 """
-    air_viscosity(T, ::FortranViscosity)
+    air_viscosity(T, ::ReferenceViscosity)
 
 Calculate air viscosity using the simplified reference formula.
 
@@ -83,7 +83,7 @@ Calculate air viscosity using the simplified reference formula.
 # Returns
 - Dynamic viscosity in Poise (g/cm·s)
 """
-function air_viscosity(T::Real, ::FortranViscosity)
+function air_viscosity(T::Real, ::ReferenceViscosity)
     # visc(t) = 1.72e-4*(393.0/(t+120.0))*(t/273.0)**1.5
     # This formula directly returns Poise (g/cm-s).
     return 1.72e-4 * (393.0 / (T + 120.0)) * (T / 273.0)^1.5
@@ -112,7 +112,7 @@ end
 
 
 """
-    air_density(P_hpa, T, ::FortranViscosity)
+    air_density(P_hpa, T, ::ReferenceViscosity)
 
 Calculate air density using the simplified reference formula.
 
@@ -123,7 +123,7 @@ Calculate air density using the simplified reference formula.
 # Returns
 - Air density (g/cm³)
 """
-function air_density(P_hpa::Real, T::Real, ::FortranViscosity)
+function air_density(P_hpa::Real, T::Real, ::ReferenceViscosity)
     # roa(p,t) = 0.001*p*100.0/(r*t)
     # This formula takes hPa and returns g/cm³.
     return 0.001 * P_hpa * 100.0 / (R_SPECIFIC_J_KG_K * T)
@@ -193,12 +193,12 @@ Internal function to calculate Stokes velocity using the selected physics model.
 - `rp`: Particle density (g/cm³)
 - `P`: Ambient pressure (Pascals)
 - `T`: Ambient temperature (Kelvin)
-- `model`: The selected viscosity model (`FortranViscosity` or `SutherlandViscosity`)
+- `model`: The selected viscosity model (`ReferenceViscosity` or `SutherlandViscosity`)
 
 # Returns
 - Settling velocity (cm/s)
 """
-function _vgrav_stokes(dp::Real, rp::Real, P::Real, T::Real, model::FortranViscosity)
+function _vgrav_stokes(dp::Real, rp::Real, P::Real, T::Real, model::ReferenceViscosity)
     p_hpa = P / 100.0
     ρa = air_density(p_hpa, T, model) # Expects hPa, returns g/cm³
     η = air_viscosity(T, model)       # Returns g/cm·s
@@ -229,7 +229,7 @@ Calculates fall speed, corrected for larger Reynolds numbers using a bisection m
 - `P`: Ambient pressure (Pascals)
 - `T`: Ambient temperature (Kelvin)
 - `ρp`: Particle density (kg/m³) - Note: redundant, `rp` is used.
-- `model`: The viscosity model to use (`FortranViscosity()` or `SutherlandViscosity()`).
+- `model`: The viscosity model to use (`ReferenceViscosity()` or `SutherlandViscosity()`).
 - `tol`: Relative tolerance for the bisection solver.
 
 # Returns
@@ -256,7 +256,7 @@ function vgrav_corrected(dp::Real, rp::Real, P::Real, T::Real, ρp::Real, model:
 
     # Get air properties in CGS units using the selected model
     η = air_viscosity(T, model)
-    ρa = model isa FortranViscosity ? air_density(P / 100.0, T, model) : air_density(P, T, model)
+    ρa = model isa ReferenceViscosity ? air_density(P / 100.0, T, model) : air_density(P, T, model)
 
     # Bisection solver setup
     x1 = 0.0
@@ -300,7 +300,7 @@ Pre-computes settling velocities for a list of particle sizes.
 # Arguments
 - `particle_properties_list`: A list of `ParticleProperties` objects.
 - `model`: The viscosity model to use. Defaults to `SutherlandViscosity()`.
-           Pass `FortranViscosity()` to match the reference implementation.
+           Pass `ReferenceViscosity()` to match the reference implementation.
 
 # Returns
 - A dictionary mapping particle size index to a 2D lookup table `vgrav(pressure, temperature)`.

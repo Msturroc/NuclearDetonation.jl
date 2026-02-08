@@ -8,7 +8,7 @@ export NumericalConfig, ValidationMode, ModernMode, InterpolationOrder
 export ERA5NumericalConfig, ERA5ValidationMode, ERA5ModernMode
 export TurbulenceModel, RandomWalk, OrnsteinUhlenbeck, HannaTurbulence
 export create_numerical_config, get_ode_solver, get_interpolation_scheme, get_solve_kwargs
-export LinearInterp, CubicInterp, FortranInterp
+export LinearInterp, CubicInterp, ReferenceInterp
 
 """
     InterpolationOrder
@@ -18,12 +18,12 @@ Enumeration of supported interpolation orders for wind fields.
 # Options
 - `LinearInterp`: Linear interpolation via Interpolations.jl (~1-2% error)
 - `CubicInterp`: Cubic spline interpolation (~0.1-0.3% error, smoother derivatives)
-- `FortranInterp`: Manual floor-based trilinear interpolation (exact reference match)
+- `ReferenceInterp`: Manual floor-based trilinear interpolation (exact reference match)
 """
 @enum InterpolationOrder begin
     LinearInterp = 1
     CubicInterp = 3
-    FortranInterp = 0  # For validation - exact floor()-based bilinear
+    ReferenceInterp = 0  # For validation - exact floor()-based bilinear
 end
 
 """
@@ -160,18 +160,18 @@ config = ERA5NumericalConfig(
 end
 
 """
-    ValidationMode(dt::T=300.0; name="validation", use_fortran_interp=true) where T<:Real
+    ValidationMode(dt::T=300.0; name="validation", use_reference_interp=true) where T<:Real
 
 Create a NumericalConfig that exactly matches the reference implementation.
 
-- FortranInterp: Manual floor-based trilinear interpolation (default for validation)
-- LinearInterp: Interpolations.jl linear (available if use_fortran_interp=false)
+- ReferenceInterp: Manual floor-based trilinear interpolation (default for validation)
+- LinearInterp: Interpolations.jl linear (available if use_reference_interp=false)
 - Forward Euler integration
 - Fixed timestep (default 300s)
 """
-function ValidationMode(dt::T=300.0; name="validation", use_fortran_interp::Bool=true) where T<:Real
+function ValidationMode(dt::T=300.0; name="validation", use_reference_interp::Bool=true) where T<:Real
     return NumericalConfig{T}(
-        interpolation_order = use_fortran_interp ? FortranInterp : LinearInterp,
+        interpolation_order = use_reference_interp ? ReferenceInterp : LinearInterp,
         ode_solver_type = :Euler,
         fixed_dt = dt,
         name = name

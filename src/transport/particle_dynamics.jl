@@ -133,7 +133,7 @@ function (interp::CubicVerticalInterpolant{T})(x::Real, y::Real, z::Real, t::Rea
 end
 
 """
-    FortranTrilinearInterpolant
+    ReferenceTrilinearInterpolant
 
 Manual 4D interpolant using floor-based bilinear/trilinear approach for reference validation.
 
@@ -145,7 +145,7 @@ Uses:
 
 This provides exact reference implementation matching for validation.
 """
-struct FortranTrilinearInterpolant{T<:Real}
+struct ReferenceTrilinearInterpolant{T<:Real}
     data1::Array{T, 3}  # 3D array at t1: (nx, ny, nk)
     data2::Array{T, 3}  # 3D array at t2: (nx, ny, nk)
     t1::T
@@ -156,7 +156,7 @@ struct FortranTrilinearInterpolant{T<:Real}
 end
 
 # Make it callable with (x, y, z, t) signature
-function (interp::FortranTrilinearInterpolant{T})(x::Real, y::Real, z::Real, t::Real) where T
+function (interp::ReferenceTrilinearInterpolant{T})(x::Real, y::Real, z::Real, t::Real) where T
     # Truncate toward zero (equivalent to floor for positive values)
     # Julia 1-indexed, so floor then clamp to [1, n-1]
     i = clamp(floor(Int, x), 1, interp.nx - 1)
@@ -561,12 +561,12 @@ end
     replace_nan!(ps_3d, 1013.25)
 
     # Determine interpolation scheme from config
-    # Options: FortranInterp (exact matching), LinearInterp (Interpolations.jl), CubicInterp (modern)
+    # Options: ReferenceInterp (exact matching), LinearInterp (Interpolations.jl), CubicInterp (modern)
     interp_order = config !== nothing ? config.interpolation_order : LinearInterp
-    use_fortran_interp = interp_order == FortranInterp
+    use_reference_interp = interp_order == ReferenceInterp
     use_cubic_vertical = interp_order == CubicInterp
 
-    if use_fortran_interp
+    if use_reference_interp
         # Exact reference matching: floor-based trilinear + time interpolation
         # Uses 3D arrays at each time level (not 4D)
         u1_3d = permuted ? u_4d[:, :, :, 1] : met_fields.u1
@@ -582,9 +582,9 @@ end
             v2_3d = -v2_3d
         end
 
-        u_interp = FortranTrilinearInterpolant(copy(u1_3d), copy(u2_3d), T(t1), T(t2), nx, ny, nk)
-        v_interp = FortranTrilinearInterpolant(copy(v1_3d), copy(v2_3d), T(t1), T(t2), nx, ny, nk)
-        w_interp = FortranTrilinearInterpolant(copy(w1_3d), copy(w2_3d), T(t1), T(t2), nx, ny, nk)
+        u_interp = ReferenceTrilinearInterpolant(copy(u1_3d), copy(u2_3d), T(t1), T(t2), nx, ny, nk)
+        v_interp = ReferenceTrilinearInterpolant(copy(v1_3d), copy(v2_3d), T(t1), T(t2), nx, ny, nk)
+        w_interp = ReferenceTrilinearInterpolant(copy(w1_3d), copy(w2_3d), T(t1), T(t2), nx, ny, nk)
     elseif use_cubic_vertical
         # Use our custom VerticalCubicInterpolant for stability on irregular vertical grids
         # It uses a local cubic Hermite scheme (O(1) evaluation, no object creation)

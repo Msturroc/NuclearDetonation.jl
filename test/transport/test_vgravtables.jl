@@ -5,10 +5,10 @@ using Test
 
 @testset "vgravtables: Gravitational Settling" begin
 
-    @testset "Air Viscosity (FortranViscosity)" begin
-        model = FortranViscosity()
+    @testset "Air Viscosity (ReferenceViscosity)" begin
+        model = ReferenceViscosity()
 
-        # At 0 deg C (273.15 K) - Fortran formula
+        # At 0 deg C (273.15 K) - reference formula
         eta_0C = air_viscosity(273.15, model)
         @test eta_0C ≈ 1.733e-4 rtol=0.01  # g/(cm*s) i.e. Poise
 
@@ -35,15 +35,15 @@ using Test
         @test air_viscosity(300.0, model) > air_viscosity(250.0, model)
 
         # Both models should agree within a few per cent at standard conditions
-        eta_fortran = air_viscosity(273.15, FortranViscosity())
-        @test eta_ref ≈ eta_fortran rtol=0.02
+        eta_reference = air_viscosity(273.15, ReferenceViscosity())
+        @test eta_ref ≈ eta_reference rtol=0.02
     end
 
-    @testset "Air Density (FortranViscosity)" begin
-        model = FortranViscosity()
+    @testset "Air Density (ReferenceViscosity)" begin
+        model = ReferenceViscosity()
 
         # At sea level (1013.25 hPa) and 0 deg C (273.15 K)
-        # FortranViscosity expects P in hPa
+        # ReferenceViscosity expects P in hPa
         rho_sealevel = air_density(1013.25, 273.15, model)
         @test rho_sealevel ≈ 1.293e-3 rtol=0.01  # g/cm^3
 
@@ -67,8 +67,8 @@ using Test
         @test rho_sealevel ≈ 1.293e-3 rtol=0.01  # g/cm^3
 
         # Both models should give same density at equivalent conditions
-        rho_fortran = air_density(1013.25, 273.15, FortranViscosity())
-        @test rho_sealevel ≈ rho_fortran rtol=0.01
+        rho_reference = air_density(1013.25, 273.15, ReferenceViscosity())
+        @test rho_sealevel ≈ rho_reference rtol=0.01
     end
 
     @testset "Cunningham Slip Correction" begin
@@ -96,7 +96,7 @@ using Test
     end
 
     @testset "Corrected Settling Velocity" begin
-        model = FortranViscosity()
+        model = ReferenceViscosity()
 
         # Small particle (1 um): Reynolds correction should be negligible
         # vgrav_corrected(dp, rp, P_pa, T, rho_p_kg_m3, model)
@@ -126,7 +126,7 @@ using Test
         @test isfinite(vg_large)
     end
 
-    @testset "Corrected Velocity: Sutherland vs Fortran" begin
+    @testset "Corrected Velocity: Sutherland vs Reference" begin
         # Both models should give similar results at standard conditions
         dp = 10.0
         rp = 2.5
@@ -134,11 +134,11 @@ using Test
         P_pa = 101325.0
         T = 273.15
 
-        vg_fortran = vgrav_corrected(dp, rp, P_pa, T, rho_p, FortranViscosity())
+        vg_reference = vgrav_corrected(dp, rp, P_pa, T, rho_p, ReferenceViscosity())
         vg_sutherland = vgrav_corrected(dp, rp, P_pa, T, rho_p, SutherlandViscosity())
 
         # Should agree within a few per cent
-        @test vg_fortran ≈ vg_sutherland rtol=0.05
+        @test vg_reference ≈ vg_sutherland rtol=0.05
     end
 
     @testset "ParticleProperties Construction" begin
@@ -150,7 +150,7 @@ using Test
     @testset "Build VGrav Tables" begin
         # Single component
         props = [ParticleProperties(diameter_μm=10.0, density_gcm3=2.5)]
-        tables = build_vgrav_tables(props; model=FortranViscosity())
+        tables = build_vgrav_tables(props; model=ReferenceViscosity())
 
         # Tables is a Dict{Int, Array{Float64, 2}}
         @test tables isa Dict{Int, Array{Float64, 2}}
@@ -172,7 +172,7 @@ using Test
             ParticleProperties(diameter_μm=100.0, density_gcm3=2.5)  # Coarse
         ]
 
-        tables = build_vgrav_tables(props; model=FortranViscosity())
+        tables = build_vgrav_tables(props; model=ReferenceViscosity())
 
         @test length(tables) == 3
         @test haskey(tables, 1) && haskey(tables, 2) && haskey(tables, 3)
@@ -192,7 +192,7 @@ using Test
 
     @testset "Table Interpolation" begin
         props = [ParticleProperties(diameter_μm=10.0, density_gcm3=2.5)]
-        tables = build_vgrav_tables(props; model=FortranViscosity())
+        tables = build_vgrav_tables(props; model=ReferenceViscosity())
 
         # Interpolate at a central grid point
         # The grid constants are internal to GravitationalSettling, so
@@ -214,7 +214,7 @@ using Test
 
     @testset "Physical Trends in Tables" begin
         props = [ParticleProperties(diameter_μm=10.0, density_gcm3=2.5)]
-        tables = build_vgrav_tables(props; model=FortranViscosity())
+        tables = build_vgrav_tables(props; model=ReferenceViscosity())
 
         # At constant pressure (mid-range index), settling velocity should vary with temperature
         ip = 13  # Mid-pressure level
@@ -235,7 +235,7 @@ using Test
     end
 
     @testset "Realistic Particle Examples" begin
-        model = FortranViscosity()
+        model = ReferenceViscosity()
         P_pa = 101325.0
         T = 288.15
 
@@ -254,7 +254,7 @@ using Test
     end
 
     @testset "Extreme Conditions" begin
-        model = FortranViscosity()
+        model = ReferenceViscosity()
         rp = 2.5
         rho_p = 2500.0
 
@@ -275,7 +275,7 @@ using Test
     end
 
     @testset "Edge Cases" begin
-        model = FortranViscosity()
+        model = ReferenceViscosity()
         rp = 2.5
         rho_p = 2500.0
 
@@ -302,7 +302,7 @@ using Test
             ParticleProperties(diameter_μm=100.0, density_gcm3=3.0)
         ]
 
-        tables = build_vgrav_tables(props; model=FortranViscosity())
+        tables = build_vgrav_tables(props; model=ReferenceViscosity())
 
         # Interpolate each component at the same conditions
         T = 273.15  # K

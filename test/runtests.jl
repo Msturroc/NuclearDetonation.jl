@@ -22,7 +22,7 @@ import NuclearDetonation.Transport:
     air_viscosity, air_density, cunningham_factor,
     vgrav_corrected,
     VGravTables, ParticleProperties,
-    FortranViscosity, SutherlandViscosity,
+    ReferenceViscosity, SutherlandViscosity,
     build_vgrav_tables, interpolate_vgrav,
     # Particle dynamics types
     WindFields, ParticleParams,

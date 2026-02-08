@@ -42,8 +42,8 @@ using .GravitationalSettling: VGravTables
 export VGravTables
 using .GravitationalSettling: air_viscosity, air_density, cunningham_factor, vgrav_corrected, build_vgrav_tables, interpolate_vgrav
 export air_viscosity, air_density, cunningham_factor, vgrav_corrected, build_vgrav_tables, interpolate_vgrav
-using .GravitationalSettling: SutherlandViscosity, FortranViscosity
-export SutherlandViscosity, FortranViscosity
+using .GravitationalSettling: SutherlandViscosity, ReferenceViscosity
+export SutherlandViscosity, ReferenceViscosity
 include("transport/decay.jl")
 include("transport/numerical_config.jl")  # Numerical method configuration
 include("transport/particle_dynamics.jl")
