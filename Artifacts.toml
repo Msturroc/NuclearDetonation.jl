@@ -1,0 +1,12 @@
+# ERA5 reanalysis data for the Upshot-Knothole Nancy nuclear test
+# 24-27 March 1953, subdomain lat [35,42] lon [-120,-110], 137 hybrid levels
+#
+# TODO: Upload subsetted ERA5 data to Zenodo and fill in hashes below.
+#
+# [nancy_era5_data]
+# git-tree-sha1 = "..."
+# lazy = true
+#
+#     [[nancy_era5_data.download]]
+#     url = "https://zenodo.org/records/.../files/nancy_era5_data.tar.gz"
+#     sha256 = "..."

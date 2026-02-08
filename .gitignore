@@ -1,0 +1,8 @@
+Manifest.toml
+*.nc
+*.jld2
+*.so
+*.dll
+*.dylib
+build/compiled_app/
+.DS_Store
