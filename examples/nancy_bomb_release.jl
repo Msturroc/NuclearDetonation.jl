@@ -7,7 +7,10 @@
 #   - Loading ERA5 met data via Julia Artifacts
 #   - Configuring a bomb release with mushroom cloud geometry
 #   - Running a 48-hour dispersion simulation
-#   - Exporting dose rate fields to NetCDF
+#   - Visualising model-predicted deposition and particle positions
+#
+# Requirements:
+#   ] add PlotlyJS   (for visualisation at the end)
 
 using NuclearDetonation
 using NuclearDetonation.Transport
@@ -82,3 +85,95 @@ snapshots = run_simulation!(
 )
 
 println("Simulation complete — $(length(snapshots)) snapshots saved.")
+
+# =============================================================================
+# Visualisation — model-predicted deposition and particle positions
+# =============================================================================
+using PlotlyJS
+
+# Extract the final snapshot
+final = snapshots[end]
+
+# --- Build lat/lon grids from the domain ---
+dom = state.domain
+lons = range(dom.lon_min, dom.lon_max, length=dom.nx)
+lats = range(dom.lat_min, dom.lat_max, length=dom.ny)
+
+# --- Total ground deposition (Bq/m²), summed over components ---
+deposition = dropdims(sum(final.total_deposition, dims=3), dims=3)  # (nx, ny)
+
+# Convert to mR/hr (approximate: 1 Bq/m² mixed fission products ≈ 3.7e-11 mR/hr)
+# This is a rough conversion for visualisation only
+dose_rate = deposition .* 3.7e-11
+
+# Log10 for plotting (mask zeros)
+log_dose = copy(dose_rate)
+log_dose[log_dose .<= 0] .= NaN
+log_dose = log10.(log_dose)
+
+# --- Deposition contour map ---
+contour_trace = contour(
+    x = collect(lons),
+    y = collect(lats),
+    z = log_dose',   # Transpose: PlotlyJS expects (ny, nx) row-major
+    colorscale = "YlOrRd",
+    contours = attr(
+        start = -2.0,
+        size = 0.5,
+        coloring = "heatmap",
+    ),
+    colorbar = attr(
+        title = "log₁₀(mR/hr)",
+        titleside = "right",
+    ),
+    name = "Dose rate",
+)
+
+# --- Particle positions (projected to lat/lon) ---
+# Positions are in grid coordinates — convert to lat/lon
+positions = final.particle_positions
+if !isempty(positions)
+    # Grid indices to geographic coordinates
+    px = [p[1] for p in positions]
+    py = [p[2] for p in positions]
+    pz = [p[3] for p in positions]
+
+    # Linear mapping: grid index 1..nx → lon_min..lon_max
+    p_lons = dom.lon_min .+ (px .- 1.0) ./ (dom.nx - 1) .* (dom.lon_max - dom.lon_min)
+    p_lats = dom.lat_min .+ (py .- 1.0) ./ (dom.ny - 1) .* (dom.lat_max - dom.lat_min)
+
+    particle_trace = scatter(
+        x = p_lons,
+        y = p_lats,
+        mode = "markers",
+        marker = attr(
+            size = 3,
+            color = pz ./ 1000.0,  # Colour by altitude (km)
+            colorscale = "Viridis",
+            colorbar = attr(
+                title = "Altitude (km)",
+                x = 1.12,
+            ),
+            opacity = 0.6,
+        ),
+        name = "Particles (n=$(length(positions)))",
+    )
+
+    traces = [contour_trace, particle_trace]
+else
+    traces = [contour_trace]
+end
+
+layout = Layout(
+    title = attr(text="Nancy 24 kT — Model-Predicted Deposition (48 h)"),
+    xaxis = attr(title="Longitude (°E)", scaleanchor="y"),
+    yaxis = attr(title="Latitude (°N)"),
+    width = 900,
+    height = 700,
+    plot_bgcolor = "white",
+)
+
+fig = plot(traces, layout)
+display(fig)
+
+println("Visualisation displayed.")
