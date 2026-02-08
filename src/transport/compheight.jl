@@ -1,7 +1,3 @@
-# SNAP: Severe Nuclear Accident Programme
-# Julia port of compheightML.f90
-# Original Copyright (C) 1992-2023 Norwegian Meteorological Institute
-#
 # Compute height of model levels and thickness of model layers from hybrid coordinates
 
 function _compute_model_heights!(
@@ -18,44 +14,42 @@ function _compute_model_heights!(
 ) where T
     nx, ny, nk = fields.nx, fields.ny, fields.nk
 
-    # Physical constants (MUST match Fortran snaptabML.f90:32-33)
-    g = T(9.81)         # Gravitational acceleration (m/s²) - Fortran value
+    # Physical constants
+    g = T(9.81)         # Gravitational acceleration (m/s²)
     ginv = T(1.0) / g
     p0 = T(1000.0)      # Reference pressure (hPa)
     cp = T(1004.0)      # Specific heat at constant pressure (J/kg·K)
     r = T(287.0)        # Gas constant for dry air (J/kg·K)
-    rcp = r / cp        # R/cp = 287/1004 ≈ 0.285856 (exact, not rounded!)
+    rcp = r / cp        # R/cp = 287/1004 ~ 0.285856 (exact, not rounded!)
     # NOTE: ahalf/alevel are already in hPa (converted when reading ERA5 data)
-    # Do NOT apply Pa→hPa conversion here (that would be a double conversion!)
+    # Do NOT apply Pa->hPa conversion here (that would be a double conversion!)
 
-    # Exner function: π = cp * (p/p₀)^(R/cp) (matches Fortran snaptabML.f90:71)
+    # Exner function: pi = cp * (p/p0)^(R/cp)
     # NOTE: @fastmath provides significant speedup for the power operation
     @inline @fastmath exner(p::T) = cp * (p / p0)^rcp
 
     # Temporary 2D arrays to hold the height and Exner pressure at the current lower interface
     # during the upward integration.
-    hlev_temp = zeros(T, nx, ny)  # Initialized to 0 (surface height)
+    hlev_temp = zeros(T, nx, ny)  # Initialised to 0 (surface height)
     pihl_temp = zeros(T, nx, ny)
 
-    # Initialize with values at the surface - MATCH FORTRAN EXACTLY!
-    # Fortran: pihl(:,:) = exner(ps2)
+    # Initialise with values at the surface
     for j in 1:ny, i in 1:nx
         pihl_temp[i, j] = exner(ps[i, j])
     end
 
-    # Initialize surface boundary values
+    # Initialise surface boundary values
     hlev_temp[:, :] .= zero(T)
     hlayer[:, :, nk] .= T(9999.0)
     hlevel[:, :, 1] .= zero(T)
 
-    # Integrate from the bottom-up - MATCH FORTRAN LOOP EXACTLY!
-    # Fortran: do k=2,nk
+    # Integrate from the bottom up
     # After reversal, Julia's coefficients are: alevel[1]=surface, alevel[nk]=TOA
-    # So we loop k=2 to nk just like Fortran!
+    # So we loop k=2 to nk
     for k in 2:nk
         for j in 1:ny
             for i in 1:nx
-                # Pressure at the upper interface - USE k DIRECTLY like Fortran
+                # Pressure at the upper interface
                 # CRITICAL: At k=nk (TOA layer), ahalf[nk] is just an average,
                 # we need ahalf[nk+1] which is the actual TOA boundary!
                 if k == nk
@@ -65,7 +59,7 @@ function _compute_model_heights!(
                 end
                 pih = exner(p_half)
 
-                # Pressure at the midpoint - USE k DIRECTLY like Fortran
+                # Pressure at the midpoint
                 p_full = alevel[k] + blevel[k] * ps[i, j]
                 pif = exner(p_full)
 
@@ -88,10 +82,10 @@ function _compute_model_heights!(
                 #     println()
                 # end
 
-                # Store the thickness - MATCH FORTRAN: hlayer(i,j,k-1) = h2-h1
+                # Store the thickness: hlayer(i,j,k-1) = h2-h1
                 hlayer[i, j, k-1] = h2 - h1
 
-                # Calculate and store the height of the midpoint - MATCH FORTRAN
+                # Calculate and store the height of the midpoint
                 denominator = pihl_temp[i, j] - pih
                 if abs(denominator) < 1e-9
                     hlevel[i, j, k] = h1 + (h2 - h1) / 2
@@ -128,16 +122,16 @@ function _compute_model_heights!(
 ) where T
     nx, ny, nk = fields.nx, fields.ny, fields.nk
 
-    # Physical constants (MUST match Fortran snaptabML.f90:32-33)
-    g = T(9.81)         # Gravitational acceleration (m/s²) - Fortran value
+    # Physical constants
+    g = T(9.81)         # Gravitational acceleration (m/s²)
     ginv = T(1.0) / g
     p0 = T(1000.0)      # Reference pressure (hPa)
     cp = T(1004.0)      # Specific heat at constant pressure (J/kg·K)
     r = T(287.0)        # Gas constant for dry air (J/kg·K)
-    rcp = r / cp        # R/cp = 287/1004 ≈ 0.285856 (exact, not rounded!)
-    inv_100 = T(0.01)   # Conversion from Pa → hPa for hybrid A-coefficients
+    rcp = r / cp        # R/cp = 287/1004 ~ 0.285856 (exact, not rounded!)
+    inv_100 = T(0.01)   # Conversion from Pa -> hPa for hybrid A-coefficients
 
-    # Exner function: π = cp * (p/p₀)^(R/cp) (matches Fortran snaptabML.f90:71)
+    # Exner function: pi = cp * (p/p0)^(R/cp)
     # NOTE: @fastmath provides significant speedup for the power operation
     @inline @fastmath exner(p::T) = cp * (p / p0)^rcp
 

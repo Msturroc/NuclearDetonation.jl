@@ -5,6 +5,8 @@ using Pkg.Artifacts
 
 export nancy_era5_files
 
+const _ARTIFACTS_TOML = joinpath(@__DIR__, "..", "..", "Artifacts.toml")
+
 """
     nancy_era5_files()
 
@@ -19,10 +21,18 @@ use the cached artifact.
 # Example
 ```julia
 met_files = nancy_era5_files()
-snapshots = run_simulation!(state, met_files, ...)
+results = run_simulation!(state, met_files, ...)
 ```
 """
 function nancy_era5_files()
-    rootpath = artifact"nancy_era5_data"
+    hash = artifact_hash("nancy_era5_data", _ARTIFACTS_TOML)
+    if hash === nothing
+        error("Artifact 'nancy_era5_data' not found in Artifacts.toml. " *
+              "ERA5 data must be uploaded to Zenodo and the artifact registered first.")
+    end
+    if !artifact_exists(hash)
+        ensure_artifact_installed("nancy_era5_data", _ARTIFACTS_TOML; lazy_download=true)
+    end
+    rootpath = artifact_path(hash)
     sort(filter(f -> endswith(f, ".nc"), readdir(rootpath, join=true)))
 end

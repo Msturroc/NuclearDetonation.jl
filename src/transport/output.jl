@@ -1,7 +1,6 @@
-# SNAP: Severe Nuclear Accident Programme
-# Output and Dose Calculation Functions
+# Atmospheric transport — Output and dose calculation functions
 #
-# Phase 7: NetCDF output, dose calculations, and export utilities
+# NetCDF output, dose calculations, and export utilities
 
 using NCDatasets
 using Printf

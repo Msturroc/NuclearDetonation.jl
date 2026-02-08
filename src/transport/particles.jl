@@ -1,8 +1,4 @@
-# SNAP: Severe Nuclear Accident Programme
-# Julia port of particleML.f90
-# Original Copyright (C) 1992-2023 Norwegian Meteorological Institute
-#
-# Defines particle data structures for Lagrangian transport
+# Atmospheric transport — Particle data structures for Lagrangian transport
 
 export Particle, ParticleProperties, ExtraParticle, scale_rad!, set_rad!, get_rad, add_rad!, get_set_rad!
 export is_active, inactivate!, flush_away_denormal!

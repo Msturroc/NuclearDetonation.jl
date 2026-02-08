@@ -1,7 +1,5 @@
-# SNAP: Severe Nuclear Accident Programme
 # Particle Dynamics - Modern ODE Solver Implementation
 #
-# Replaces forwrd.F90 with modern Julia ODE solver approach
 # Uses OrdinaryDiffEq.jl for adaptive integration and Interpolations.jl for wind fields
 
 using OrdinaryDiffEq  # ODE solvers only (not the full DifferentialEquations.jl metapackage)
@@ -72,7 +70,7 @@ struct WindFields{T<:Real, I4, I3, I1}
     ny::Int
     nk::Int
 
-    # Raw w fields for Fortran-style interpolation (x,y,k,time-1/2)
+    # Raw w fields for floor-based interpolation (x,y,k,time-1/2)
     w1_raw::Array{T,3}
     w2_raw::Array{T,3}
 end
@@ -137,15 +135,15 @@ end
 """
     FortranTrilinearInterpolant
 
-Manual 4D interpolant matching Fortran SNAP's floor-based bilinear/trilinear approach.
+Manual 4D interpolant using floor-based bilinear/trilinear approach for reference validation.
 
 Uses:
-- floor() for integer grid indices (matches Fortran's int(x))
+- floor() for integer grid indices (truncation toward zero)
 - Explicit bilinear weights c1, c2, c3, c4
 - Linear time interpolation with (t2-t)/(t2-t1) weighting
 - No sigma-level interpolation (uses nearest k level)
 
-This provides exact Fortran matching for validation.
+This provides exact reference implementation matching for validation.
 """
 struct FortranTrilinearInterpolant{T<:Real}
     data1::Array{T, 3}  # 3D array at t1: (nx, ny, nk)
@@ -159,7 +157,7 @@ end
 
 # Make it callable with (x, y, z, t) signature
 function (interp::FortranTrilinearInterpolant{T})(x::Real, y::Real, z::Real, t::Real) where T
-    # Match Fortran's int() which truncates toward zero (equivalent to floor for positive values)
+    # Truncate toward zero (equivalent to floor for positive values)
     # Julia 1-indexed, so floor then clamp to [1, n-1]
     i = clamp(floor(Int, x), 1, interp.nx - 1)
     j = clamp(floor(Int, y), 1, interp.ny - 1)
@@ -175,7 +173,7 @@ function (interp::FortranTrilinearInterpolant{T})(x::Real, y::Real, z::Real, t::
     dy = clamp(dy, T(0), T(1))
     dz = clamp(dz, T(0), T(1))
 
-    # Time interpolation weights (matching Fortran rt1, rt2)
+    # Time interpolation weights (rt1, rt2)
     dt = interp.t2 - interp.t1
     if dt > 0
         rt1 = (interp.t2 - t) / dt  # Weight for older fields
@@ -406,26 +404,26 @@ end
                                          lat_max::Real=T(90.0)) where T
     nx, ny, nk = met_fields.nx, met_fields.ny, met_fields.nk
 
-    # Compute base grid spacing in meters (matching Fortran mapfield.f)
-    R_earth = T(6.371e6)  # Earth radius in meters
+    # Compute base grid spacing in metres
+    R_earth = T(6.371e6)  # Earth radius in metres
     lon_range_deg = T(lon_max - lon_min)
     lat_range_deg = T(lat_max - lat_min)
     dlon_deg = lon_range_deg / T(nx - 1)  # Degrees per grid cell in longitude
     dlat_deg = lat_range_deg / T(ny - 1)  # Degrees per grid cell in latitude
     dlon_rad = dlon_deg * T(π) / T(180.0)
     dlat_rad = dlat_deg * T(π) / T(180.0)
-    dx_m = R_earth * dlon_rad  # hx in Fortran (meters)
-    dy_m = R_earth * dlat_rad  # hy in Fortran (meters)
+    dx_m = R_earth * dlon_rad  # hx (metres)
+    dy_m = R_earth * dlat_rad  # hy (metres)
 
     # Compute latitude-dependent map scale factor xm = 1/cos(lat)
-    # This matches Fortran mapfield.f: xm(i,j) = sx/clat where sx=1 for geographic grids
-    # Near poles, clamp cos(lat) to avoid division by zero (matches Fortran clat90)
+    # For geographic grids: xm(i,j) = 1/cos(lat)
+    # Near poles, clamp cos(lat) to avoid division by zero
     xm_1d = Vector{T}(undef, ny)
     for j in 1:ny
         lat_deg = lat_min + (j - 1) * dlat_deg
         lat_rad = lat_deg * T(π) / T(180.0)
         clat = cos(lat_rad)
-        clat = max(clat, T(0.01745))  # ~cos(89°), matching Fortran clat90
+        clat = max(clat, T(0.01745))  # ~cos(89°), polar clamp
         xm_1d[j] = T(1.0) / clat
     end
 
@@ -569,8 +567,8 @@ end
     use_cubic_vertical = interp_order == CubicInterp
 
     if use_fortran_interp
-        # Exact Fortran matching: floor-based trilinear + time interpolation
-        # Uses 3D arrays at each time level (not 4D), matching Fortran's approach
+        # Exact reference matching: floor-based trilinear + time interpolation
+        # Uses 3D arrays at each time level (not 4D)
         u1_3d = permuted ? u_4d[:, :, :, 1] : met_fields.u1
         u2_3d = permuted ? u_4d[:, :, :, 2] : met_fields.u2
         v1_3d = permuted ? v_4d[:, :, :, 1] : met_fields.v1
@@ -671,7 +669,7 @@ end
         x_grid, y_grid, z_grid, (T(t1), T(t2)),
         T(lon_min), T(lon_max), T(lat_min), T(lat_max), dx_m, dy_m,
         nx, ny, nk,
-        # Store raw w arrays aligned with z_grid ordering for Fortran-style interpolation
+        # Store raw w arrays aligned with z_grid ordering for floor-based interpolation
         # Materialize the views to Array{T,3}
         (permuted ? collect(met_fields.w1[:, :, level_perm]) : met_fields.w1),
         (permuted ? collect(met_fields.w2[:, :, level_perm]) : met_fields.w2)
@@ -779,9 +777,8 @@ function particle_velocity!(du, u, p::ParticleODEParams, t)
     end
 
     # CRITICAL: Use latitude-dependent map scale factor for x-direction (longitude)
-    # Fortran mapfield.f computes: xm(i,j) = 1/cos(lat)
-    # Fortran posint.f90 computes: rmx = xm/dxgrid, rmy = ym/dygrid
-    # Fortran forwrd.F90 applies:  x = x + u*dt*rmx
+    # Map scale: xm(i,j) = 1/cos(lat)
+    # Advection: rmx = xm/dxgrid, rmy = ym/dygrid; x = x + u*dt*rmx
     #
     # For geographic (lat/lon) grids, one degree of longitude shrinks toward poles:
     #   physical_distance_x = grid_distance_x * cos(lat)

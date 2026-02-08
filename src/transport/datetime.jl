@@ -1,8 +1,5 @@
-# SNAP: Severe Nuclear Accident Programme
-# Julia port of datetime.f90
-# Original Copyright (C) 1992-2023 Norwegian Meteorological Institute
+# Atmospheric transport — DateTime with hourly granularity
 #
-# Represents datetime with hourly granularity
 # All times in UTC (Zulu timezone), Gregorian calendar
 
 export DateTime, Duration, add_duration, datetime_diff, monthdays

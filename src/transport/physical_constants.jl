@@ -3,7 +3,7 @@ module PhysicalConstants
 
 export G_GRAVITY_M_S2, R_SPECIFIC_J_KG_K
 
-# Physical Constants used throughout SNAP
+# Physical constants used throughout the transport module
 
 """Gravitational acceleration (m/s^2)"""
 const G_GRAVITY_M_S2 = 9.80665

@@ -2,7 +2,7 @@
 
 using Test
 
-@testset "SNAP Particle System" begin
+@testset "Particle System" begin
 
     @testset "Particle Construction" begin
         p = Particle()

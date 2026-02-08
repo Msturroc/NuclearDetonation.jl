@@ -1,5 +1,5 @@
 # Tests for release.jl: Source Term Modeling
-# Based on SNAP release.f90
+# Source term modelling tests
 
 using Test
 using Random

@@ -1,11 +1,11 @@
-# Tests for snap_dimensions.jl: Grid Dimensions and Resolution Handling
+# Tests for dimensions.jl: Grid Dimensions and Resolution Handling
 
 using Test
 # Import from the nested TransportDimensions module
 using NuclearDetonation.Transport.TransportDimensions: nx, ny, nk, surface_index, output_resolution_factor,
                                                       set_dimensions!, hres_field, lres_pos, hres_pos
 
-@testset "SNAP Grid Dimensions" begin
+@testset "Grid Dimensions" begin
 
     @testset "Initial Grid Dimensions" begin
         # Test initial values

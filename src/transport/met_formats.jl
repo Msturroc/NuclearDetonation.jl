@@ -5,9 +5,9 @@
 
 using NCDatasets
 
-# Debug flag for EDCOMP comparison with Fortran SNAP
-# Set to true to print detailed diagnostic output for vertical velocity computation
-const SNAP_DEBUG_EDCOMP = false
+# Debug flag for EDCOMP vertical velocity computation
+# Set to true to print detailed diagnostic output
+const DEBUG_EDCOMP = false
 
 """
     MetFormat
@@ -23,7 +23,7 @@ abstract type MetFormat end
 """
     ERA5Format <: MetFormat
 
-ERA5 reanalysis data in SNAP-preprocessed format (via fimex).
+ERA5 reanalysis data preprocessed via fimex.
 
 Variable names:
 - Dimensions: `longitude`, `latitude`, `hybrid`
@@ -55,7 +55,7 @@ struct ERA5RawFormat <: MetFormat end
 """
     GFSFormat <: MetFormat
 
-GFS forecast data in SNAP format (converted via fimex).
+GFS forecast data preprocessed via fimex.
 
 Variable names:
 - Dimensions: `longitude`, `latitude`, `hybrid`
@@ -72,23 +72,23 @@ struct GFSFormat <: MetFormat end
 Automatically detect meteorological data format from NetCDF file.
 
 Supported formats:
-- ERA5Format: SNAP-preprocessed ERA5 (x_wind_ml, y_wind_ml, air_temperature_ml)
+- ERA5Format: ERA5 preprocessed via fimex (x_wind_ml, y_wind_ml, air_temperature_ml)
 - ERA5RawFormat: Raw CDS ERA5 (u, v, t with model_level dimension)
-- GFSFormat: SNAP-preprocessed GFS (x_wind_pl, y_wind_pl, air_temperature_pl)
+- GFSFormat: GFS preprocessed via fimex (x_wind_pl, y_wind_pl, air_temperature_pl)
 """
 function detect_met_format(filepath::String)
     NCDataset(filepath) do ds
-        # Both ERA5 and GFS use "hybrid" dimension in SNAP format
+        # Both ERA5 and GFS use "hybrid" dimension in preprocessed format
         # Raw ERA5 uses "model_level" dimension
         # Distinguish by checking variable names:
-        # - ERA5 SNAP: x_wind_ml, y_wind_ml, air_temperature_ml (model levels)
+        # - ERA5 preprocessed: x_wind_ml, y_wind_ml, air_temperature_ml (model levels)
         # - ERA5 Raw: u, v, t (with model_level dimension)
-        # - GFS: x_wind_pl, y_wind_pl, air_temperature_pl (pressure levels)
+        # - GFS preprocessed: x_wind_pl, y_wind_pl, air_temperature_pl (pressure levels)
         if haskey(ds.dim, "hybrid") || haskey(ds.dim, "model_level")
-            # Check for ERA5-specific SNAP variable names
+            # Check for ERA5-specific preprocessed variable names
             if haskey(ds, "x_wind_ml") || haskey(ds, "air_temperature_ml")
                 return ERA5Format()
-            # Check for GFS-specific SNAP variable names
+            # Check for GFS-specific preprocessed variable names
             elseif haskey(ds, "x_wind_pl") || haskey(ds, "air_temperature_pl")
                 return GFSFormat()
             # Check for raw CDS ERA5 format (model_level dimension with u, v, t variables)
@@ -109,7 +109,7 @@ end
 Get grid dimensions for the given format.
 """
 function get_met_dimensions(::ERA5Format, ds::NCDataset)
-    # ERA5 files use "hybrid" dimension (for Fortran SNAP compatibility)
+    # ERA5 preprocessed files use "hybrid" dimension
     return (
         length(ds["longitude"]),
         length(ds["latitude"]),
@@ -189,7 +189,7 @@ end
 Get time coordinate variable for the given format.
 """
 function get_time_variable(::ERA5Format, ds::NCDataset)
-    # ERA5 files use "time" dimension (for Fortran SNAP compatibility)
+    # ERA5 preprocessed files use "time" dimension
     return ds["time"][:]
 end
 
@@ -258,47 +258,33 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
     p0_hpa = haskey(ds, "p0") ? T(ds["p0"][]) / T(100.0) : T(1000.0)
     nk = length(ap)
 
-    # CRITICAL: Match Fortran SNAP's treatment of hybrid coefficients EXACTLY!
-    # Fortran readfield_nc.f90 reads ap into alev array (reversed via klevel),
-    # then compute_vertical_coords treats alev as FULL-level values and computes
-    # ahalf as half-levels by averaging adjacent full-levels.
+    # Treatment of hybrid coefficients:
+    # ERA5's ap/bp are loaded and reversed so that alevel[1]=surface, alevel[nk]=TOA.
+    # ahalf is then computed as half-levels by averaging adjacent full-levels.
     #
-    # POTENTIAL BUG: ERA5's ap/bp ARE half-level coefficients, but Fortran treats
-    # them as full-level values. This may be incorrect for ERA5 data, but we must
-    # match Fortran's behavior exactly for validation. TODO: investigate and fix
-    # in both Fortran and Julia after validation is complete.
-    #
-    # Fortran convention: alevel(1)=surface, alevel(nk)=TOA
+    # Convention: alevel(1)=surface, alevel(nk)=TOA
     # ERA5 native: ap[1]=TOA, ap[137]=surface
-    # This reversal happens in Fortran's readfield_nc.f90 via klevel(k)=nk-k+1
+    # Reversal: klevel(k) = nk - k + 1
 
     # Step 1: Load reversed ap into alevel array
-    # Julia's alevel[1..nk] = Fortran's alevel(2..nk+1) (no surface boundary in Julia's alevel)
-    # Fortran: alevel(1)=0.0, alevel(2)=ap(137), ..., alevel(138)=ap(1)
-    # Julia: alevel[1]=ap(137), ..., alevel[137]=ap(1)
+    # alevel[1] = ap[nk] (near surface), alevel[nk] = ap[1] (TOA)
     for k in 1:nk
-        # Julia alevel[k] = ap[nk + 1 - k]
-        # k=1: alevel[1] = ap[137] (near surface)
-        # k=137: alevel[137] = ap[1] (TOA)
         met_fields.alevel[k] = ap[nk + 1 - k]
         met_fields.blevel[k] = b[nk + 1 - k]
     end
 
-    # Step 2: Compute ahalf from alevel - MATCH FORTRAN EXACTLY!
-    # Fortran readfield_nc.f90 line 1222-1242
-    # Julia ahalf[1..nk+1] should match Fortran ahalf(1..nk+1)
-    met_fields.ahalf[1] = met_fields.alevel[1]  # Surface (Fortran line 1222)
+    # Step 2: Compute ahalf from alevel (half-level averaging)
+    met_fields.ahalf[1] = met_fields.alevel[1]  # Surface
     met_fields.bhalf[1] = met_fields.blevel[1]
 
-    # Fortran uses manual_level_selection branch for ERA5 (line 1237):
-    # ahalf(k) = (alevel(k) + alevel(k+1)) / 2  (average FORWARD, not backward!)
+    # ahalf(k) = (alevel(k) + alevel(k+1)) / 2  (average forward)
     for k in 2:nk-1
         met_fields.ahalf[k] = (met_fields.alevel[k] + met_fields.alevel[k + 1]) * T(0.5)
         met_fields.bhalf[k] = (met_fields.blevel[k] + met_fields.blevel[k + 1]) * T(0.5)
     end
 
     # After reversal: alevel[1]=surface, alevel[nk]=TOA
-    # Fortran compute_vertical_coords: ahalf(nk) = alevel(nk) (TOA boundary)
+    # TOA boundary
     met_fields.ahalf[nk] = met_fields.alevel[nk]
     met_fields.bhalf[nk] = met_fields.blevel[nk]
     # Convenience extra slot for edcomp indexing (nz+1): equals TOA boundary
@@ -320,29 +306,10 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
     # ERA5 native: [:,:,1] = TOA, [:,:,137] = surface
     # After reversal: [:,:,1] = surface, [:,:,137] = TOA (matches alevel ordering)
     #
-    # KNOWN ISSUE: k-level offset between Julia and Fortran
-    # Empirical testing confirmed: Julia k=5 values EXACTLY match Fortran k=4 values
-    #   - At time=2: Julia k=5 has u=-2.561119, v=-1.9980354
-    #   - Fortran k=4 reports: u=-2.56111908, v=-1.99803543 (identical!)
-    #
-    # Root cause: Fortran's LEVELS.INPUT = "137, 0, 136, 135, 134, 133, ..."
-    # has a dummy surface level (0) at position 1, shifting all indices by 1.
-    # Julia's simple reverse() doesn't account for this dummy level.
-    #
-    # Effect: Julia accesses winds at slightly different vertical levels than Fortran,
-    # causing ~1-3m/hour altitude divergence that accumulates over time.
-    #
-    # FIX: Shift level indexing by 1 to match Fortran's dummy-level convention
-    # After reverse and shift: Julia k matches Fortran k for all levels
-    #
     # Store PHYSICAL v-wind (no negation) for correct EDCOMP divergence calculation
     # Negation for grid convention is applied later in create_wind_interpolants
 
     # Reverse wind arrays to match vlevel ordering (surface at k=1, TOA at k=nk)
-    # NOTE (2025-12-12): Removed the +1 shift that was causing wind/vlevel mismatch.
-    # The shift was intended to match Fortran's dummy surface level, but it caused
-    # Julia to sample winds from the wrong vertical level (~26% v-wind error).
-    # Now winds and vlevel have consistent k-indexing for correct interpolation.
     function reverse_levels!(dest::AbstractArray{T,3}, src::AbstractArray{T,3}) where T
         dest .= reverse(src, dims=3)
         return dest
@@ -364,7 +331,7 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
 
     # ERA5 provides absolute temperature T (K). Do not convert to θ here.
 
-    # Latitude orientation and map factors: match Fortran conventions
+    # Latitude orientation and map factors
     # ERA5 often stores latitude from north->south; reverse Y dimension to make j increase northward
     lat_rev = is_latitude_reversed(ds)
     if lat_rev
@@ -393,13 +360,7 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
     # Map scale factors per latitude row
     Transport.compute_map_scale_factors!(met_fields.xm, met_fields.ym, lats)
 
-    # Compute vertical velocity for BOTH timesteps
-    # CRITICAL FIX: Match Fortran behavior - compute edcomp SEPARATELY for each time slice!
-    # Previously Julia computed w2 and copied to w1, but Fortran calls edcomp for each timestep.
-    #
-    # NOTE: Fortran om2edot.f90 DOES use omega to seed edcomp, but getting the units/ordering
-    # correct is complex. Using continuity-only with *2 compensation gives good results.
-    # TODO: Properly implement omega→sigmadot conversion for even better matching.
+    # Compute vertical velocity for BOTH timesteps (edcomp separately for each time slice)
     era5_format = ERA5Format()
 
     # 1a) Compute w1 from u1/v1/ps1 (window_idx time slice)
@@ -425,10 +386,10 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
         averaging = !has_omega
     )
     if !has_omega
-        # Match Fortran om2edot behavior when omega is absent: continuity-only → multiply by 2
+        # Continuity-only branch: compensate for internal 0.5 averaging
         met_fields.w1 .*= T(2.0)
     end
-    # Fortran enforces w=0 at surface level
+    # Enforce w=0 at surface level
     met_fields.w1[:, :, 1] .= zero(T)
 
     # 1b) Compute w2 from u2/v2/ps2 (next_idx time slice)
@@ -452,27 +413,22 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
         averaging = !has_omega
     )
     if !has_omega
-        # Match Fortran om2edot behavior when omega is absent: continuity-only → multiply by 2
+        # Continuity-only branch: compensate for internal 0.5 averaging
         met_fields.w2 .*= T(2.0)
     end
-    # Fortran enforces w=0 at surface level
+    # Enforce w=0 at surface level
     met_fields.w2[:, :, 1] .= zero(T)
 
-    # DEBUG: Print final w values at particle location for comparison with Fortran
-    if SNAP_DEBUG_EDCOMP
-        println("=== JULIA w1 FINAL (continuity-only, from window_idx=$window_idx) ===")
+    # DEBUG: Print final w values at particle location for comparison
+    if DEBUG_EDCOMP
+        println("=== w1 FINAL (continuity-only, from window_idx=$window_idx) ===")
         println("  w1[68,79,4] = $(met_fields.w1[68,79,4])")
         println("  w1[68,79,5] = $(met_fields.w1[68,79,5])")
-        println("=== JULIA w2 AFTER *2.0 (from next_idx=$next_idx) ===")
+        println("=== w2 AFTER *2.0 (from next_idx=$next_idx) ===")
         println("  w2[68,79,4] = $(met_fields.w2[68,79,4])")
         println("  w2[68,79,5] = $(met_fields.w2[68,79,5])")
-        println("  Compare with Fortran first edcomp (time 2): w2(68,79,k=4)")
-        println("  Compare with Fortran second edcomp (time 3): w2(68,79,k=4)")
         println("===============================================")
     end
-
-    # For ERA5 validation against Fortran SNAP: do NOT use omega even if present.
-    # Fortran configuration in this case derives sigma-dot from continuity only (EDCOMP).
 
     # Load precipitation for both timesteps (check both precipitation_flux and precipitation_rate)
     precip_var = haskey(ds, "precipitation_flux") ? "precipitation_flux" :
@@ -496,15 +452,11 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
         fill!(met_fields.precip2, zero(T))
     end
 
-    # CRITICAL FIX (2025-12-12): ERA5 provides absolute temperature T, but the
-    # height computation formula (h2 = h1 + θ*(π_upper - π_lower)/g) requires
-    # potential temperature θ. Fortran converts T→θ in readfield_nc.f90:441-448.
-    # Without this conversion, computed heights are ~13m lower, causing particles
-    # to be initialized at wrong sigma levels → wrong winds → trajectory divergence.
-    #
-    # Convert T→θ: θ = T × (p0/p)^(R/cp) where p0 = 1000 hPa, R/cp ≈ 0.286
+    # Convert absolute temperature T to potential temperature θ.
+    # The hypsometric height formula requires θ, not T.
+    # θ = T × (p0/p)^(R/cp) where p0 = 1000 hPa, R/cp ≈ 0.286
     R_CP = T(287.058 / 1005.0)  # R/cp ≈ 0.286
-    for k in 2:size(met_fields.t1, 3)  # Skip k=1 (surface), matching Fortran k=2,nk
+    for k in 2:size(met_fields.t1, 3)  # Skip k=1 (surface)
         for j in 1:size(met_fields.t1, 2)
             for i in 1:size(met_fields.t1, 1)
                 # Compute pressure at this grid point (hPa)
@@ -585,8 +537,7 @@ function read_initial_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
     lats = collect(T.(ds["latitude"]))
     Transport.compute_map_scale_factors!(met_fields.xm, met_fields.ym, lats)
 
-    # CRITICAL: Convert absolute temperature to potential temperature
-    # This matches Fortran SNAP's t2thetafac conversion in readfield_nc.f90:400
+    # Convert absolute temperature to potential temperature
     # θ = T * (p₀/p)^(R/cp) where p₀ = 1000 hPa
     # NOTE: alevel is in Pa (from NetCDF ap), ps is in hPa (converted above)
     # So we need to convert alevel/100 + blevel*ps to get pressure in hPa
@@ -610,8 +561,8 @@ function read_initial_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
     met_fields.w1 .= 0.0f0
     met_fields.w2 .= 0.0f0
 
-    # CRITICAL: Compute vertical velocity from horizontal wind divergence
-    # GFS doesn't provide omega/w field, so we use continuity equation
+    # Compute vertical velocity from horizontal wind divergence
+    # GFS doesn't provide omega/w field, so we use the continuity equation
     @info "Computing vertical velocity from continuity equation (edcomp) for GFS initial data"
 
     # Grid spacing for GFS 0.25° data
@@ -630,8 +581,8 @@ function read_initial_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
         met_fields.ahalf, met_fields.bhalf, met_fields.vhalf,
         dx_m, dy_m
     )
-    # CRITICAL: edcomp averages output with input (see om2edot.f90:199).
-    # When input is zero, output is halved, so multiply by 2 for correct value.
+    # edcomp averages output with input; when input is zero, output is halved,
+    # so multiply by 2 for the correct value.
     met_fields.w1 .*= T(2.0)
 
     compute_etadot_from_continuity!(
@@ -641,8 +592,8 @@ function read_initial_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
         met_fields.ahalf, met_fields.bhalf, met_fields.vhalf,
         dx_m, dy_m
     )
-    # CRITICAL: edcomp averages output with input (see om2edot.f90:199).
-    # When input is zero, output is halved, so multiply by 2 for correct value.
+    # edcomp averages output with input; when input is zero, output is halved,
+    # so multiply by 2 for the correct value.
     met_fields.w2 .*= T(2.0)
 
     # Load precipitation (check both precipitation_flux and precipitation_rate)
@@ -697,13 +648,13 @@ function read_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
     p0_hpa = haskey(ds, "p0") ? T(ds["p0"][]) / T(100.0) : T(1000.0)
     nk = length(ap)
 
-    # Match Fortran SNAP's reversed hybrid coefficient loading (same as initialization)
+    # Reversed hybrid coefficient loading (same as initialisation)
     for k in 1:nk
         met_fields.alevel[k] = ap[nk + 1 - k]
         met_fields.blevel[k] = b[nk + 1 - k]
     end
 
-    # Match Fortran's ahalf computation (average) with TOA boundary
+    # ahalf computation (average) with TOA boundary
     met_fields.ahalf[1] = met_fields.alevel[1]
     met_fields.bhalf[1] = met_fields.blevel[1]
 
@@ -753,7 +704,7 @@ function read_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
         met_fields.ps2 .= reverse(met_fields.ps2, dims=2)
     end
 
-    # Fortran mapfield.f calculates hx/hy as arc-length on sphere (constant by window)
+    # Grid spacing: arc-length on sphere (constant per window)
     R_earth = T(6.371e6)
     lons = collect(T.(ds["longitude"]))
     lats = collect(T.(ds["latitude"]))
@@ -790,10 +741,10 @@ function read_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
         averaging = !has_omega
     )
     if !has_omega
-        # Match Fortran continuity-only branch: multiply by 2 after internal 0.5 averaging
+        # Continuity-only branch: compensate for internal 0.5 averaging
         met_fields.w2 .*= T(2.0)
     end
-    # Fortran enforces w=0 at surface level
+    # Enforce w=0 at surface level
     met_fields.w2[:, :, 1] .= zero(T)
 
     # STEP 4: Load precipitation for new *2 data only
@@ -882,8 +833,7 @@ function read_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
     lats = collect(T.(ds["latitude"]))
     Transport.compute_map_scale_factors!(met_fields.xm, met_fields.ym, lats)
 
-    # CRITICAL: Convert absolute temperature to potential temperature
-    # This matches Fortran SNAP's t2thetafac conversion in readfield_nc.f90:400
+    # Convert absolute temperature to potential temperature
     # θ = T * (p₀/p)^(R/cp) where p₀ = 1000 hPa
     # NOTE: alevel is in Pa (from NetCDF ap), ps is in hPa (converted above)
     # So we need to convert alevel/100 + blevel*ps to get pressure in hPa
@@ -906,8 +856,8 @@ function read_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
     # w1 was already swapped from previous w2, so only zero w2 before computing
     met_fields.w2 .= 0.0f0
 
-    # CRITICAL: Compute vertical velocity from horizontal wind divergence
-    # GFS doesn't provide omega/w field, so we use continuity equation
+    # Compute vertical velocity from horizontal wind divergence
+    # GFS doesn't provide omega/w field, so we use the continuity equation
     @info "Computing vertical velocity from continuity equation (edcomp) for GFS time level 2"
 
     # Grid spacing for GFS 0.25° data
@@ -926,8 +876,8 @@ function read_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
         met_fields.ahalf, met_fields.bhalf, met_fields.vhalf,
         dx_m, dy_m
     )
-    # CRITICAL: edcomp averages output with input (see om2edot.f90:199).
-    # When input is zero, output is halved, so multiply by 2 for correct value.
+    # edcomp averages output with input; when input is zero, output is halved,
+    # so multiply by 2 for the correct value.
     met_fields.w2 .*= 2.0
 
     # Load precipitation for next timestep only (precip1 was already swapped)

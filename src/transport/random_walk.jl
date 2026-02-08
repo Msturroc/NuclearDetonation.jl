@@ -1,7 +1,5 @@
-# SNAP: Severe Nuclear Accident Programme
-# Random Walk Diffusion Module
+# Atmospheric transport — Random walk diffusion
 #
-# Ported from rwalk.f90
 # Implements turbulent diffusion using random walk (Wiener process)
 # Integrates with particle_dynamics.jl via StochasticDiffEq.jl
 

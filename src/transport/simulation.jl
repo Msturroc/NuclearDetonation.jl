@@ -1,7 +1,6 @@
-# SNAP: Severe Nuclear Accident Programme
 # Main Simulation Loop and State Management
 #
-# Integrates all SNAP components into a working atmospheric dispersion simulation
+# Integrates all transport components into a working atmospheric dispersion simulation
 
 using StaticArrays
 using Statistics
@@ -68,15 +67,15 @@ the sigma coordinate that corresponds to the given height at position (x, y, t).
 """
 function height_to_sigma_hybrid(x::Real, y::Real, height_m::Real,
                                met_fields, t::Real=0.0)
-    # CRITICAL: To match Fortran's release.f90:344-376, we must interpolate TEMPERATURE first,
-    # then compute heights using the interpolated T profile. Interpolating pre-computed heights
-    # gives different results due to nonlinearity of the hypsometric equation.
+    # CRITICAL: We must interpolate TEMPERATURE first, then compute heights using the
+    # interpolated T profile. Interpolating pre-computed heights gives different results
+    # due to nonlinearity of the hypsometric equation.
 
-    # Get grid indices using floor (truncation) to match Fortran's int(x) behavior
+    # Get grid indices using floor (truncation) to match int(x) behaviour
     i = clamp(floor(Int, x), 1, met_fields.nx - 1)
     j = clamp(floor(Int, y), 1, met_fields.ny - 1)
 
-    # Bilinear interpolation weights (matches Fortran)
+    # Bilinear interpolation weights
     dxx = x - i
     dyy = y - j
     c1 = (1.0 - dyy) * (1.0 - dxx)  # (i,j)
@@ -84,7 +83,7 @@ function height_to_sigma_hybrid(x::Real, y::Real, height_m::Real,
     c3 = dyy * (1.0 - dxx)           # (i,j+1)
     c4 = dyy * dxx                   # (i+1,j+1)
 
-    # Temporal interpolation weights (matching Fortran release.f90:276-277)
+    # Temporal interpolation weights
     # t=0 means use t1 only, t=1 means use t2 only
     # For t between 0 and 1: rt1 = (1-t), rt2 = t
     rt1 = 1.0 - t
@@ -99,7 +98,7 @@ function height_to_sigma_hybrid(x::Real, y::Real, height_m::Real,
         println("  t=$t → rt1=$rt1, rt2=$rt2")
     end
 
-    # Interpolate TEMPERATURE at release location (spatial + temporal, matching Fortran release.f90:346-349)
+    # Interpolate TEMPERATURE at release location (spatial + temporal)
     nk = met_fields.nk
     T_interp = zeros(Float64, nk)
     for k in 1:nk
@@ -155,7 +154,7 @@ function height_to_sigma_hybrid(x::Real, y::Real, height_m::Real,
         println("  alevel[nk]=$(met_fields.alevel[nk]), blevel[nk]=$(met_fields.blevel[nk])")
     end
 
-    # Now compute heights using interpolated T (matching Fortran release.f90:344-376)
+    # Now compute heights using interpolated T (hypsometric integration)
     g = 9.81
     ginv = 1.0 / g
     p0 = 1000.0
@@ -176,7 +175,6 @@ function height_to_sigma_hybrid(x::Real, y::Real, height_m::Real,
     hhu = 0.0
 
     # Integrate upward from surface - MUST loop UPWARD k=2 to nk, not downward!
-    # Fortran release.f90:344-376 loops k=2,nk (upward)
     for k in 2:nk
         # CRITICAL: ahalf/alevel already in hPa - no double conversion!
         # SPECIAL CASE: At k=nk (TOA), use ahalf[nk+1] which is the actual TOA boundary!
@@ -460,8 +458,8 @@ function SimulationDomain(; lon_min::Real, lon_max::Real,
         fill!(cell_area, dx * dy)
     end
 
-    # Convert Dates types to SNAP types if needed
-    # Note: SNAP DateTime only supports hourly granularity (no minutes/seconds)
+    # Convert Dates types to internal types if needed
+    # Note: Internal DateTime only supports hourly granularity (no minutes/seconds)
     if start_time isa Dates.DateTime
         start_time = DateTime(Dates.year(start_time), Dates.month(start_time),
                              Dates.day(start_time), Dates.hour(start_time))
@@ -552,7 +550,7 @@ mutable struct ParticleEnsemble{T<:Real}
     positions::Vector{SVector{3,T}}
     velocities::Vector{SVector{3,T}}
     ages::Vector{T}
-    initial_total_masses::Vector{Float32}  # Track initial mass for SNAP's 1% removal threshold
+    initial_total_masses::Vector{Float32}  # Track initial mass for 1% removal threshold
 
     function ParticleEnsemble{T}(ncomponents::Int, component_names::Vector{String}) where T<:Real
         @assert ncomponents > 0
@@ -618,7 +616,7 @@ end
 """
     SimulationState{T<:Real}
 
-Complete state of the SNAP simulation at a given time.
+Complete state of the transport simulation at a given time.
 
 # Fields
 - `domain::SimulationDomain{T}`: Spatial-temporal domain
@@ -684,7 +682,7 @@ function add_particle!(ensemble::ParticleEnsemble{T},
     push!(ensemble.velocities, velocity)
     push!(ensemble.ages, age)
 
-    # Track initial total mass for SNAP's 1% removal threshold
+    # Track initial total mass for 1% removal threshold
     push!(ensemble.initial_total_masses, Float32(sum(mass)))
 end
 
@@ -696,7 +694,7 @@ Remove particles that have become inactive (deposited or decayed away).
 Returns the number of particles removed.
 """
 function remove_inactive_particles!(ensemble::ParticleEnsemble{T}; mass_threshold::Float32=0.01f0) where T<:Real
-    # Remove particles based on SNAP's criteria:
+    # Remove particles based on inactivity criteria:
     # 1. Explicitly inactivated (negative radioactivity)
     # 2. Below relative mass threshold (default 1% of initial mass)
     removal_mask = [begin
@@ -728,7 +726,7 @@ end
     initialize_simulation(domain::SimulationDomain, sources::Vector{ReleaseSource},
                          component_names::Vector{String}, decay_params::Vector{DecayParams})
 
-Initialize a SNAP simulation with release sources.
+Initialise a transport simulation with release sources.
 
 # Arguments
 - `domain`: Simulation domain configuration
@@ -836,7 +834,7 @@ particle mass to the surrounding 8 grid cells.
 
         n_accumulated += 1
 
-        # Grid assignment: trilinear interpolation (smooth, default) or nearest-neighbor (matches Fortran SNAP)
+        # Grid assignment: trilinear interpolation (smooth, default) or nearest-neighbour
         if use_trilinear
             # TRILINEAR INTERPOLATION: Distribute to 8 cells (more accurate, smoother fields)
             i0 = floor(Int, x)
@@ -887,7 +885,7 @@ particle mass to the surrounding 8 grid cells.
                 (i1, j0, k0), (i1, j0, k1), (i1, j1, k0), (i1, j1, k1)
             ]
         else
-            # NEAREST-NEIGHBOR: Assign to 1 cell (matches Fortran SNAP exactly)
+            # NEAREST-NEIGHBOUR: Assign to 1 cell
             i0 = round(Int, x)
             j0 = round(Int, y)
 

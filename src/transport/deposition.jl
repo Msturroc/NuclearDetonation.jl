@@ -1,7 +1,5 @@
-# SNAP: Severe Nuclear Accident Programme
 # Deposition Module - Dry and Wet Deposition
 #
-# Ported from drydep.f90 and wetdep.f90
 # Implements surface deposition mechanisms for particles
 
 # Physical constants
@@ -67,7 +65,7 @@ end
 Dry deposition parameterization schemes.
 
 # Schemes
-- Zhang2001: Zhang et al. (2001) scheme (DEFAULT, matches SNAP Fortran)
+- Zhang2001: Zhang et al. (2001) scheme (DEFAULT)
 - Emerson2020: Emerson et al. (2020) revised scheme
 
 # References
@@ -373,12 +371,12 @@ where:
 - R₁ = rebound correction (1 - exp(-√St))
 
 # Schemes
-- Zhang2001 (default, matches SNAP Fortran drydep.f90 lines 369-439):
+- Zhang2001 (default):
   - EB = Sc^(-0.54)
   - EIM = (St/(0.8+St))²
   - EIN = 0.5(d/A)²
 
-- Emerson2020 (SNAP drydep.f90 lines 444-511):
+- Emerson2020:
   - EB = 0.2×Sc^(-2/3)
   - EIM = 0.4×(St/(0.8+St))^1.7
   - EIN = 2.5×(d/A)^0.8
@@ -407,17 +405,17 @@ function surface_resistance(land_use::LandUseClass, season::SeasonCategory,
 
     # Collection efficiencies depend on scheme
     if scheme == Zhang2001
-        # Zhang et al. (2001) - matches SNAP Fortran drydep.f90 line 414
+        # Zhang et al. (2001) - Brownian diffusion efficiency
         EB = schmidt^(-0.54)
 
-        # SNAP Fortran drydep.f90 line 426
+        # Impaction efficiency
         if stokes > 0.0
             EIM = (stokes / (0.8 + stokes))^2
         else
             EIM = zero(T)
         end
 
-        # SNAP Fortran drydep.f90 line 433
+        # Interception efficiency
         if A > 0.0
             EIN = 0.5 * (particle_diameter / A)^2
         else
@@ -425,17 +423,17 @@ function surface_resistance(land_use::LandUseClass, season::SeasonCategory,
         end
 
     else  # Emerson2020
-        # Emerson et al. (2020) - matches SNAP Fortran drydep.f90 line 488
+        # Emerson et al. (2020) - Brownian diffusion efficiency
         EB = 0.2 * schmidt^(-2/3)
 
-        # SNAP Fortran drydep.f90 line 499
+        # Impaction efficiency
         if stokes > 0.0
             EIM = 0.4 * (stokes / (0.8 + stokes))^1.7
         else
             EIM = zero(T)
         end
 
-        # SNAP Fortran drydep.f90 line 506
+        # Interception efficiency
         if A > 0.0
             EIN = 2.5 * (particle_diameter / A)^0.8
         else
@@ -461,7 +459,7 @@ function surface_resistance(land_use::LandUseClass, season::SeasonCategory,
     # Empirical constant ε₀ = 3.0 (both schemes)
     epsilon_0 = T(3.0)
 
-    # Surface resistance - matches SNAP Fortran drydep.f90 lines 436, 509
+    # Surface resistance
     return 1 / (epsilon_0 * u_star * E_total * R1)
 end
 
@@ -663,14 +661,13 @@ function apply_wet_deposition!(particle_mass::AbstractVector{T},
 end
 
 # =============================================================================
-# BARTNICKI WET DEPOSITION SCHEME (matches Fortran wetdep.f90)
+# BARTNICKI WET DEPOSITION SCHEME (Bartnicki, 2003)
 # =============================================================================
 
 """
     wet_deposition_constant(radius_μm::Real)
 
 Compute the wet deposition constant for a given particle radius.
-Matches Fortran wetdep.f90 wet_deposition_constant().
 
 # Arguments
 - `radius_μm`: Particle radius in micrometers
@@ -695,7 +692,6 @@ end
                                    use_convective::Bool=true)
 
 Compute instantaneous wet scavenging rate using Bartnicki (2003) scheme.
-Matches Fortran wetdep.f90 wet_deposition_rate_bartnicki_imm().
 
 # Arguments
 - `radius_μm`: Particle radius in micrometers
@@ -724,7 +720,7 @@ function wet_deposition_rate_bartnicki(radius_μm::T, precip_mmh::T, depconst::T
 
     rkw = zero(T)
 
-    # Size-dependent scavenging (order matters - matches Fortran)
+    # Size-dependent scavenging (order matters)
     if r > 0.05 && r <= 1.4
         rkw = a0 * q^T(0.79)
     end
@@ -753,7 +749,6 @@ end
                                    use_convective::Bool=true)
 
 Compute wet deposition rate (fraction deposited per timestep) using Bartnicki scheme.
-Matches Fortran wetdep.f90 wet_deposition_rate().
 
 # Arguments
 - `radius_μm`: Particle radius in micrometers
@@ -774,7 +769,7 @@ function bartnicki_wet_deposition_rate(radius_μm::T, precip_mmh::T, tstep::T;
     return 1 - exp(-tstep * rkw)
 end
 
-# Minimum precipitation threshold for wet deposition (mm/h) - from Fortran
+# Minimum precipitation threshold for wet deposition (mm/h)
 const WETDEP_PRECMIN = 0.01
 
 # Minimum sigma level for wet deposition (approx 550 hPa)

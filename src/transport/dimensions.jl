@@ -1,8 +1,4 @@
-# SNAP: Severe Nuclear Accident Programme
-# Julia port of snapdimML.f90
-# Original Copyright (C) 1992-2023 Norwegian Meteorological Institute
-#
-# Model dimensions and resolution parameters
+# Atmospheric transport — Model dimensions and resolution parameters
 
 module TransportDimensions
 

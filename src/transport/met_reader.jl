@@ -1,8 +1,6 @@
-# SNAP: Severe Nuclear Accident Programme
-# Meteorological Data Reader (NetCDF.jl-based)
+# Atmospheric transport — Meteorological data reader (NetCDF)
 #
 # Modern Julia interface for reading meteorological data from NetCDF files
-# Replaces Fortran readfield_nc.f90 with idiomatic Julia design
 
 using NCDatasets  # Using NCDatasets.jl instead of NetCDF.jl for better ergonomics
 
@@ -10,7 +8,7 @@ using NCDatasets  # Using NCDatasets.jl instead of NetCDF.jl for better ergonomi
     MeteoParams
 
 Configuration for meteorological data variable names and flags.
-Maps NetCDF variable names to internal SNAP fields.
+Maps NetCDF variable names to internal transport fields.
 
 Supports multiple model types (ERA5, AROME, ECMWF, etc.) via `init_meteo_params!`.
 
@@ -225,7 +223,7 @@ Construct a `MeteoFields` container with pre-allocated arrays.
 
 # Arguments
 - `nx`, `ny`, `nk`: Grid dimensions
-- `T`: Float type (default Float32 to match Fortran real)
+- `T`: Float type (default Float32)
 - `with_abs_temp`: Allocate absolute temperature arrays
 """
 function MeteoFields(nx::Int, ny::Int, nk::Int; T::Type=Float32, with_abs_temp::Bool=false)
@@ -728,8 +726,7 @@ function read_meteo_timestep!(fields::MeteoFields, filename::String,
             # Sensible heat flux (optional) - use buffer to avoid allocation
             if params.hflux != ""
                 # ERA5 sshf is accumulated since start of forecast.
-                # However, SNAP uses instantaneous flux.
-                # For now, we read it as-is. unit_conversion_factor can handle units.
+                # We read it as-is; unit_conversion_factor can handle units.
                 load_netcdf_variable(ds, params.hflux, start2d, count2d,
                                    buffer=temp_3d)
                 fields.hflux2[:, :] .= @view temp_3d[:, :, 1]
@@ -761,7 +758,7 @@ function read_meteo_timestep!(fields::MeteoFields, filename::String,
                     T(dx), T(dy)
                 )
 
-                # NOTE: Do NOT multiply by 2.0! Fortran uses the etadot field AFTER the *0.5 averaging in om2edot
+                # NOTE: Do NOT multiply by 2.0! The etadot field is used AFTER the *0.5 averaging in om2edot
 
             elseif params.sigmadot_is_omega
                 # Vertical velocity provided as omega (Pa/s) - convert to sigma-dot
@@ -769,10 +766,10 @@ function read_meteo_timestep!(fields::MeteoFields, filename::String,
                                           fields.ahalf, fields.bhalf, fields.vhalf)
                 @debug "Converted omega to sigma-dot for vertical velocity field"
 
-                # CRITICAL FIX: Match Fortran's om2edot behavior
-                # Fortran calls edcomp after omega conversion and AVERAGES the two methods
-                # This is essential for correct vertical velocity in ERA5 data
-                @info "Computing vertical velocity from continuity to average with omega (matching Fortran edcomp)"
+                # CRITICAL FIX: Average omega-derived and continuity-derived vertical velocity
+                # edcomp is called after omega conversion and the two methods are averaged.
+                # This is essential for correct vertical velocity in ERA5 data.
+                @info "Computing vertical velocity from continuity to average with omega (edcomp)"
 
                 # Save omega-derived sigmadot
                 w2_omega = copy(fields.w2)
@@ -790,7 +787,7 @@ function read_meteo_timestep!(fields::MeteoFields, filename::String,
                 )
 
                 # Average omega-derived and continuity-derived vertical velocities
-                # This matches Fortran's edcomp line 222: edot(i,j,k) = (edot(i,j,k) + etadot)*0.5
+                # Average: edot(i,j,k) = (edot(i,j,k) + etadot)*0.5
                 fields.w2 .= 0.5 .* (w2_omega .+ fields.w2)
                 @debug "Averaged omega-derived and continuity-derived sigmadot"
             end

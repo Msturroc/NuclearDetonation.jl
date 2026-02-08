@@ -1,7 +1,6 @@
-# SNAP: Severe Nuclear Accident Programme
-# Hybrid coordinate utilities for sigma↔height conversions
+# Hybrid coordinate utilities for sigma<->height conversions
 #
-# Provides robust helpers that mirror SNAP's hybrid vertical coordinate handling.
+# Provides robust helpers for hybrid vertical coordinate handling.
 # The helpers build a local vertical column profile from the interpolated
 # geopotential heights and offer monotonic conversions between sigma (η) and
 # geometric height. NaN values returned by the interpolant are guard-railed by
@@ -10,7 +9,7 @@
 
 export HybridProfile, hybrid_profile, height_from_sigma, sigma_from_height
 
-const SNAP_DEBUG_HYBRID = false
+const DEBUG_HYBRID = false
 
 """
     HybridProfile
@@ -51,7 +50,7 @@ function hybrid_profile(winds::WindFields{T}, x::Real, y::Real, t::Real) where T
     end
 
     # DEBUG: Print first few and last few sigma/height pairs
-    if SNAP_DEBUG_HYBRID && t < 10.0  # Only at start of simulation
+    if DEBUG_HYBRID && t < 10.0  # Only at start of simulation
         println("\nDEBUG hybrid_profile at x=$xq, y=$yq, t=$t:")
         println("  First 5 levels:")
         for i in 1:min(5, n_levels)
@@ -143,7 +142,7 @@ function height_from_sigma(profile::HybridProfile{T},
     idx_hi = searchsortedfirst(σ_levels, σ_clamped)
 
     # VERBOSE DEBUG: Track interpolation for extreme sigma values
-    verbose_debug = SNAP_DEBUG_HYBRID && (σ < 0.3 || σ > 0.95)
+    verbose_debug = DEBUG_HYBRID && (σ < 0.3 || σ > 0.95)
 
     if idx_hi <= 1
         h = heights[1]

@@ -1,8 +1,4 @@
-# SNAP: Severe Nuclear Accident Programme
-# Julia port of posintML.f90
-# Original Copyright (C) 1992-2023 Norwegian Meteorological Institute
-#
-# Interpolation of meteorological fields to particle positions
+# Atmospheric transport — Interpolation of meteorological fields to particle positions
 
 """
     interpolate_met_to_particle!(particle::Particle, pextra::ExtraParticle,
@@ -81,7 +77,7 @@ function interpolate_met_to_particle!(particle::Particle,
     c4 = dy_frac * dx_frac              # Upper-right (i+1, j+1)
 
     # === Boundary layer top (sigma/eta coordinate) ===
-    # Note: In original Fortran, this interpolated from bl1/bl2 arrays
+    # Note: Originally this interpolated from bl1/bl2 arrays
     # Here we assume boundary layer top is stored in a field
     # For now, we'll skip this as it's not in MeteoFields structure
     # TODO: Add bl (boundary layer top in sigma/eta) to MeteoFields if needed

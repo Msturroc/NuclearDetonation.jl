@@ -18,19 +18,11 @@ import NuclearDetonation.Transport:
     # Met reader components
     MeteoParams, MeteoFields, init_meteo_params!, load_netcdf_variable,
     unit_conversion_factor, read_meteo_timestep!,
-    # Component and parameter types
-    DefinedComponent, RunningComponent, OutputComponent,
-    GRAV_TYPE_UNDEFINED, GRAV_TYPE_OFF, GRAV_TYPE_FIXED, GRAV_TYPE_COMPUTED,
-    TIME_PROFILE_CONSTANT, TIME_PROFILE_BOMB, TIME_PROFILE_LINEAR, TIME_PROFILE_STEPS, TIME_PROFILE_UNDEFINED,
-    def_comp, run_comp, output_component,
-    ncomp, nocomp, time_profile, component,
-    nparnum, iparnum,
-    push_dcomp!,
     # VGrav tables components
-    G_GRAVITY_CM_S2, R_SPECIFIC_J_KG_K, LAMBDA_FREE_PATH_μM,
     air_viscosity, air_density, cunningham_factor,
-    drag_coefficient, vgrav_stokes, vgrav_corrected,
+    vgrav_corrected,
     VGravTables, ParticleProperties,
+    FortranViscosity, SutherlandViscosity,
     build_vgrav_tables, interpolate_vgrav,
     # Particle dynamics types
     WindFields, ParticleParams,

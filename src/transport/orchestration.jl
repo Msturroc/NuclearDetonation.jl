@@ -1,14 +1,13 @@
-# SNAP: Severe Nuclear Accident Programme
 # Orchestration - High-Level Simulation Runner
 #
 # Provides top-level functions to run complete simulations with minimal boilerplate.
-# Integrates all SNAP components: particle dynamics, deposition, decay, concentration fields.
+# Integrates all transport components: particle dynamics, deposition, decay, concentration fields.
 
 using NCDatasets
 using Dates: value
 using Printf
 using OrdinaryDiffEq
-using OrdinaryDiffEq: Euler  # PRIORITY 2: Import Euler method for Fortran alignment
+using OrdinaryDiffEq: Euler  # Import Euler method for reference alignment
 using StaticArrays
 using NuclearDetonation.Transport:
     update_domain_vertical!,
@@ -145,13 +144,13 @@ Configuration options for simulation execution.
     max_duration::T = 0.0  # 0 = unlimited (run all met data)
     reltol::T = 1e-4
     abstol::T = 1e-6
-    dt_particle::T = 300.0  # Default particle timestep (s), matches SNAP TIME.STEP
-    use_trilinear_gridding::Bool = false  # false = nearest-neighbor (Fortran SNAP), true = trilinear (smoother)
-    # Validation option: use Fortran-style two-stage Euler stepping (forwrd.F90)
+    dt_particle::T = 300.0  # Default particle timestep (s), matches reference TIME.STEP
+    use_trilinear_gridding::Bool = false  # false = nearest-neighbor (reference implementation), true = trilinear (smoother)
+    # Validation option: use two-stage Euler stepping
     # NOTE: Testing showed little difference vs ODE.jl for advection parity (Issue #1)
     # Scaling factor for vertical advection (omega field)
     omega_scale::T = 1.0
-    use_fortran_stepping::Bool = false
+    use_reference_stepping::Bool = false
     # New output configuration (defaults to legacy behavior for backward compatibility)
     output_config::OutputConfig = OutputConfig()
 end
@@ -200,9 +199,9 @@ Configuration for deposition physics.
     season::SeasonCategory = SUMMER
     apply_dry_deposition::Bool = true
     apply_wet_deposition::Bool = false
-    use_simple_deposition::Bool = false  # Use simplified approach like Fortran DRY.DEPOSITION.NEW
-    simple_deposition_velocity::T = 0.002  # Fortran's NEW scheme uses 0.002 m/s for particles
-    simple_surface_height::T = 30.0  # Fortran uses 30m surface layer height in drydep2
+    use_simple_deposition::Bool = false  # Use simplified approach (DRY.DEPOSITION.NEW scheme)
+    simple_deposition_velocity::T = 0.002  # NEW scheme uses 0.002 m/s for particles
+    simple_surface_height::T = 30.0  # Reference uses 30m surface layer height in drydep2
     wet_deposition_precip_threshold::T = 0.01  # Min precip for wet depo (mm/hr). Set to 0.0 for FLEXPART-like continuous scavenging
     roughness_length_map::Union{Nothing,Matrix{T}} = nothing
     friction_velocity_map::Union{Nothing,Matrix{T}} = nothing
@@ -213,7 +212,7 @@ end
 """
     TurbulentDiffusionConfig{T<:Real}
 
-Configuration for turbulent diffusion (random walk) - from SNAP rwalk.f90.
+Configuration for turbulent diffusion (random walk).
 
 # Fields
 - `apply_diffusion::Bool`: Enable turbulent diffusion
@@ -229,8 +228,7 @@ Configuration for turbulent diffusion (random walk) - from SNAP rwalk.f90.
 - `blfullmix::Bool`: Full mixing in boundary layer (default: false)
 
 # Reference
-From SNAP Fortran rwalk.f90 (Norwegian Meteorological Institute)
-Bartnicki (2011) parameterization for turbulent diffusion
+Bartnicki (2011) parameterisation for turbulent diffusion
 """
 @kwdef struct TurbulentDiffusionConfig{T<:Real}
     apply_diffusion::Bool = true
@@ -347,16 +345,16 @@ Integrate one simulation timestep: advection, deposition, decay.
 
     # Compute map ratios for horizontal advection (convert m/s to grid/s)
     # CRITICAL FIX (Issue #39): For ERA5 lat/lon grids, use equatorial grid spacing
-    # to match Fortran's mapfield.f approach:
-    #   Fortran: hlon = R_earth * dlon_rad (grid spacing at equator)
-    #            rmx = xm / hlon where xm = 1/cos(lat) at particle position
+    # using the mapfield approach:
+    #   hlon = R_earth * dlon_rad (grid spacing at equator)
+    #   rmx = xm / hlon where xm = 1/cos(lat) at particle position
     # The xm factor is applied later in particle_velocity for ERA5.
     #
     # Previous bug: domain.dx included cos(lat_mid) from mid-latitude conversion,
     # but then 1/cos(lat) was also applied at particle position, double-counting
     # the latitude correction and causing ~19% longitude drift.
     if is_era5
-        # ERA5: Use equatorial grid spacing (Fortran mapfield.f approach)
+        # ERA5: Use equatorial grid spacing (mapfield approach)
         # Per-cell spacing in degrees = total span / (nx-1) intervals
         dlon_deg = (domain.lon_max - domain.lon_min) / (domain.nx - 1)
         dlat_deg = (domain.lat_max - domain.lat_min) / (domain.ny - 1)
@@ -465,7 +463,7 @@ Integrate one simulation timestep: advection, deposition, decay.
             end
 
             if use_wet_deposition
-                # Use Bartnicki (2003) scheme - matches Fortran wetdep.f90
+                # Use Bartnicki (2003) scheme
                 radius_μm = T(props.diameter_μm) / T(2.0)  # diameter → radius
                 depconst = wet_deposition_constant(radius_μm)
                 lambda_field = similar(precip_field)
@@ -543,7 +541,7 @@ Integrate one simulation timestep: advection, deposition, decay.
 
         pos_era5 = [x_era5, y_era5, z_sigma]
 
-        # Update boundary layer diagnostics from meteorology (matches Fortran bldp)
+        # Update boundary layer diagnostics from meteorology (matches reference bldp)
         blk_time = local_time_offset
         tbl_sigma = winds.tbl_interp(pos_era5[1], pos_era5[2], blk_time)
         if !isfinite(tbl_sigma)
@@ -560,7 +558,7 @@ Integrate one simulation timestep: advection, deposition, decay.
 
         # =============================================================================
         # STEP 1: DRY DEPOSITION (at CURRENT position, before movement)
-        # Match Fortran order: drydep → forwrd → rwalk
+        # Match reference order: drydep → advection → random walk
         # =============================================================================
         surface_height_sigma = 0.996  # Surface/constant flux layer at ~30m height
 
@@ -570,7 +568,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                 ii = round(Int, clamp(pos_domain[1], 1, domain.nx))
                 jj = round(Int, clamp(pos_domain[2], 1, domain.ny))
 
-                # Use simplified deposition approach matching Fortran's DRY.DEPOSITION.NEW when configured
+                # Use simplified deposition approach (DRY.DEPOSITION.NEW scheme) when configured
                 if deposition_config.use_simple_deposition
                     # Use simplified approach: vd = simple_deposition_velocity + settling_velocity
                     vg = Float64(particle.grv)
@@ -589,9 +587,9 @@ Integrate one simulation timestep: advection, deposition, decay.
                                           P_hpa, T_k)
                 end
 
-                # Fortran's DRY.DEPOSITION.NEW uses: vd_particles = 0.002 m/s + settling_velocity
+                # DRY.DEPOSITION.NEW scheme: vd_particles = 0.002 m/s + settling_velocity
                 vd_simple = deposition_config.simple_deposition_velocity + vg
-                h_surface = deposition_config.simple_surface_height  # Fortran uses 30m in drydep2
+                h_surface = deposition_config.simple_surface_height  # Reference uses 30m in drydep2
 
                 # Deposition rate coefficient
                 k_dep = vd_simple / h_surface
@@ -623,10 +621,10 @@ Integrate one simulation timestep: advection, deposition, decay.
                     end
                 end
 
-                # FORTRAN PARITY: Complete deposition for large particles at ground level
-                # From drydep.f90:217: if (part%z == vlevel(1)) deprate = 1.0
-                # This applies to particles with radius >= 10 μm when at the surface
-                if z_sigma >= 0.999  # At ground level (vlevel(1) in Fortran)
+                # Complete deposition for large particles at ground level
+                # Reference: if (part%z == vlevel(1)) deprate = 1.0
+                # This applies to particles with radius >= 10 um when at the surface
+                if z_sigma >= 0.999  # At ground level (vlevel(1) in reference)
                     size_idx_particle = particle_size_config.particle_size_indices[i]
                     if size_idx_particle > 0 && size_idx_particle <= length(particle_size_config.size_bins)
                         diameter_μm = particle_size_config.size_bins[size_idx_particle].diameter_μm
@@ -706,9 +704,9 @@ Integrate one simulation timestep: advection, deposition, decay.
             end
         end
 
-        # BARTNICKI WET DEPOSITION (matches Fortran wetdep.f90)
+        # BARTNICKI WET DEPOSITION - Bartnicki (2003) scavenging scheme
         # Conditions: particle above surface layer AND below ~550 hPa (sigma > 0.67)
-        # Fortran: if (kwetdep == 1 .AND. prc > precmin .AND. part%z > 0.67) then
+        # Reference: if (kwetdep == 1 .AND. prc > precmin .AND. part%z > 0.67) then
         if use_wet_deposition && z_sigma > surface_height_sigma && z_sigma > WETDEP_SIGMA_MIN
             ii = round(Int, clamp(pos_domain[1], 1, domain.nx))
             jj = round(Int, clamp(pos_domain[2], 1, domain.ny))
@@ -770,8 +768,8 @@ Integrate one simulation timestep: advection, deposition, decay.
             # DEBUG: Disabled for performance (W_WIND and GRID PARAMETER diagnostics)
 
             # NOTE: Do NOT zero out meteorological w_wind in surface layer!
-            # Fortran only zeros gravitational settling (wg), not meteorological wind.
-            # See forwrd.F90:288-291 - it only zeros wg when dry deposition is active.
+            # Reference only zeros gravitational settling (wg), not meteorological wind.
+            # It only zeros wg when dry deposition is active.
 
             profile_local = hybrid_profile(p.winds, x, y, t)
 
@@ -797,9 +795,9 @@ Integrate one simulation timestep: advection, deposition, decay.
                     # DEBUG: Disabled for performance (SETTLING logging)
                 end
 
-                # CRITICAL: Match Fortran behavior from forwrd.F90 lines 289-293
-                # Disable settling velocity in the surface layer ONLY if dry deposition is enabled.
-                # Fortran: if (def_comp(part%icomp)%kdrydep == 1 .and. part%z > surface_height_sigma) then wg = 0.0
+                # CRITICAL: Match reference behaviour — disable settling velocity in the surface
+                # layer ONLY if dry deposition is enabled.
+                # Reference: if (def_comp(part%icomp)%kdrydep == 1 .and. part%z > surface_height_sigma) then wg = 0.0
                 # When dry deposition is disabled, allow settling all the way to ground to prevent
                 # turbulence from bouncing particles back up.
                 if p.dry_enabled && z > 0.996
@@ -851,7 +849,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                 w_total = w_wind + vg_sigma
                 in_surface = z > 0.996
 
-                # Compute diagnostic variables to match Fortran trace
+                # Compute diagnostic variables to match reference trace
                 # Get layer thickness (dz), temperature (theta), and vertical grid info
                 T_k_trace = p.winds.t_interp(x, y, z, t)
                 z_grid = p.winds.z_grid
@@ -883,9 +881,9 @@ Integrate one simulation timestep: advection, deposition, decay.
             end
 
             # CRITICAL: Apply latitude-dependent map scale factor xm for longitude advection
-            # Fortran mapfield.f: xm(i,j) = 1/cos(lat)
-            # Fortran posint.f90: rmx = xm/dxgrid
-            # Fortran forwrd.F90: x = x + u*dt*rmx
+            # mapfield: xm(i,j) = 1/cos(lat)
+            # posint: rmx = xm/dxgrid
+            # advection: x = x + u*dt*rmx
             #
             # For geographic grids, 1° of longitude shrinks toward poles:
             # physical_distance_x = grid_distance_x * cos(lat)
@@ -939,15 +937,15 @@ Integrate one simulation timestep: advection, deposition, decay.
         )
 
         # Integrate trajectory
-        # Option 1: Fortran-style two-stage Euler stepping (validation)
-        #           NOTE: Although Fortran default is simple Euler, we use Heun for better accuracy.
+        # Option 1: Two-stage Euler stepping (validation)
+        #           NOTE: Although the reference default is simple Euler, we use Heun for better accuracy.
         #           Testing showed Heun gives slightly better agreement than simple Euler.
         # Option 2: OrdinaryDiffEq.jl solver (default/production)
-        if config.use_fortran_stepping
+        if config.use_reference_stepping
             # Two-stage (Heun/trapezoidal) stepping
-            # Session 7 finding: Pure Euler (matching Fortran) gives marginal lon improvement
+            # Session 7 finding: Pure Euler gives marginal lon improvement
             # but worse lat/alt. Heun is slightly better overall, so keep it.
-            # The ~0.04° lat / 0.08° lon error is primarily due to chaotic trajectory divergence
+            # The ~0.04 deg lat / 0.08 deg lon error is primarily due to chaotic trajectory divergence
             # from small initial differences, not the time-stepping scheme.
             t1_local = local_time_offset
             du1 = zeros(T, 3)
@@ -1040,7 +1038,7 @@ Integrate one simulation timestep: advection, deposition, decay.
         prev_sigma = z_sigma_deposition
 
         # Apply turbulent diffusion
-        # Choice between SNAP rwalk.f90 (simple) or Hanna (1982) with O-U process and CBL
+        # Choice between simple random walk or Hanna (1982) with O-U process and CBL
         if !isnothing(hanna_config) && hanna_config.apply_turbulence
             # ===== HANNA (1982) TURBULENCE SCHEME =====
             # Height-dependent, stability-aware, with Ornstein-Uhlenbeck process
@@ -1215,7 +1213,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                     if hanna_config.flexpart_mode
                         # ===== FLEXPART-COMPATIBLE MODE =====
                         # Uses normalized wp = w/σ_w, drift inside O-U step
-                        # Matches FLEXPART turbulence_mod.f90 lines 136-146
+                        # Matches FLEXPART turbulence module
                         #
                         # Note: particle.w_turb stores NORMALIZED wp in this mode
                         wp_old = T(particle.w_turb)
@@ -1234,7 +1232,7 @@ Integrate one simulation timestep: advection, deposition, decay.
 
                         # ===== FLEXPART DISPLACEMENT LIMIT (line 150) =====
                         # Prevents single-step jumps larger than BL height
-                        # Use rem() not mod() - Julia's mod doesn't preserve sign like Fortran
+                        # Use rem() not mod() - Julia's mod doesn't preserve sign
                         if abs(delz) > h
                             delz = rem(delz, h)
                         end
@@ -1360,7 +1358,7 @@ Integrate one simulation timestep: advection, deposition, decay.
 
             # Apply turbulent displacements
             # NOTE: Wind alignment (FLEXPART-style) was tested but gave worse FMS.
-            # Using simple x/y perturbations like SNAP's rwalk.f90 instead.
+            # Using simple x/y perturbations (random walk) instead.
             # The O-U process already gives temporally correlated velocities.
             x_domain_final += particle.u_turb * dt * map_ratio_x
             y_domain_final += particle.v_turb * dt * map_ratio_y
@@ -1398,11 +1396,11 @@ Integrate one simulation timestep: advection, deposition, decay.
             z_sigma_final = clamp(z_sigma_final, σ_grid_min, σ_grid_max)
             z_height_final = height_from_sigma(profile_eval, z_sigma_final; fallback_height=prev_height)
 
-            # FORTRAN PARITY FIX: Do NOT deposit particles after turbulence!
-            # Fortran's order is: drydep → forwrd → rwalk, with NO deposition after rwalk.
+            # PARITY FIX: Do NOT deposit particles after turbulence!
+            # Reference order is: drydep → advection → random walk, with NO deposition after walk.
             # Particles that turbulence pushes to the surface survive until the NEXT timestep's
             # drydep call. The previous code here was depositing particles immediately after
-            # turbulence, causing 12× higher particle loss than Fortran.
+            # turbulence, causing 12x higher particle loss than the reference.
             # Now we just clamp the position and let the next timestep's drydep handle it.
 
             z_height_final = clamp(z_height_final, 0.0, z_max_m)
@@ -1411,8 +1409,8 @@ Integrate one simulation timestep: advection, deposition, decay.
             z_sigma_deposition = z_sigma_final  # Update for deposition check
 
         elseif diffusion_config.apply_diffusion
-            # ===== SNAP TURBULENT DIFFUSION (rwalk.f90) =====
-            # Original SNAP algorithm for backward compatibility
+            # ===== SIMPLE TURBULENT DIFFUSION (random walk) =====
+            # Original random walk algorithm for backward compatibility
 
             # Get wind components at particle position for horizontal diffusion
             # Use end of timestep for wind evaluation (after advection)
@@ -1441,7 +1439,7 @@ Integrate one simulation timestep: advection, deposition, decay.
             tsqrtfactor_h = sqrt(ratio_h)
 
             # Horizontal diffusion (wind-speed dependent)
-            # From rwalk.f90 line 101: rl = 2*a*((vabs*tmix_h)^b) * tsqrtfactor_h
+            # rl = 2*a*((vabs*tmix_h)^b) * tsqrtfactor_h
             in_bl = pos_final[3] > tbl  # Remember: z_sigma > tbl means IN boundary layer
             a = in_bl ? diffusion_config.horizontal_a_bl : diffusion_config.horizontal_a_above
 
@@ -1457,65 +1455,64 @@ Integrate one simulation timestep: advection, deposition, decay.
             y_domain_final += rl * rnd_y * map_ratio_y
 
             # Vertical diffusion (dimensionless in sigma coordinates)
-            # From rwalk.f90 lines 107-116
             # ERA5 FIX: Use clamped sigma for large particle settling (Issue #38)
             # For particles with large settling velocities, pos_final[3] can be >> 1.0.
             # The reflection formula 2.0 - z would give negative sigma, incorrectly
             # pushing particles to top of BL. GFS doesn't need this fix.
             # NOTE: Only apply this fix when settling is enabled; for pure advection+turbulence,
-            # use raw pos_final[3] like Fortran to avoid systematic downward drift.
+            # use raw pos_final[3] to avoid systematic downward drift.
             z_sigma_final = (is_era5 && settling_enabled) ? z_sigma_deposition : pos_final[3]
 
             # DIAGNOSTIC: Log turbulence parameters for first particle at each hour
             hour = current_time_global / 3600.0
-            if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "SNAP_TURB_DIAG", "") == "1"
+            if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "TRANSPORT_TURB_DIAG", "") == "1"
                 @info "TURB_DIAG" hour=round(Int, hour) particle=i tbl=round(tbl, digits=4) hbl_m=round(particle.hbl, digits=1) z_sigma=round(z_sigma_final, digits=4) tsqrtfactor_v=round(tsqrtfactor_v, digits=4) in_bl=(z_sigma_final > tbl)
             end
 
             if z_sigma_final <= tbl  # Above boundary layer
-                # From rwalk.f90 line 108: vrdbla = labove * tsqrtfactor_v
+                # vrdbla = labove * tsqrtfactor_v (above BL diffusion)
                 rv = diffusion_config.labove * tsqrtfactor_v
                 z_sigma_final += rv * rnd_z
                 # DIAGNOSTIC
-                if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "SNAP_TURB_DIAG", "") == "1"
+                if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "TRANSPORT_TURB_DIAG", "") == "1"
                     @info "TURB_RV_ABOVE" rv=round(rv, digits=6) rnd_z=round(rnd_z, digits=3) z_after=round(z_sigma_final, digits=4)
                 end
             else  # In boundary layer
-                # From rwalk.f90 lines 110-111: Check if full mixing should be used
+                # Check if full mixing should be used
                 bl_entrainment_thickness = (1.0 - tbl) * (1.0 + diffusion_config.entrainment)
                 top_entrainment = max(0.0, 1.0 - bl_entrainment_thickness)
 
-                # CRITICAL: Match Fortran rwalk.f90:111 - use full mixing when timestep is large
+                # CRITICAL: Use full mixing when timestep is large
                 # If blfullmix=true OR tsqrtfactor_v > 1.0, redistribute particle randomly in BL
                 if diffusion_config.blfullmix || tsqrtfactor_v > 1.0
-                    # Full mixing mode - randomly distribute in boundary layer (rwalk.f90:112)
+                    # Full mixing mode - randomly distribute in boundary layer
                     # z = 1.0 - bl_entrainment_thickness * (rnd(3) + 0.5)
                     # This gives z in range [top_entrainment, 1.0]
                     z_sigma_final = 1.0 - bl_entrainment_thickness * (rnd_z + 0.5)
                 else
                     # Incremental mixing mode with small displacements and reflections
-                    # From rwalk.f90 line 114: rv = (1-tbl)*tsqrtfactor_v
+                    # rv = (1-tbl)*tsqrtfactor_v (in-BL incremental mixing)
                     rv = (1.0 - tbl) * tsqrtfactor_v
                     z_before = z_sigma_final
                     z_sigma_final += rv * rnd_z
                     # DIAGNOSTIC
-                    if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "SNAP_TURB_DIAG", "") == "1"
+                    if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "TRANSPORT_TURB_DIAG", "") == "1"
                         @info "TURB_RV_INBL" rv=round(rv, digits=6) rnd_z=round(rnd_z, digits=3) z_before=round(z_before, digits=4) z_after=round(z_sigma_final, digits=4) top_ent=round(top_entrainment, digits=4)
                     end
 
                     # Reflection from ABL top (with entrainment zone)
                     # DISABLED: To allow particles to escape the PBL and match FLEXPART/HYSPLIT
                     # if z_sigma_final < top_entrainment
-                    #     # CRITICAL FIX: SNAP reflects from tbl, not top_entrainment!
-                    #     # See rwalk.f90 line 123: part%z = 2.0*part%tbl - part%z
+                    #     # CRITICAL FIX: Reflect from tbl, not top_entrainment!
+                    #     # Reference: part%z = 2.0*part%tbl - part%z
                     #     z_sigma_final = 2.0 * tbl - z_sigma_final
                     # end
 
-                    # Bottom reflection from Fortran rwalk.f90:127-129
-                    # ERA5 FIX: Enable bottom reflection for ERA5 (matches Fortran rwalk behavior)
+                    # Bottom reflection (reference implementation)
+                    # ERA5 FIX: Enable bottom reflection for ERA5 (matches reference behaviour)
                     # GFS: Keep clamping to avoid upward drift issues
                     if is_era5 && z_sigma_final > 1.0
-                        z_sigma_final = 2.0 - z_sigma_final  # Fortran reflection
+                        z_sigma_final = 2.0 - z_sigma_final  # Standard reflection
                     end
 
                     # Enforce vertical limits
@@ -1528,7 +1525,7 @@ Integrate one simulation timestep: advection, deposition, decay.
             z_sigma_final = clamp(z_sigma_final, σ_grid_min, σ_grid_max)
             z_height_final = height_from_sigma(profile_eval, z_sigma_final; fallback_height=prev_height)
 
-            # FORTRAN PARITY FIX: Do NOT deposit particles after turbulence!
+            # PARITY FIX: Do NOT deposit particles after turbulence!
             # (Same fix as Hanna turbulence path above - see comment there for details)
             z_height_final = clamp(z_height_final, 0.0, z_max_m)
             prev_sigma = z_sigma_final
@@ -1548,7 +1545,7 @@ Integrate one simulation timestep: advection, deposition, decay.
 
         # Update position (CRITICAL: store sigma not height!)
         # CRITICAL FIX: Do NOT update particle.z after transport!
-        # The Fortran SNAP code does not change particle z coordinate after deposition.
+        # The reference code does not change particle z coordinate after deposition.
         # It only reduces radioactivity (rad_). The position is determined solely by
         # advection and diffusion. Updating particle.z here was causing particles to
         # artificially remain in the surface layer, leading to repeated deposition.
@@ -1575,7 +1572,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                 1.0 + (y_domain_final - 1.0) * grid_scale_y
             end
             # Use the same 4D height interpolant as integration, evaluated directly
-            # at the particle's (x,y,σ,t). This mirrors SNAP's bilinear + vertical + temporal
+            # at the particle's (x,y,sigma,t). This mirrors the bilinear + vertical + temporal
             # interpolation and avoids extra error from re-tabulating a 1D profile.
             xq = clamp(x_met_trace, 1.0f0, Float32(winds.nx))
             yq = clamp(y_met_trace, 1.0f0, Float32(winds.ny))
@@ -1585,7 +1582,7 @@ Integrate one simulation timestep: advection, deposition, decay.
 
             # DEBUG: Disabled for performance (TRACE WRITE logging)
 
-            # Compute diagnostic variables for trace (matching Fortran output)
+            # Compute diagnostic variables for trace (matching reference output)
             w_wind_trace = advection_enabled ? winds.w_interp(x_met_trace, y_met_trace, z_sigma_deposition, T(local_time_offset + dt)) : 0.0
             vg_sigma_trace = 0.0  # Will be computed if settling enabled
             if settling_enabled && !isempty(particle_size_config.particle_size_indices)
@@ -1616,8 +1613,8 @@ Integrate one simulation timestep: advection, deposition, decay.
             in_surface_trace = z_sigma_deposition > 0.996
 
             # Optional diagnostic: write detailed w interpolation breakdown for particle 1
-            # Enable by setting environment variable SNAP_W_DIAG=1
-            if i == 1 && get(ENV, "SNAP_W_DIAG", "0") == "1"
+            # Enable by setting environment variable TRANSPORT_W_DIAG=1
+            if i == 1 && get(ENV, "TRANSPORT_W_DIAG", "0") == "1"
                 # Write hourly diagnostics under outputs/ to avoid mixing with step diagnostics
                 base_dir = dirname(trace_filename)
                 diag_dir = joinpath(base_dir, "outputs")
@@ -1626,7 +1623,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                 end
                 diag_path = joinpath(diag_dir, "w_diag_hour_particle1.csv")
 
-                # Compute Fortran-style contributions from raw w fields
+                # Compute reference-style contributions from raw w fields
                 # Indices and fractional offsets
                 ii = clamp(floor(Int, x_domain_final), 1, winds.nx)
                 jj = clamp(floor(Int, y_domain_final), 1, winds.ny)
@@ -1688,7 +1685,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                 end
             end
 
-            # Use trace_time_override if specified (for Fortran istep=0 parity where trace is at t=0)
+            # Use trace_time_override if specified (for istep=0 parity where trace is at t=0)
             trace_time = isnothing(trace_time_override) ? (current_time_global + dt) : trace_time_override
 
             # Only write trace if output_config allows it at this time
@@ -1982,7 +1979,7 @@ function run_simulation!(state::SimulationState{T},
             read_initial_met_fields!(met_format, met_fields, ds, init_time_idx1, init_time_idx2)
             # Initialize domain heights from first met data
             update_domain_vertical!(state.domain, met_fields)
-            # Align domain map factors with met-derived ones (match Fortran mapfield)
+            # Align domain map factors with met-derived ones (match reference mapfield)
             state.domain.xm .= met_fields.xm
             state.domain.ym .= met_fields.ym
             domain_heights_initialized = true
@@ -1998,7 +1995,7 @@ function run_simulation!(state::SimulationState{T},
 
     # Proper initialization: set sigma from desired release height using hybrid profile at t=0
     # Then compute altitude from sigma consistently (no cheating) — this yields ~91 m exactly.
-    # CRITICAL FIX (Issue #1): GFS needs w-wind negation to match Fortran sigma-dot convention
+    # CRITICAL FIX (Issue #1): GFS needs w-wind negation to match reference sigma-dot convention
     negate_w_gfs = isa(met_format, GFSFormat)
     # CRITICAL: Use correct time span for winds0 (not 1.0s!) to enable proper time interpolation
     winds0 = create_wind_interpolants(met_fields, 0.0, init_time_diff,
@@ -2070,11 +2067,11 @@ function run_simulation!(state::SimulationState{T},
         end
     end
 
-    # FORTRAN PARITY FIX: Perform "istep=0" integration step before main loop
-    # Fortran SNAP integrates at istep=0 and writes trace at t=istep*tstep=0.
-    # Without this step, Julia does N integrations while Fortran does N+1.
+    # PARITY FIX: Perform "istep=0" integration step before main loop
+    # Reference integrates at istep=0 and writes trace at t=istep*tstep=0.
+    # Without this step, Julia does N integrations while the reference does N+1.
     if config.verbose
-        println("Performing istep=0 integration step (Fortran parity)")
+        println("Performing istep=0 integration step (reference parity)")
     end
     _ = integrate_timestep!(state, winds0, T(config.dt_particle),
                            particle_size_config, deposition_config,
@@ -2090,7 +2087,7 @@ function run_simulation!(state::SimulationState{T},
                            numerical_config=numerical_config,
                            trace_filename=trace_filename,
                            is_era5=isa(met_format, ERA5Format),
-                           trace_time_override=T(0.0),  # Write trace at t=0 like Fortran istep=0
+                           trace_time_override=T(0.0),  # Write trace at t=0 like reference istep=0
                            output_config=config.output_config)
 
     # Main simulation loop - start from file containing the release time
@@ -2265,7 +2262,7 @@ function run_simulation!(state::SimulationState{T},
                     # ODE solver will integrate from local_time to local_time + dt_sub
 
                     # Optional per-step w diagnostic for particle 1
-                    if get(ENV, "SNAP_W_DIAG_STEP", "0") == "1"
+                    if get(ENV, "TRANSPORT_W_DIAG_STEP", "0") == "1"
                         # Only for particle 1 to keep file small
                         for i_diag in 1:1
                             if is_active(state.ensemble.particles[i_diag])
@@ -2278,7 +2275,7 @@ function run_simulation!(state::SimulationState{T},
                                     1.0 + (pos_diag[2] - 1.0) * grid_scale_y
                                 end
                                 z_sigma = pos_diag[3]
-                                # Compute Fortran-style w components at start of substep
+                                # Compute reference-style w components at start of substep
                                 ii = clamp(floor(Int, x_met), 1, winds.nx)
                                 jj = clamp(floor(Int, y_met), 1, winds.ny)
                                 dxf = clamp(Float64(x_met - ii), 0.0, 1.0)

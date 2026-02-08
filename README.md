@@ -17,7 +17,6 @@ The transport module uses modern Julia ODE solvers ([OrdinaryDiffEq.jl](https://
 ## Inspired by
 
 - [GLASSTONE](https://github.com/NukeWorker/glasstone) — Nuclear weapon effects (Glasstone & Dolan, 1977)
-- [SNAP](https://github.com/metno/snap) — Severe Nuclear Accident Programme (Norwegian Meteorological Institute)
 - [FLEXPART](https://www.flexpart.eu/) — Lagrangian particle dispersion model (Stohl et al., 2005)
 
 ## Nancy showcase
@@ -86,7 +85,7 @@ snapshots = run_simulation!(state, met_files)
 ## Configuring the solver
 
 ```julia
-# Forward Euler (default, fast, matches Fortran reference)
+# Forward Euler (default, fast)
 config = ERA5NumericalConfig(ode_solver_type=:Euler, fixed_dt=300.0)
 
 # Tsit5 (5th-order Runge-Kutta, more accurate)

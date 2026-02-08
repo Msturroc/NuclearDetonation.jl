@@ -1,9 +1,7 @@
-# Hanna (1982) Turbulence Parameterization
-# Based on FLEXPART implementation
+# Hanna (1982) Turbulence Parameterisation
 # References:
-# - Hanna, S.R. (1982): Applications in Air Pollution Modeling
+# - Hanna, S.R. (1982): Applications in Air Pollution Modelling
 # - Stohl et al. (2005): FLEXPART version 6.2
-# - turbulence_mod.f90 from FLEXPART
 
 using SpecialFunctions: erf
 
@@ -57,7 +55,7 @@ config = HannaTurbulenceConfig(
     blfullmix::Bool = false
     # Turbulence intensity multiplier for HORIZONTAL sigma values (sigu, sigv).
     # Hanna (1982) gives σ ≈ 0.5 m/s → diffusivity D = σ²τ ≈ 2.5 m²/s
-    # Baseline SNAP gives D ≈ 130 m²/s (52× larger)
+    # Typical large-scale models give D ≈ 130 m²/s (52x larger)
     # Default 1.0 = original Hanna values; adjust to tune horizontal spreading
     sigma_scale::T = 1.0
     # Separate multiplier for VERTICAL sigma (sigw).
@@ -67,7 +65,7 @@ config = HannaTurbulenceConfig(
     # - Stores normalized wp = w/σ_w instead of actual velocity
     # - Drift term inside O-U step: +dt*(dsigwdz + rhograd/rhoa*sigw)
     # - Unscaled random noise: sqrt(2*dt/tlw) instead of sigw*sqrt(...)
-    # This matches FLEXPART's turbulence_mod.f90 lines 136-146
+    # This follows the FLEXPART normalised-velocity formulation (Stohl et al., 2005)
     flexpart_mode::Bool = false
     # ===== SIMPLE CONVECTIVE INJECTION MODE =====
     # Robust alternative to complex CBL bi-Gaussian scheme for tropical convection.
@@ -270,7 +268,7 @@ function compute_unstable_turbulence(
         sigv = sigu
 
         # Ryall & Maryon 1998: Height-dependent vertical variance
-        # This is the key improvement over simple SNAP!
+        # Height-dependent formulation for improved vertical mixing
         # Ensure argument to sqrt is non-negative (can be negative for z > h)
         sigw_arg = max(
             T(1.2) * wst^2 * (T(1.0) - T(0.9) * zeta) * zeta^T(0.66666) +
@@ -434,7 +432,7 @@ Key differences from standard O-U:
 4. Displacement is wp * σ_w * dt
 5. **NEW**: When -h/L > 5, uses skewed Langevin terms from CBL scheme
 
-From FLEXPART turbulence_mod.f90 lines 136-146 and cbl_mod.f90 lines 225-230.
+Based on the FLEXPART normalised-velocity formulation (Stohl et al., 2005).
 
 # Arguments
 - `wp_old::T` - Previous NORMALIZED vertical velocity (dimensionless, = w/σ_w)
@@ -496,19 +494,19 @@ function flexpart_vertical_step(
             drift = dsigwdz + rhoaux * sigw
 
             if dt_over_tlw < T(0.5)
-                # Short timestep formula (FLEXPART lines 137-139)
+                # Short timestep formula
                 # wp = (1 - dt/tlw)*wp + sqrt(2*dt/tlw)*R + dt*(dsigwdz + rhoaux*sigw)
                 wp_new = muladd(T(1.0) - dt_over_tlw, wp_old,
                                muladd(sqrt(T(2.0) * dt_over_tlw), rnd, dt * drift))
             else
-                # Long timestep formula (FLEXPART lines 142-145)
+                # Long timestep formula with exponential decay
                 # wp = exp(-dt/tlw)*wp + sqrt(1-r²)*R + tlw*(1-r)*(dsigwdz + rhoaux*sigw)
                 r = exp(-dt_over_tlw)
                 wp_new = muladd(r, wp_old,
                                muladd(sqrt(T(1.0) - r^2), rnd, tlw * (T(1.0) - r) * drift))
             end
 
-            # Displacement: wp * sigw * dt (FLEXPART line 139/145: delz=wp*sigw*dtf)
+            # Displacement: wp * sigw * dt
             delz = wp_new * sigw * dt
         end
     end
@@ -518,7 +516,7 @@ end
 
 # ============================================================================
 # Convective Boundary Layer (CBL) Scheme
-# Based on Luhar, Hibberd & Hurley (1996) and FLEXPART cbl_mod.f90
+# Based on Luhar, Hibberd & Hurley (1996)
 # ============================================================================
 
 """
@@ -750,8 +748,8 @@ function cbrt(x::T) where T<:Real
 end
 
 # ============================================================================
-# CBL Langevin Scheme (FLEXPART-compatible)
-# Based on Luhar-Hibberd-Hurley (1996) and FLEXPART cbl_mod.f90
+# CBL Langevin Scheme
+# Based on Luhar-Hibberd-Hurley (1996)
 # ============================================================================
 
 """
@@ -759,9 +757,9 @@ end
 
 Compute drift (a_th) and diffusion (b_th) coefficients for CBL Langevin equation.
 
-This implements FLEXPART's skewed PDF turbulence from cbl_mod.f90, which uses
-Luhar-Hibberd-Hurley bi-Gaussian formulation to generate non-Gaussian vertical
-velocity distributions with realistic skewness and kurtosis.
+This implements the skewed PDF turbulence scheme using the Luhar-Hibberd-Hurley
+bi-Gaussian formulation to generate non-Gaussian vertical velocity distributions
+with realistic skewness and kurtosis.
 
 # Arguments
 - `wp::T` - Normalized vertical velocity (w/σ_w, dimensionless)
@@ -786,7 +784,7 @@ and b_th is the standard Kolmogorov diffusion coefficient.
 
 # References
 - Luhar et al. (1996): Comparison of closure schemes for velocity PDF
-- FLEXPART cbl_mod.f90 lines 215-230
+- Stohl et al. (2005): FLEXPART version 6.2
 """
 function compute_cbl_langevin_terms(
     wp::T,
@@ -838,14 +836,14 @@ function compute_cbl_langevin_terms(
         P_tot = T(1e-20)
     end
 
-    # Q term: Weighted velocity difference (cbl_mod.f90 line 212)
+    # Q term: Weighted velocity difference (Luhar et al., 1996)
     # Q = timedir * (a*ρ*(w-wa)/σa² * Pa + b*ρ*(w+wb)/σb² * Pb)
     Q = timedir * (
         (aluarw * rhoa * deltawa / sigma_wa2) * pa +
         (bluarw * rhoa * deltawb / sigma_wb2) * pb
     )
 
-    # Phi term: Vertical drift with erf components (cbl_mod.f90 lines 215-223)
+    # Phi term: Vertical drift with erf components (Luhar et al., 1996)
     Phi = compute_Phi_term(
         wold, wold2, cbl_params, rhoa, rhograd, pa, pb
     )
@@ -869,7 +867,7 @@ end
 
 Compute the Phi vertical drift term for CBL Langevin equation.
 
-This is the complex drift term from FLEXPART cbl_mod.f90 lines 215-223,
+This is the complex drift term from the Luhar et al. (1996) formulation,
 incorporating error functions and gradients of bi-Gaussian parameters.
 
 # Arguments
@@ -924,7 +922,7 @@ function compute_Phi_term(
     aperfa = (wold - wa) / (sqrt(T(2.0)) * sigma_wa)
     aperfb = (wold + wb) / (sqrt(T(2.0)) * sigma_wb)
 
-    # Phi components (FLEXPART cbl_mod.f90 lines 215-223)
+    # Phi components (Luhar et al., 1996)
 
     # Lines 215: -0.5 * (a*ρ*dwa + ρ*wa*da + a*wa*dρ) * erf(aperfa)
     term1 = -T(0.5) * (

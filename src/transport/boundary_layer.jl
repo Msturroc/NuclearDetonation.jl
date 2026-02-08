@@ -1,5 +1,4 @@
-# SNAP: Severe Nuclear Accident Programme
-# Boundary layer diagnostics (port of bldp.f90)
+# Boundary layer diagnostics
 #
 # Computes sigma/eta coordinate of boundary layer top and mixing height
 # by evaluating Richardson numbers in hybrid vertical coordinates.
@@ -18,13 +17,13 @@ _hybrid_coeff_to_hpa(::Type{ERA5Format}, a::T) where T = a
 #
 # Note: oct29_test GFS code used PLUS for initial (k=2) and MINUS for loop (k>=2)
 # To preserve exact GFS behaviour from oct29_test, we need separate signs:
-_height_sign_initial(::Type{ERA5Format}) = 1   # Fix: use +1 (matches Fortran)
+_height_sign_initial(::Type{ERA5Format}) = 1   # +1 for surface-to-top integration
 _height_sign_initial(::Type{GFSFormat}) = 1    # Preserve: oct29_test used +1
-_height_sign_loop(::Type{ERA5Format}) = 1      # Fix: use +1 (matches Fortran)
+_height_sign_loop(::Type{ERA5Format}) = 1      # +1 for surface-to-top integration
 _height_sign_loop(::Type{GFSFormat}) = -1      # Preserve: oct29_test used -1
 
 # Helper for met-format-specific temperature conversion for boundary layer calculation
-# Fortran SNAP converts T → θ in readfield_nc.f90 via t2thetafac BEFORE bldp.f90
+# The reference implementation converts T → θ via t2thetafac before boundary layer computation
 # ERA5 stores absolute temperature T → needs conversion to potential temperature θ
 # GFS: keep as-is (oct29_test worked with raw values)
 # Formula: θ = T * (1000/p)^(R/cp) = T * t2thetafac(p)
@@ -83,10 +82,10 @@ function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
     psurf_ref = T(psurf_ref)
     ric_factor = T(ric_factor)
 
-    # Exner function (consistent with snaptabML)
+    # Exner function
     exner(p::T) = cp * (p / T(1000.0))^rcp
 
-    # Determine allowable pressure bounds for BL search (cf. Fortran bldp)
+    # Determine allowable pressure bounds for BL search
     pbl_top = T(600.0)
     pbl_bot = T(975.0)
 
@@ -166,8 +165,8 @@ function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
 
         zh[1] = zero(T)
         zf[1] = zero(T)
-        # Format-specific sign: ERA5 (+1) matches Fortran, GFS (+1) preserves oct29_test
-        # Convert T→θ for ERA5 (Fortran does this in readfield_nc.f90 via t2thetafac)
+        # Format-specific sign: ERA5 (+1) for surface-to-top, GFS (+1) preserves oct29_test
+        # Convert T→θ for ERA5 (reference does this via t2thetafac before BL computation)
         theta_2 = _t2theta(F, t_field[i, j, 2], p_level[2], rcp)
         zh[2] = zh[1] + _height_sign_initial(F) * theta_2 * (pih[1] - pih[2]) * ginv
         denom = pih[1] - pih[2]
@@ -194,7 +193,7 @@ function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
             p_level[k + 1] = _hybrid_coeff_to_hpa(F, fields.alevel[k + 1]) + fields.blevel[k + 1] * ps
             pif[k + 1] = exner(p_level[k + 1])
 
-            # Convert T→θ for ERA5 (Fortran does this in readfield_nc.f90 via t2thetafac)
+            # Convert T→θ for ERA5 (reference does this via t2thetafac before BL computation)
             theta_k = _t2theta(F, t_field[i, j, k], p_level[k], rcp)
             theta_kp1 = _t2theta(F, t_field[i, j, k + 1], p_level[k + 1], rcp)
 

@@ -1,5 +1,4 @@
-# SNAP: Severe Nuclear Accident Programme
-# Main Time-Stepping Loop
+# Atmospheric transport — Main time-stepping loop
 #
 # Integrates advection, turbulence, settling, decay, and deposition
 
@@ -160,7 +159,7 @@ function advect_particles!(state::SimulationState{T},
             w = wind_fields.w_interp(x, y, z, state.timestep * params.dt)
 
             # Convert wind from m/s to grid coordinates per second
-            # Use Fortran-consistent base spacings from current met window (winds.dx_m/dy_m)
+            # Use base spacings from current met window (winds.dx_m/dy_m)
             local_ix = min(floor(Int, x), state.domain.nx)
             local_iy = min(floor(Int, y), state.domain.ny)
             dx_dt = u / wind_fields.dx_m * state.domain.xm[local_ix, local_iy]

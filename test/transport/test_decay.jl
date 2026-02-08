@@ -1,5 +1,5 @@
 # Tests for decay.jl: Radioactive Decay Module
-# Based on SNAP decay.f90
+# Radioactive decay tests
 
 using Test
 

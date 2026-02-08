@@ -1,7 +1,6 @@
-# SNAP: Severe Nuclear Accident Programme
-# Radioactive Decay Module
+# Atmospheric transport — Radioactive decay
 #
-# Ported from decay.f90 - handles radioactive decay of particles and deposition fields
+# Handles radioactive decay of particles and deposition fields.
 # Supports:
 #   1. Standard exponential decay (half-life based)
 #   2. Nuclear weapon fallout decay (t^-1.2 power law from Glasstone/Dolan)

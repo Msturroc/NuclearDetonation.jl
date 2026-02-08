@@ -2,7 +2,7 @@
 # GRAVITATIONAL SETTLING VELOCITY
 #
 # This file contains functions to calculate the gravitational settling velocity
-# of particles, mirroring the logic in SNAP's `vgravtables.f90`.
+# of particles.
 #
 # It supports two underlying physics models for air viscosity, which can be
 # selected at runtime using dispatch:
@@ -10,7 +10,7 @@
 # - `SutherlandViscosity`: A more modern, physically accurate model based on
 #   Sutherland's formula. This is the default.
 # - `FortranViscosity`: A simplified model that exactly replicates the
-#   formulas used in the original Fortran SNAP code, used for validation.
+#   formulae used in the reference implementation, used for validation.
 #
 # Key functions:
 # - `vgrav_corrected`: Iteratively corrects Stokes velocity for larger Reynolds numbers.
@@ -59,8 +59,8 @@ struct SutherlandViscosity <: AbstractViscosityModel end
 """
     FortranViscosity()
 
-Selects the simplified air viscosity and density formulas used in the original
-Fortran SNAP code. Use this model to validate against the reference implementation.
+Selects the simplified air viscosity and density formulae used in the
+reference implementation. Use this model for validation.
 """
 struct FortranViscosity <: AbstractViscosityModel end
 
@@ -69,13 +69,13 @@ struct FortranViscosity <: AbstractViscosityModel end
 # Physical Properties of Air (Dispatched by Model)
 #
 # Note: All internal calculations are done in CGS units (cm, g, s) to align
-# with the Fortran implementation. These functions return values in CGS units.
+# with the reference implementation. These functions return values in CGS units.
 # ==============================================================================
 
 """
     air_viscosity(T, ::FortranViscosity)
 
-Calculate air viscosity using the simplified Fortran formula.
+Calculate air viscosity using the simplified reference formula.
 
 # Arguments
 - `T`: Temperature (Kelvin)
@@ -84,7 +84,7 @@ Calculate air viscosity using the simplified Fortran formula.
 - Dynamic viscosity in Poise (g/cm·s)
 """
 function air_viscosity(T::Real, ::FortranViscosity)
-    # Fortran visc(t) = 1.72e-4*(393.0/(t+120.0))*(t/273.0)**1.5
+    # visc(t) = 1.72e-4*(393.0/(t+120.0))*(t/273.0)**1.5
     # This formula directly returns Poise (g/cm-s).
     return 1.72e-4 * (393.0 / (T + 120.0)) * (T / 273.0)^1.5
 end
@@ -114,7 +114,7 @@ end
 """
     air_density(P_hpa, T, ::FortranViscosity)
 
-Calculate air density using the simplified Fortran formula.
+Calculate air density using the simplified reference formula.
 
 # Arguments
 - `P_hpa`: Pressure (hPa)
@@ -124,7 +124,7 @@ Calculate air density using the simplified Fortran formula.
 - Air density (g/cm³)
 """
 function air_density(P_hpa::Real, T::Real, ::FortranViscosity)
-    # Fortran roa(p,t) = 0.001*p*100.0/(r*t)
+    # roa(p,t) = 0.001*p*100.0/(r*t)
     # This formula takes hPa and returns g/cm³.
     return 0.001 * P_hpa * 100.0 / (R_SPECIFIC_J_KG_K * T)
 end
@@ -158,7 +158,7 @@ end
 
 Calculate the Cunningham slip correction factor. This is essential for small
 particles where the mean free path of air is comparable to the particle size.
-The formula is taken directly from the Fortran `slipf` function.
+The formula follows the standard Cunningham correction.
 
 # Arguments
 - `dp`: Particle diameter (μm)
@@ -167,15 +167,14 @@ The formula is taken directly from the Fortran `slipf` function.
 - Cunningham slip correction factor (dimensionless)
 """
 function cunningham_factor(dp::Real)
-    # This is a direct port of the `slipf` function in `vgravtables.f90`
-    # The formula is valid for dp in micrometers.
+    # The formula is valid for dp in micrometres.
     if dp <= 0.0
         return 1.0
     end
     # Use the more precise lambda from the test suite
     lam_um = 0.0653 # Mean free path in μm
     
-    # Empirical constants from the Fortran code
+    # Empirical constants
     A = 1.257
     B = 0.4
     C_cunn = 0.55
@@ -222,8 +221,7 @@ end
 """
     vgrav_corrected(dp, rp, P, T, ρp, model; tol=0.001)
 
-Calculates fall speed, corrected for larger Reynolds numbers. This is a direct
-port of the `iter` subroutine in `vgravtables.f90`, using a bisection method.
+Calculates fall speed, corrected for larger Reynolds numbers using a bisection method.
 
 # Arguments
 - `dp`: Particle diameter (μm)
@@ -238,7 +236,7 @@ port of the `iter` subroutine in `vgravtables.f90`, using a bisection method.
 - Corrected settling velocity (m/s)
 """
 function vgrav_corrected(dp::Real, rp::Real, P::Real, T::Real, ρp::Real, model::AbstractViscosityModel; tol=0.001)
-    # The `fit` function from Fortran, which is the target for the root-finding
+    # The `fit` function, which is the target for the root-finding
     function fit(u, u0, dp, ρa, η)
         A1 = 0.15
         A2 = 0.687
@@ -250,7 +248,7 @@ function vgrav_corrected(dp::Real, rp::Real, P::Real, T::Real, ρp::Real, model:
     # Initial Stokes velocity (u0) in cm/s, using the selected physics model.
     u0 = _vgrav_stokes(dp, rp, P, T, model)
 
-    # Bisection method from Fortran `iter`
+    # Bisection method
     epsilon = tol * u0
     if abs(u0) < 1e-12 # Handle zero or near-zero stokes velocity
         return 0.0
@@ -297,13 +295,12 @@ end
 """
     build_vgrav_tables(particle_properties_list; model=SutherlandViscosity())
 
-Pre-computes settling velocities for a list of particle sizes. This is
-analogous to the `main` program in `vgravtables.f90`.
+Pre-computes settling velocities for a list of particle sizes.
 
 # Arguments
 - `particle_properties_list`: A list of `ParticleProperties` objects.
 - `model`: The viscosity model to use. Defaults to `SutherlandViscosity()`.
-           Pass `FortranViscosity()` to match the reference SNAP code.
+           Pass `FortranViscosity()` to match the reference implementation.
 
 # Returns
 - A dictionary mapping particle size index to a 2D lookup table `vgrav(pressure, temperature)`.
@@ -336,7 +333,7 @@ function build_vgrav_tables(particle_properties_list; model::AbstractViscosityMo
     return vgrav_tables
 end
 
-# Constants for interpolation grid, derived from Fortran vgravtables.f90
+# Constants for interpolation grid
 const NUMTEMP_VG = 41
 const NUMPRES_VG = 25
 const TINCR_VG = 200.0 / (NUMTEMP_VG - 1)
@@ -348,12 +345,12 @@ const PBASE_VG = 0.0 - PINCR_VG
     interpolate_vgrav(vgrav_tables::VGravTables, size_idx::Int, P_hpa::Real, T_k::Real) -> Float64
 
 Interpolates the pre-computed gravitational settling velocity from `vgrav_tables`
-for a given particle size index, pressure, and temperature, precisely mirroring
-the bilinear interpolation logic from Fortran's `forwrd.F90`.
+for a given particle size index, pressure, and temperature, using bilinear
+interpolation.
 
 # Arguments
 - `vgrav_tables`: The pre-computed settling velocity tables.
-- `size_idx`: The index of the particle size bin (Fortran's mrunning).
+- `size_idx`: The index of the particle size bin.
 - `P_hpa`: Pressure in hPa.
 - `T_k`: Temperature in Kelvin.
 
@@ -361,23 +358,19 @@ the bilinear interpolation logic from Fortran's `forwrd.F90`.
 - `Float64`: Interpolated settling velocity in m/s.
 """
 function interpolate_vgrav(vgrav_tables::VGravTables, size_idx::Int, P_hpa::Real, T_k::Real)::Float64
-    # Fortran vgtable is (temperature, pressure, component)
-    # Julia vgrav_tables[size_idx] is (pressure, temperature)
-    # So we need to transpose or adjust indexing.
-    # Fortran: vgtable(it,ip,mrunning)
-    # Julia: table[ip, it]
+    # table[ip, it] — indexed by (pressure, temperature)
     table = vgrav_tables[size_idx]
 
-    # Calculate indices and interpolation factors exactly as in Fortran forwrd.F90
+    # Calculate indices and interpolation factors
     ip_float = (P_hpa - PBASE_VG) / PINCR_VG
     ip = floor(Int, ip_float)
     ip = max(ip, 1)
-    ip = min(NUMPRES_VG - 1, ip) # Fortran uses size(vgtable,2)-1
+    ip = min(NUMPRES_VG - 1, ip)
 
     it_float = (T_k - TBASE_VG) / TINCR_VG
     it = floor(Int, it_float)
     it = max(it, 1)
-    it = min(NUMTEMP_VG - 1, it) # Fortran uses size(vgtable,1)-1
+    it = min(NUMTEMP_VG - 1, it)
 
     # Get interpolation values
     p_interp_factor = (P_hpa - (PBASE_VG + ip * PINCR_VG)) / PINCR_VG
@@ -387,9 +380,7 @@ function interpolate_vgrav(vgrav_tables::VGravTables, size_idx::Int, P_hpa::Real
     p_interp_factor = clamp(p_interp_factor, 0.0, 1.0)
     t_interp_factor = clamp(t_interp_factor, 0.0, 1.0)
 
-    # Fortran indexing: vgtable(it,ip,mrunning)
-    # Julia table[ip, it]
-    # Note: Fortran uses 1-based indexing, so ip and it are already correct for Julia array access
+    # Bilinear interpolation
 
     # Interpolate in temperature direction first
     grav_p1_t = table[ip, it] * (1.0 - t_interp_factor) + table[ip, it + 1] * t_interp_factor

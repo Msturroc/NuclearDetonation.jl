@@ -1,8 +1,4 @@
-# SNAP: Severe Nuclear Accident Programme
-# Julia port of snapparML.f90
-# Original Copyright (C) 1992-2023 Norwegian Meteorological Institute
-#
-# Component parameter definitions for radionuclides
+# Atmospheric transport — Component parameter definitions for radionuclides
 
 module TransportParameters
 

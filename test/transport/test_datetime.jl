@@ -1,8 +1,8 @@
-# Tests for snap_datetime.jl: DateTime and Duration System
+# Tests for datetime.jl: DateTime and Duration System
 
 using Test
 
-@testset "SNAP DateTime System" begin
+@testset "DateTime System" begin
 
     @testset "DateTime Construction" begin
         dt = DateTime(2025, 10, 10, 12)

@@ -1,4 +1,3 @@
-# SNAP: Severe Nuclear Accident Programme
 # Validation Module - GeoJSON contour loading, UTM conversion, and FMS scoring
 #
 # Provides tools for comparing model output against digitised historical contours

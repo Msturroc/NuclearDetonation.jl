@@ -1,5 +1,5 @@
-# Numerical Configuration for SNAP Modernization
-# Allows toggling between validation mode (Fortran-matching) and modern mode
+# Numerical Configuration
+# Allows toggling between validation mode (reference-matching) and modern mode
 
 using Interpolations
 using OrdinaryDiffEq
@@ -18,12 +18,12 @@ Enumeration of supported interpolation orders for wind fields.
 # Options
 - `LinearInterp`: Linear interpolation via Interpolations.jl (~1-2% error)
 - `CubicInterp`: Cubic spline interpolation (~0.1-0.3% error, smoother derivatives)
-- `FortranInterp`: Manual floor-based trilinear interpolation (exact Fortran SNAP match)
+- `FortranInterp`: Manual floor-based trilinear interpolation (exact reference match)
 """
 @enum InterpolationOrder begin
     LinearInterp = 1
     CubicInterp = 3
-    FortranInterp = 0  # For validation - exact Fortran floor() based bilinear
+    FortranInterp = 0  # For validation - exact floor()-based bilinear
 end
 
 """
@@ -32,12 +32,12 @@ end
 Enumeration of supported turbulence parameterisations for ERA5 simulations.
 
 # Options
-- `RandomWalk`: Simple uncorrelated random walk (Fortran SNAP baseline)
+- `RandomWalk`: Simple uncorrelated random walk (baseline)
 - `OrnsteinUhlenbeck`: Temporally correlated turbulence via O-U process
 - `HannaTurbulence`: Hanna (1982) height-dependent parameterisation with O-U
 """
 @enum TurbulenceModel begin
-    RandomWalk = 0        # Simple random walk (baseline, matches Fortran)
+    RandomWalk = 0        # Simple random walk (baseline)
     OrnsteinUhlenbeck = 1 # O-U process with temporal correlation
     HannaTurbulence = 2   # Full Hanna (1982) with stability dependence
 end
@@ -56,14 +56,14 @@ Configuration for numerical methods used in particle integration.
 - `name::String`: Configuration name for output files
 
 # Solver Types
-- `:Euler`: Forward Euler with fixed dt (matches Fortran exactly)
+- `:Euler`: Forward Euler with fixed dt (reference implementation match)
 - `:Tsit5`: Tsitouras 5th order Runge-Kutta with fixed dt
 - `:AutoTsit5`: Tsit5 with adaptive timestepping
 
 # Examples
 
 ```julia
-# Validation mode - matches Fortran SNAP exactly
+# Validation mode - matches reference implementation exactly
 config = NumericalConfig(
     interpolation_order = LinearInterp,
     ode_solver_type = :Euler,
@@ -111,19 +111,19 @@ Extends NumericalConfig with ERA5-specific options for turbulence.
 - `name::String`: Configuration name for output files
 
 # Solver Types
-- `:Euler`: Forward Euler with fixed dt (matches Fortran exactly)
+- `:Euler`: Forward Euler with fixed dt (reference implementation match)
 - `:Tsit5`: Tsitouras 5th order Runge-Kutta with fixed dt
 - `:AutoTsit5`: Tsit5 with adaptive timestepping
 
 # Turbulence Models
-- `RandomWalk`: Simple uncorrelated random walk (Fortran SNAP baseline)
+- `RandomWalk`: Simple uncorrelated random walk (baseline)
 - `OrnsteinUhlenbeck`: Temporally correlated turbulence via O-U process
 - `HannaTurbulence`: Hanna (1982) height-dependent with O-U
 
 # Examples
 
 ```julia
-# Baseline mode - matches Fortran SNAP exactly (DEFAULT)
+# Baseline mode - matches reference implementation exactly (DEFAULT)
 config = ERA5NumericalConfig(
     interpolation_order = LinearInterp,
     ode_solver_type = :Euler,
@@ -162,7 +162,7 @@ end
 """
     ValidationMode(dt::T=300.0; name="validation", use_fortran_interp=true) where T<:Real
 
-Create a NumericalConfig that exactly matches Fortran SNAP.
+Create a NumericalConfig that exactly matches the reference implementation.
 
 - FortranInterp: Manual floor-based trilinear interpolation (default for validation)
 - LinearInterp: Interpolations.jl linear (available if use_fortran_interp=false)
@@ -216,10 +216,10 @@ end
 """
     ERA5ValidationMode(dt::T=300.0; name="era5_baseline") where T<:Real
 
-Create an ERA5NumericalConfig that exactly matches Fortran SNAP.
+Create an ERA5NumericalConfig that exactly matches the reference implementation.
 This is the DEFAULT configuration for ERA5 simulations.
 
-- Linear interpolation (Fortran-compatible)
+- Linear interpolation (reference-compatible)
 - Forward Euler integration
 - Fixed timestep (default 300s)
 - Simple random walk turbulence
@@ -331,7 +331,7 @@ function get_solve_kwargs(config::NumericalConfig)
     kwargs = Dict{Symbol, Any}()
 
     if config.ode_solver_type == :Euler
-        # Fixed timestep Euler (matches Fortran)
+        # Fixed timestep Euler (reference implementation match)
         kwargs[:dt] = config.fixed_dt
         kwargs[:adaptive] = false
     elseif config.ode_solver_type == :Tsit5
@@ -442,7 +442,7 @@ end
 Convenience function to create ERA5NumericalConfig from a mode symbol.
 
 # Arguments
-- `mode`: :baseline (default, Fortran parity) or :modern (enhanced numerics)
+- `mode`: :baseline (default, reference parity) or :modern (enhanced numerics)
 
 # Examples
 ```julia

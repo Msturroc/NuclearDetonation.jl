@@ -1,5 +1,5 @@
 # Tests for deposition.jl: Dry and Wet Deposition
-# Based on SNAP drydep.f90 and wetdep.f90
+# Dry and wet deposition tests
 
 using Test
 using NuclearDetonation.Transport:

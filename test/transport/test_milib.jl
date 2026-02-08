@@ -1,5 +1,5 @@
 # Tests for milib.jl: Coordinate Transformations and Map Field Calculations
-# Based on DNMI/met.no Fortran code
+# Coordinate transformation tests
 
 using Test
 

@@ -1,9 +1,8 @@
 """
 Convert omega (Pa/s) to sigma-dot (dσ/dt) for hybrid coordinates.
 
-This implements the critical conversion from SNAP's om2edot.f90.
 Meteorological models provide vertical velocity in pressure coordinates (omega, Pa/s),
-but SNAP's transport code requires it in sigma coordinates (dσ/dt).
+but the transport code requires it in sigma coordinates (dσ/dt).
 
 The conversion is: σ̇ = ω * (dσ/dp)
 
@@ -56,7 +55,7 @@ end
     compute_etadot_from_continuity!(::ERA5Format, ...)
 
 ERA5-specific vertical velocity computation using continuity equation.
-Keeps data in file order (TOA first, surface last) matching Fortran SNAP.
+Keeps data in file order (TOA first, surface last).
 """
 function compute_etadot_from_continuity!(::ERA5Format,
                                          edot::Array{T,3},
@@ -100,7 +99,6 @@ end
 Compute etadot (sigma-dot) from horizontal winds using continuity equation.
 
 This is a critical fallback when meteorological data lacks vertical velocity.
-Implements SNAP's edcomp subroutine from om2edot.f90.
 
 Based on Jan Erik Haugen's Hirlam routine EDCOMP.
 """
@@ -193,7 +191,7 @@ function compute_etadot_from_continuity!(edot::Array{T,3},
                 dp = da + db * ps[i, j]
 
                 # DEBUG: Print at sample point (80, 63) for level 100
-                if SNAP_DEBUG_EDCOMP && i == 80 && j == 63 && k == 100
+                if DEBUG_EDCOMP && i == 80 && j == 63 && k == 100
                     println("JULIA EDCOMP DEBUG k=$k i=$i j=$j:")
                     println("  da=$da db=$db deta=$deta")
                     println("  ps[i,j]=$(ps[i,j]) Pa")
@@ -206,9 +204,7 @@ function compute_etadot_from_continuity!(edot::Array{T,3},
                     println("  etadot*deta/dp=$(etadot * deta / dp)")
                 end
 
-                # CRITICAL: Match Fortran EXACTLY - no dp check!
-                # Fortran om2edot.f90:220 does: etadot = etadot*deta/dp
-                # without any guard, so Julia must do the same
+                # No dp guard — matches the reference implementation exactly
                 etadot = etadot * deta / dp
 
                 # Mean with input value (will be zero for GFS case)
@@ -219,13 +215,13 @@ function compute_etadot_from_continuity!(edot::Array{T,3},
                 end
 
                 # DEBUG: Print final value
-                if SNAP_DEBUG_EDCOMP && i == 80 && j == 63 && k == 100
+                if DEBUG_EDCOMP && i == 80 && j == 63 && k == 100
                     println("  edot[i,j,k] (after averaging=$(averaging))=$(edot[i, j, k])")
                 end
 
                 # DEBUG: Also print values at particle 1 location (i=68, j=79)
                 # After reversal: particle near surface (sigma~0.989) is at k=4-5, not k=133-134!
-                if SNAP_DEBUG_EDCOMP && i == 68 && j == 79 && (k == 4 || k == 5)
+                if DEBUG_EDCOMP && i == 68 && j == 79 && (k == 4 || k == 5)
                     println("JULIA EDCOMP DEBUG k=$k i=$i j=$j:")
                     println("  === U/V FIELD VALUES ===")
                     println("  u[i,j,k]=$(u[i,j,k]) v[i,j,k]=$(v[i,j,k])")
@@ -292,7 +288,7 @@ Map scale factors correct for this distortion:
 - xm(i,j) = 1 / cos(latitude) - corrects for longitudinal convergence
 - ym(i,j) = 1 - constant for all latitudes
 
-Based on SNAP's mapfield.f90 for igtype=2 (geographic grids).
+Applies to igtype=2 (geographic grids).
 """
 function compute_map_scale_factors!(xm::Matrix{T},
                                      ym::Matrix{T},
@@ -320,4 +316,4 @@ function compute_map_scale_factors!(xm::Matrix{T},
 
     return nothing
 end
-const SNAP_DEBUG_EDCOMP = false
+const DEBUG_EDCOMP = false

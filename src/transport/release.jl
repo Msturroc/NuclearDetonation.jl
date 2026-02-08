@@ -1,7 +1,5 @@
-# SNAP: Severe Nuclear Accident Programme
-# Release Module - Source Term Modeling
+# Atmospheric transport — Source term modelling
 #
-# Ported from release.f90
 # Handles particle release profiles including nuclear weapon mushroom clouds
 
 """

@@ -1,13 +1,11 @@
-# SNAP: Severe Nuclear Accident Programme
 # Meteorological Interpolation Library (milib)
 #
-# Ported from Fortran 77 to Julia
-# Original Copyright (C) 2006-2008 met.no (Norwegian Meteorological Institute)
+# Coordinate conversion routines for various map projections.
 
 """
     earthr()
 
-Return Earth radius in meters (DNMI standard value).
+Return Earth radius in metres (standard value).
 
 # Returns
 - `Float64`: Earth radius = 6,371,000 m
@@ -34,7 +32,7 @@ All values are in radians. Arrays are modified in-place.
 - `ierror`: 0 = success, 1 = invalid icall
 
 # Based on
-DNMI/FoU Hirlam code, modified by Anstein Foss (1995)
+Hirlam code by Anstein Foss (1995)
 """
 function sph2rot!(icall::Int, x::Vector{Float64}, y::Vector{Float64},
                   xcen::Float64, ycen::Float64)
@@ -130,7 +128,7 @@ Spherical coordinates are in radians.
 - `ierror`: 0 = success, 1 = invalid icall
 
 # Based on
-DNMI/FoU Hirlam code, modified by Anstein Foss (1995-1997)
+Hirlam code by Anstein Foss (1995-1997)
 """
 function pol2sph!(icall::Int, x::Vector{Float64}, y::Vector{Float64},
                   fpol::Float64, xp::Float64, yp::Float64, an::Float64, fi::Float64)
@@ -236,7 +234,7 @@ Spherical coordinates are in radians.
 - `ierror`: 0 = success, 1 = invalid icall
 
 # Based on
-met.no/FoU code by Ole Vignes (2008)
+Lambert projection code (2008)
 """
 function lam2sph!(icall::Int, x::Vector{Float64}, y::Vector{Float64},
                   xw::Float64, ys::Float64, dx::Float64, dy::Float64,
@@ -347,7 +345,7 @@ Spherical coordinates are in radians.
 - `ierror`: 0 = success, 1 = invalid icall
 
 # Based on
-DNMI/FoU code by Anstein Foss (1996)
+Mercator projection code by Anstein Foss (1996)
 """
 function mer2sph!(icall::Int, x::Vector{Float64}, y::Vector{Float64},
                   xw::Float64, ys::Float64, dx::Float64, dy::Float64, yc::Float64)
@@ -510,8 +508,7 @@ For all grid types, parameters are stored in a 6-element array:
 - `ierror`: 0 = success, 1 = invalid grid type/parameters
 
 # Based on
-DNMI/FoU code by J.E. Haugen and Anstein Foss (1994-1996)
-met.no code by Ole Vignes (2008)
+Coordinate conversion code by J.E. Haugen and Anstein Foss (1994-1996)
 """
 function xyconvert!(npos::Int, x::Vector{Float64}, y::Vector{Float64},
                     igtypa::Int, ga::Vector{Float64}, igtypr::Int, gr::Vector{Float64})
@@ -748,7 +745,7 @@ y_gradient = ym[i,j] * (field[i,j+1] - field[i,j-1]) / (hy * 2.0)
 ```
 
 # Based on
-DNMI/FoU code by Anstein Foss (1995-1996) and Ole Vignes (2008)
+Map projection code by Anstein Foss (1995-1996)
 """
 function mapfield(imapr::Int, icori::Int, igtype::Int, grid::Vector{Float64},
                   nx::Int, ny::Int)
