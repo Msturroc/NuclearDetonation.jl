@@ -386,24 +386,37 @@ Create simulation domain from geographic coordinates (convenience constructor).
 # Arguments
 - `lon_min, lon_max`: Longitude bounds (degrees East, -180 to 180)
 - `lat_min, lat_max`: Latitude bounds (degrees North, -90 to 90)
-- `z_min, z_max`: Height bounds (meters MSL)
+- `z_min, z_max`: Height bounds (metres MSL)
 - `nx, ny, nz`: Grid dimensions
-- `start_time, end_time`: DateTime bounds
+- `start_time`: Start DateTime (or `t_start` as alias)
+- `end_time`: End DateTime — provide this **or** `duration_hours`
+- `duration_hours`: Simulation duration in hours (alternative to `end_time`)
 - `dt_output`: Output interval (default: 1 hour)
 - `dt_met`: Met data interval (default: 1 hour for ERA5 hourly data)
 
 # Returns
 - `SimulationDomain{Float64}`: Configured domain
 
-# Example
+# Examples
 ```julia
+# Using start_time + end_time
 domain = SimulationDomain(
     lon_min=-120.0, lon_max=-110.0,
     lat_min=34.0, lat_max=42.0,
     z_min=0.0, z_max=15000.0,
     nx=100, ny=80, nz=30,
-    start_time=DateTime(1953, 3, 24, 13, 10),
-    end_time=DateTime(1953, 3, 26, 13, 10)
+    start_time=DateTime(1953, 3, 24, 13),
+    end_time=DateTime(1953, 3, 26, 13)
+)
+
+# Using t_start + duration_hours
+domain = SimulationDomain(
+    lon_min=-120.0, lon_max=-110.0,
+    lat_min=35.0, lat_max=42.0,
+    z_min=0.0, z_max=35000.0,
+    nx=36, ny=25, nz=137,
+    t_start=DateTime(1953, 3, 24, 13),
+    duration_hours=12
 )
 ```
 """
@@ -411,10 +424,33 @@ function SimulationDomain(; lon_min::Real, lon_max::Real,
                            lat_min::Real, lat_max::Real,
                            z_min::Real, z_max::Real,
                            nx::Int, ny::Int, nz::Int,
-                           start_time::Union{DateTime,Dates.DateTime},
-                           end_time::Union{DateTime,Dates.DateTime},
+                           start_time::Union{DateTime,Dates.DateTime,Nothing}=nothing,
+                           t_start::Union{DateTime,Dates.DateTime,Nothing}=nothing,
+                           end_time::Union{DateTime,Dates.DateTime,Nothing}=nothing,
+                           duration_hours::Union{Real,Nothing}=nothing,
                            dt_output::Union{Duration,Dates.Hour}=Dates.Hour(1),
                            dt_met::Union{Duration,Dates.Hour}=Dates.Hour(1))
+    # Resolve start time (accept either start_time or t_start)
+    if start_time !== nothing
+        st = start_time
+    elseif t_start !== nothing
+        st = t_start
+    else
+        error("Provide either start_time or t_start")
+    end
+
+    # Resolve end time (accept either end_time or duration_hours)
+    if end_time !== nothing
+        et = end_time
+    elseif duration_hours !== nothing
+        et = if st isa Dates.DateTime
+            st + Dates.Hour(round(Int, duration_hours))
+        else
+            st + Duration(round(Int, duration_hours))
+        end
+    else
+        error("Provide either end_time or duration_hours")
+    end
     T = Float64
 
     # Convert to typed values
@@ -460,13 +496,13 @@ function SimulationDomain(; lon_min::Real, lon_max::Real,
 
     # Convert Dates types to internal types if needed
     # Note: Internal DateTime only supports hourly granularity (no minutes/seconds)
-    if start_time isa Dates.DateTime
-        start_time = DateTime(Dates.year(start_time), Dates.month(start_time),
-                             Dates.day(start_time), Dates.hour(start_time))
+    if st isa Dates.DateTime
+        st = DateTime(Dates.year(st), Dates.month(st),
+                      Dates.day(st), Dates.hour(st))
     end
-    if end_time isa Dates.DateTime
-        end_time = DateTime(Dates.year(end_time), Dates.month(end_time),
-                           Dates.day(end_time), Dates.hour(end_time))
+    if et isa Dates.DateTime
+        et = DateTime(Dates.year(et), Dates.month(et),
+                      Dates.day(et), Dates.hour(et))
     end
     if dt_output isa Dates.Hour
         dt_output = Duration(0, 0, 0, Dates.value(dt_output))
@@ -476,7 +512,7 @@ function SimulationDomain(; lon_min::Real, lon_max::Real,
     end
 
     return SimulationDomain(nx, ny, nz, dx, dy, hlevel, xm, ym, cell_area,
-                            start_time, end_time, dt_output, dt_met,
+                            st, et, dt_output, dt_met,
                             lon_min=lon_min, lon_max=lon_max,
                             lat_min=lat_min, lat_max=lat_max)
 end

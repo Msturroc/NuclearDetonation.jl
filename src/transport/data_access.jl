@@ -12,7 +12,7 @@ const _ARTIFACTS_TOML = joinpath(@__DIR__, "..", "..", "Artifacts.toml")
 
 Return a sorted vector of file paths to the Nancy ERA5 meteorological data files.
 
-On first call, triggers a lazy download from Zenodo (~300 MB). Subsequent calls
+On first call, triggers a download from Zenodo (~96 MB). Subsequent calls
 use the cached artifact.
 
 # Returns
@@ -31,8 +31,13 @@ function nancy_era5_files()
               "ERA5 data must be uploaded to Zenodo and the artifact registered first.")
     end
     if !artifact_exists(hash)
-        ensure_artifact_installed("nancy_era5_data", _ARTIFACTS_TOML; lazy_download=true)
+        ensure_artifact_installed("nancy_era5_data", _ARTIFACTS_TOML)
     end
     rootpath = artifact_path(hash)
-    sort(filter(f -> endswith(f, ".nc"), readdir(rootpath, join=true)))
+    # Tarball extracts with a nancy_era5_data/ subdirectory
+    datadir = joinpath(rootpath, "nancy_era5_data")
+    if !isdir(datadir)
+        datadir = rootpath
+    end
+    sort(filter(f -> endswith(f, ".nc"), readdir(datadir, join=true)))
 end

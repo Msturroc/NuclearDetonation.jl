@@ -214,6 +214,34 @@ struct ReleaseSource{T<:Real}
 end
 
 """
+    ReleaseSource(domain::SimulationDomain, lat, lon, geometry, profile, activity, nparticles)
+
+Convenience constructor that converts geographic coordinates to grid coordinates.
+
+# Arguments
+- `domain`: Simulation domain (for coordinate conversion)
+- `lat`: Release latitude (degrees North)
+- `lon`: Release longitude (degrees East)
+- `geometry`: Release geometry (ColumnRelease, CylinderRelease, etc.)
+- `profile`: Temporal release profile (BombRelease, ConstantRelease, etc.)
+- `activity`: Release activity per component (Bq)
+- `nparticles`: Number of particles
+
+# Example
+```julia
+source = ReleaseSource(domain, 37.0956, -116.1028,
+    CylinderRelease(0.0, 12500.0, 2500.0),
+    BombRelease(0.0), [1e15], 1000)
+```
+"""
+function ReleaseSource(domain, lat::Real, lon::Real,
+                       geometry::ReleaseGeometry, profile::ReleaseProfile,
+                       activity::Vector{T}, nparticles::Int) where T<:Real
+    x, y = latlon_to_grid(domain, lat, lon)
+    return ReleaseSource((T(x), T(y)), geometry, profile, activity, nparticles)
+end
+
+"""
     Plume{T<:Real}
 
 Information for a single particle plume.

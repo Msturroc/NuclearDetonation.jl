@@ -8,8 +8,8 @@
 # optimised parameters, then plots model-predicted dose rate contours.
 #
 # Requirements:
-#   - ERA5 data in ../ERA5_data_snap/ (preprocessed _snap.nc files)
 #   - ] add CairoMakie
+#   - ERA5 data artifact (~96 MB, downloaded automatically on first run)
 #
 # Usage:
 #   julia --project=.. nancy_bomb_release.jl
@@ -107,13 +107,8 @@ end
 # ============================================================================
 
 println("\n1. Loading ERA5 met data...")
-era5_dir = joinpath(@__DIR__, "ERA5_data_snap")
-if !isdir(era5_dir)
-    error("ERA5 data directory not found: $(era5_dir)\n" *
-          "   Copy or symlink preprocessed ERA5 _snap.nc files here.")
-end
-era5_files = sort(filter(f -> endswith(f, "_snap.nc"),
-                         [joinpath(era5_dir, f) for f in readdir(era5_dir)]))
+era5_files = nancy_era5_files()
+println("   Found $(length(era5_files)) ERA5 files")
 
 met_format = Transport.detect_met_format(era5_files[1])
 nx_met, ny_met, nk_met = NCDataset(era5_files[1]) do ds
