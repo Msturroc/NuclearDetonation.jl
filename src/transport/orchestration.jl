@@ -210,41 +210,6 @@ Configuration for deposition physics.
 end
 
 """
-    TurbulentDiffusionConfig{T<:Real}
-
-Configuration for turbulent diffusion (random walk).
-
-# Fields
-- `apply_diffusion::Bool`: Enable turbulent diffusion
-- `tmix_v::T`: Vertical mixing time (seconds, default: 900s = 15 min)
-- `tmix_h::T`: Horizontal mixing time (seconds, default: 900s = 15 min)
-- `lmax::T`: Maximum l-eta in mixing layer (default: 0.28)
-- `labove::T`: l-eta above mixing layer (default: 0.03)
-- `entrainment::T`: Entrainment zone fraction (default: 0.1 = 10%)
-- `hmax::T`: Maximum mixing height (m, default: 2500.0)
-- `horizontal_a_bl::T`: Horizontal diffusion coefficient in BL (default: 0.5)
-- `horizontal_a_above::T`: Horizontal diffusion coefficient above BL (default: 0.25)
-- `horizontal_b::T`: Power law exponent for wind speed dependence (default: 0.875)
-- `blfullmix::Bool`: Full mixing in boundary layer (default: false)
-
-# Reference
-Bartnicki (2011) parameterisation for turbulent diffusion
-"""
-@kwdef struct TurbulentDiffusionConfig{T<:Real}
-    apply_diffusion::Bool = true
-    tmix_v::T = 900.0           # 15 minutes vertical mixing time
-    tmix_h::T = 900.0           # 15 minutes horizontal mixing time
-    lmax::T = 0.28              # Maximum l-eta in mixing layer
-    labove::T = 0.03            # l-eta above mixing layer
-    entrainment::T = 0.1        # 10% entrainment zone
-    hmax::T = 2500.0            # Maximum mixing height (m)
-    horizontal_a_bl::T = 0.5    # Horizontal coeff in BL
-    horizontal_a_above::T = 0.25 # Horizontal coeff above BL
-    horizontal_b::T = 0.875     # Power law exponent
-    blfullmix::Bool = false     # Gradual mixing (not instant)
-end
-
-"""
     ParticleSizeConfig
 
 Configuration for particle size distribution and settling.
@@ -317,7 +282,6 @@ Integrate one simulation timestep: advection, deposition, decay.
                             deposition_config::DepositionConfig{T},
                             decay_params::Vector{DecayParams{T}},
                             config::SimulationConfig{T};
-                            diffusion_config::TurbulentDiffusionConfig{T}=TurbulentDiffusionConfig{T}(),
                             hanna_config::Union{Nothing,HannaTurbulenceConfig{T}}=nothing,
                             advection_enabled::Bool=true,
                             settling_enabled::Bool=true,
@@ -327,7 +291,6 @@ Integrate one simulation timestep: advection, deposition, decay.
                             local_time_offset::T=T(0.0),
                             numerical_config::Union{NumericalConfig, ERA5NumericalConfig, Nothing}=nothing,
                             trace_filename::String="julia_particles_trace.csv",
-                            is_era5::Bool=false,
                             trace_time_override::Union{Nothing, T}=nothing,
                             output_config::OutputConfig=OutputConfig()) where T<:Real
 
@@ -340,7 +303,7 @@ Integrate one simulation timestep: advection, deposition, decay.
     grid_scale_y = (ny_met - 1) / (domain.ny - 1)
     z_max_m = maximum(domain.hlevel)
 
-    # CRITICAL: Detect if met data has reversed latitude (ERA5: N→S, GFS: S→N)
+    # CRITICAL: Detect if met data has reversed latitude (ERA5: N→S)
     lat_reversed = (winds.y_grid[end] < winds.y_grid[1])
 
     # Compute map ratios for horizontal advection (convert m/s to grid/s)
@@ -348,27 +311,21 @@ Integrate one simulation timestep: advection, deposition, decay.
     # using the mapfield approach:
     #   hlon = R_earth * dlon_rad (grid spacing at equator)
     #   rmx = xm / hlon where xm = 1/cos(lat) at particle position
-    # The xm factor is applied later in particle_velocity for ERA5.
+    # The xm factor is applied later in particle_velocity.
     #
     # Previous bug: domain.dx included cos(lat_mid) from mid-latitude conversion,
     # but then 1/cos(lat) was also applied at particle position, double-counting
     # the latitude correction and causing ~19% longitude drift.
-    if is_era5
-        # ERA5: Use equatorial grid spacing (mapfield approach)
-        # Per-cell spacing in degrees = total span / (nx-1) intervals
-        dlon_deg = (domain.lon_max - domain.lon_min) / (domain.nx - 1)
-        dlat_deg = (domain.lat_max - domain.lat_min) / (domain.ny - 1)
-        R_earth = T(6.371e6)  # metres
-        # Grid spacing at equator (metres per grid cell)
-        dx_equator = R_earth * dlon_deg * T(π) / T(180.0)
-        dy_equator = R_earth * dlat_deg * T(π) / T(180.0)
-        map_ratio_x = T(1.0) / dx_equator
-        map_ratio_y = T(1.0) / dy_equator
-    else
-        # GFS: Use domain.dx/dy (proven in oct29 reference implementation)
-        map_ratio_x = T(1.0) / domain.dx
-        map_ratio_y = T(1.0) / domain.dy
-    end
+    # ERA5: Use equatorial grid spacing (mapfield approach)
+    # Per-cell spacing in degrees = total span / (nx-1) intervals
+    dlon_deg = (domain.lon_max - domain.lon_min) / (domain.nx - 1)
+    dlat_deg = (domain.lat_max - domain.lat_min) / (domain.ny - 1)
+    R_earth = T(6.371e6)  # metres
+    # Grid spacing at equator (metres per grid cell)
+    dx_equator = R_earth * dlon_deg * T(π) / T(180.0)
+    dy_equator = R_earth * dlat_deg * T(π) / T(180.0)
+    map_ratio_x = T(1.0) / dx_equator
+    map_ratio_y = T(1.0) / dy_equator
 
     σ_grid_min = 0.0
     σ_grid_max = 1.0
@@ -418,9 +375,9 @@ Integrate one simulation timestep: advection, deposition, decay.
     for j in 1:ny_domain
         # Use same lat reversal logic as particle transforms
         if lat_reversed
-            y_met = ny_met - ((j - 1.0) * grid_scale_y)  # ERA5
+            y_met = ny_met - ((j - 1.0) * grid_scale_y)
         else
-            y_met = (j - 1.0) * grid_scale_y + 1.0  # GFS
+            y_met = (j - 1.0) * grid_scale_y + 1.0
         end
         for i in 1:nx_domain
             x_met = (i - 1.0) * grid_scale_x + 1.0
@@ -484,6 +441,16 @@ Integrate one simulation timestep: advection, deposition, decay.
         end
     end
 
+    # Pre-allocate heights buffer to avoid per-call allocation in hybrid_profile
+    heights_buffer = Vector{Float64}(undef, length(winds.z_grid))
+
+    # Pre-compute trace decision: same for all particles in this timestep
+    trace_time = isnothing(trace_time_override) ? (current_time_global + dt) : trace_time_override
+    write_trace_this_step = should_write_trace(output_config, trace_time, dt)
+
+    # Open trace file once for the entire particle loop (avoids per-particle open/close)
+    trace_io = write_trace_this_step ? open(trace_filename, "a") : nothing
+
     # Integrate each active particle
     for (i, particle) in enumerate(state.ensemble.particles)
         if !is_active(particle)
@@ -497,14 +464,14 @@ Integrate one simulation timestep: advection, deposition, decay.
         x_era5 = (pos_domain[1] - 1.0) * grid_scale_x + 1.0
         # Use lat_reversed (computed at function start) for coordinate transform
         if lat_reversed
-            y_era5 = ny_met - (pos_domain[2] - 1.0) * grid_scale_y  # Reverse for ERA5
+            y_era5 = ny_met - (pos_domain[2] - 1.0) * grid_scale_y  # Reverse for N→S latitude
         else
-            y_era5 = (pos_domain[2] - 1.0) * grid_scale_y + 1.0  # No reversal for GFS
+            y_era5 = (pos_domain[2] - 1.0) * grid_scale_y + 1.0
         end
         # Stored position uses sigma for vertical coordinate (see simulation.jl).
         stored_sigma = clamp(Float64(pos_domain[3]), σ_grid_min, σ_grid_max)
         prev_sigma = isfinite(particle.z) ? clamp(Float64(particle.z), σ_grid_min, σ_grid_max) : nothing
-        profile_start = hybrid_profile(winds, x_era5, y_era5, local_time_offset)
+        profile_start = hybrid_profile(winds, x_era5, y_era5, local_time_offset; heights_buffer=heights_buffer)
 
         # DEBUG: Disabled for performance
         # if i == 1
@@ -545,14 +512,14 @@ Integrate one simulation timestep: advection, deposition, decay.
         blk_time = local_time_offset
         tbl_sigma = winds.tbl_interp(pos_era5[1], pos_era5[2], blk_time)
         if !isfinite(tbl_sigma)
-            tbl_sigma = 1.0 - (diffusion_config.hmax / z_max_m)
+            tbl_sigma = 1.0 - (2500.0 / z_max_m)
         end
         tbl_sigma = clamp(tbl_sigma, 0.0, 1.0)
         particle.tbl = Float32(tbl_sigma)
 
         hbl_meter = winds.hbl_interp(pos_era5[1], pos_era5[2], blk_time)
         if !isfinite(hbl_meter)
-            hbl_meter = diffusion_config.hmax
+            hbl_meter = 2500.0
         end
         particle.hbl = Float32(max(hbl_meter, 0.0))
 
@@ -771,7 +738,7 @@ Integrate one simulation timestep: advection, deposition, decay.
             # Reference only zeros gravitational settling (wg), not meteorological wind.
             # It only zeros wg when dry deposition is active.
 
-            profile_local = hybrid_profile(p.winds, x, y, t)
+            profile_local = hybrid_profile(p.winds, x, y, t; heights_buffer=p.heights_buffer)
 
             # Add gravitational settling if configured AND enabled
             vg_sigma = 0.0
@@ -804,7 +771,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                     vg_sigma = 0.0  # Dry deposition will handle removal in surface layer
                 else
                     # Convert settling velocity (m/s) to sigma tendency using local layer thickness
-                    # Oct29 proven method: Direct height interpolation (works for GFS, simpler than hypsometric)
+                    # Direct height interpolation (simpler than hypsometric)
                     z_grid = p.winds.z_grid
                     # Ensure within bounds (avoid extrapolation artifacts)
                     z_clamped = clamp(z, z_grid[1] + eps(T), z_grid[end] - eps(T))
@@ -888,25 +855,17 @@ Integrate one simulation timestep: advection, deposition, decay.
             # For geographic grids, 1° of longitude shrinks toward poles:
             # physical_distance_x = grid_distance_x * cos(lat)
             # So to convert m/s to grid/s: dx/dt = u * xm / hx where xm = 1/cos(lat)
-            #
-            # NOTE: This xm factor is ONLY needed for ERA5 lat/lon grids.
-            # GFS already has correct map ratios pre-computed - applying xm breaks GFS!
 
-            if p.is_era5
-                # ERA5: Apply latitude-dependent xm factor
-                # Convert y-position to latitude (y is in met grid coordinates, typically 1 to ny)
-                ny_met = length(p.winds.y_grid)
-                lat_frac = (y - 1.0) / max(ny_met - 1, 1)  # 0 to 1
-                lat_deg = p.domain.lat_min + lat_frac * (p.domain.lat_max - p.domain.lat_min)
-                lat_rad = lat_deg * π / 180.0
-                clat = cos(lat_rad)
-                clat = max(clat, 0.01745)  # ~cos(89°), avoid division by zero near poles
-                xm_factor = 1.0 / clat
-                du[1] = u_wind * p.map_ratio_x * xm_factor
-            else
-                # GFS: Use oct29 proven method - direct map ratios without xm correction
-                du[1] = u_wind * p.map_ratio_x
-            end
+            # Apply latitude-dependent xm factor
+            # Convert y-position to latitude (y is in met grid coordinates, typically 1 to ny)
+            ny_met = length(p.winds.y_grid)
+            lat_frac = (y - 1.0) / max(ny_met - 1, 1)  # 0 to 1
+            lat_deg = p.domain.lat_min + lat_frac * (p.domain.lat_max - p.domain.lat_min)
+            lat_rad = lat_deg * π / 180.0
+            clat = cos(lat_rad)
+            clat = max(clat, 0.01745)  # ~cos(89°), avoid division by zero near poles
+            xm_factor = 1.0 / clat
+            du[1] = u_wind * p.map_ratio_x * xm_factor
             du[2] = v_wind * p.map_ratio_y
             # Sigma tendency: w is dσ/dt (positive increases σ toward surface)
             du[3] = w_wind + vg_sigma
@@ -933,7 +892,7 @@ Integrate one simulation timestep: advection, deposition, decay.
             domain = domain,
             config = config,
             numerical_config = numerical_config, # Added for interpolation access
-            is_era5 = is_era5  # Pass format flag for conditional xm scaling
+            heights_buffer = heights_buffer
         )
 
         # Integrate trajectory
@@ -967,7 +926,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                 y_domain_final = (pos_final[2] - 1.0) / grid_scale_y + 1.0
             end
             t_eval = t1_local + dt
-            profile_eval = hybrid_profile(winds, pos_final[1], pos_final[2], T(t_eval))
+            profile_eval = hybrid_profile(winds, pos_final[1], pos_final[2], T(t_eval); heights_buffer=heights_buffer)
         else
             # OrdinaryDiffEq path
             tspan = (local_time_offset, local_time_offset + dt)
@@ -1000,7 +959,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                 y_domain_final = (pos_final[2] - 1.0) / grid_scale_y + 1.0
             end
             t_eval = sol.t[end]
-            profile_eval = hybrid_profile(winds, pos_final[1], pos_final[2], t_eval)
+            profile_eval = hybrid_profile(winds, pos_final[1], pos_final[2], t_eval; heights_buffer=heights_buffer)
         end
         # Track final sigma coordinate (will be updated by turbulent diffusion)
         z_sigma_deposition = clamp(pos_final[3], σ_grid_min, σ_grid_max)
@@ -1408,129 +1367,6 @@ Integrate one simulation timestep: advection, deposition, decay.
             prev_height = z_height_final
             z_sigma_deposition = z_sigma_final  # Update for deposition check
 
-        elseif diffusion_config.apply_diffusion
-            # ===== SIMPLE TURBULENT DIFFUSION (random walk) =====
-            # Original random walk algorithm for backward compatibility
-
-            # Get wind components at particle position for horizontal diffusion
-            # Use end of timestep for wind evaluation (after advection)
-            t_diffusion = local_time_offset + dt
-            u_wind = winds.u_interp(pos_final[1], pos_final[2], pos_final[3], t_diffusion)
-            v_wind = winds.v_interp(pos_final[1], pos_final[2], pos_final[3], t_diffusion)
-            vabs = hypot(u_wind, v_wind)
-
-            # Compute top of boundary layer in sigma coordinates (tbl)
-            # z_sigma ranges from 0 (top) to 1 (surface)
-            # If mixing height is 1500m and domain top is z_max_m, then:
-            tbl_from_particle = Float64(particle.tbl)
-            tbl_computed = 1.0 - (diffusion_config.hmax / z_max_m)
-            tbl = particle.tbl > 0f0 ?
-                clamp(Float64(particle.tbl), 0.0, 1.0) :
-                clamp(tbl_computed, 0.0, 1.0)
-
-            # Pre-compute time factors
-            ratio_v = dt / diffusion_config.tmix_v
-            ratio_h = dt / diffusion_config.tmix_h
-            if ratio_v <= 0 || ratio_h <= 0
-                throw(DomainError(ratio_v,
-                    "Invalid turbulent diffusion timestep: dt=$(dt) s, tmix_v=$(diffusion_config.tmix_v) s, tmix_h=$(diffusion_config.tmix_h) s, ratio_h=$(ratio_h)"))
-            end
-            tsqrtfactor_v = sqrt(ratio_v)
-            tsqrtfactor_h = sqrt(ratio_h)
-
-            # Horizontal diffusion (wind-speed dependent)
-            # rl = 2*a*((vabs*tmix_h)^b) * tsqrtfactor_h
-            in_bl = pos_final[3] > tbl  # Remember: z_sigma > tbl means IN boundary layer
-            a = in_bl ? diffusion_config.horizontal_a_bl : diffusion_config.horizontal_a_above
-
-            rl = 2.0 * a * (vabs * diffusion_config.tmix_h)^diffusion_config.horizontal_b * tsqrtfactor_h
-
-            # Random perturbations [-0.5, 0.5]
-            rnd_x = rand() - 0.5
-            rnd_y = rand() - 0.5
-            rnd_z = rand() - 0.5
-
-            # Apply horizontal diffusion in grid coordinates
-            x_domain_final += rl * rnd_x * map_ratio_x
-            y_domain_final += rl * rnd_y * map_ratio_y
-
-            # Vertical diffusion (dimensionless in sigma coordinates)
-            # ERA5 FIX: Use clamped sigma for large particle settling (Issue #38)
-            # For particles with large settling velocities, pos_final[3] can be >> 1.0.
-            # The reflection formula 2.0 - z would give negative sigma, incorrectly
-            # pushing particles to top of BL. GFS doesn't need this fix.
-            # NOTE: Only apply this fix when settling is enabled; for pure advection+turbulence,
-            # use raw pos_final[3] to avoid systematic downward drift.
-            z_sigma_final = (is_era5 && settling_enabled) ? z_sigma_deposition : pos_final[3]
-
-            # DIAGNOSTIC: Log turbulence parameters for first particle at each hour
-            hour = current_time_global / 3600.0
-            if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "TRANSPORT_TURB_DIAG", "") == "1"
-                @info "TURB_DIAG" hour=round(Int, hour) particle=i tbl=round(tbl, digits=4) hbl_m=round(particle.hbl, digits=1) z_sigma=round(z_sigma_final, digits=4) tsqrtfactor_v=round(tsqrtfactor_v, digits=4) in_bl=(z_sigma_final > tbl)
-            end
-
-            if z_sigma_final <= tbl  # Above boundary layer
-                # vrdbla = labove * tsqrtfactor_v (above BL diffusion)
-                rv = diffusion_config.labove * tsqrtfactor_v
-                z_sigma_final += rv * rnd_z
-                # DIAGNOSTIC
-                if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "TRANSPORT_TURB_DIAG", "") == "1"
-                    @info "TURB_RV_ABOVE" rv=round(rv, digits=6) rnd_z=round(rnd_z, digits=3) z_after=round(z_sigma_final, digits=4)
-                end
-            else  # In boundary layer
-                # Check if full mixing should be used
-                bl_entrainment_thickness = (1.0 - tbl) * (1.0 + diffusion_config.entrainment)
-                top_entrainment = max(0.0, 1.0 - bl_entrainment_thickness)
-
-                # CRITICAL: Use full mixing when timestep is large
-                # If blfullmix=true OR tsqrtfactor_v > 1.0, redistribute particle randomly in BL
-                if diffusion_config.blfullmix || tsqrtfactor_v > 1.0
-                    # Full mixing mode - randomly distribute in boundary layer
-                    # z = 1.0 - bl_entrainment_thickness * (rnd(3) + 0.5)
-                    # This gives z in range [top_entrainment, 1.0]
-                    z_sigma_final = 1.0 - bl_entrainment_thickness * (rnd_z + 0.5)
-                else
-                    # Incremental mixing mode with small displacements and reflections
-                    # rv = (1-tbl)*tsqrtfactor_v (in-BL incremental mixing)
-                    rv = (1.0 - tbl) * tsqrtfactor_v
-                    z_before = z_sigma_final
-                    z_sigma_final += rv * rnd_z
-                    # DIAGNOSTIC
-                    if i == 1 && abs(hour - round(hour)) < 0.01 && get(ENV, "TRANSPORT_TURB_DIAG", "") == "1"
-                        @info "TURB_RV_INBL" rv=round(rv, digits=6) rnd_z=round(rnd_z, digits=3) z_before=round(z_before, digits=4) z_after=round(z_sigma_final, digits=4) top_ent=round(top_entrainment, digits=4)
-                    end
-
-                    # Reflection from ABL top (with entrainment zone)
-                    # DISABLED: To allow particles to escape the PBL and match FLEXPART/HYSPLIT
-                    # if z_sigma_final < top_entrainment
-                    #     # CRITICAL FIX: Reflect from tbl, not top_entrainment!
-                    #     # Reference: part%z = 2.0*part%tbl - part%z
-                    #     z_sigma_final = 2.0 * tbl - z_sigma_final
-                    # end
-
-                    # Bottom reflection (reference implementation)
-                    # ERA5 FIX: Enable bottom reflection for ERA5 (matches reference behaviour)
-                    # GFS: Keep clamping to avoid upward drift issues
-                    if is_era5 && z_sigma_final > 1.0
-                        z_sigma_final = 2.0 - z_sigma_final  # Standard reflection
-                    end
-
-                    # Enforce vertical limits
-                    z_sigma_final = min(z_sigma_final, 1.0)
-                    z_sigma_final = max(z_sigma_final, top_entrainment)
-                end
-            end
-
-            # Convert back to domain vertical coordinates
-            z_sigma_final = clamp(z_sigma_final, σ_grid_min, σ_grid_max)
-            z_height_final = height_from_sigma(profile_eval, z_sigma_final; fallback_height=prev_height)
-
-            # PARITY FIX: Do NOT deposit particles after turbulence!
-            # (Same fix as Hanna turbulence path above - see comment there for details)
-            z_height_final = clamp(z_height_final, 0.0, z_max_m)
-            prev_sigma = z_sigma_final
-            prev_height = z_height_final
-            z_sigma_deposition = z_sigma_final  # Update for deposition check
         end
 
         # Check bounds
@@ -1685,14 +1521,9 @@ Integrate one simulation timestep: advection, deposition, decay.
                 end
             end
 
-            # Use trace_time_override if specified (for istep=0 parity where trace is at t=0)
-            trace_time = isnothing(trace_time_override) ? (current_time_global + dt) : trace_time_override
-
-            # Only write trace if output_config allows it at this time
-            if should_write_trace(output_config, trace_time, dt)
-                open(trace_filename, "a") do io
-                    println(io, "$(i),$(trace_time),$(lat),$(lon),$(z_sigma_deposition),$(altitude_m),$(w_wind_trace),$(vg_sigma_trace),$(w_total_trace),$(in_surface_trace),0.0,0.0,0.0,0,0")
-                end
+            # Write trace to pre-opened handle (avoids per-particle open/close)
+            if trace_io !== nothing
+                println(trace_io, "$(i),$(trace_time),$(lat),$(lon),$(z_sigma_deposition),$(altitude_m),$(w_wind_trace),$(vg_sigma_trace),$(w_total_trace),$(in_surface_trace),0.0,0.0,0.0,0,0")
             end
         end
 
@@ -1702,6 +1533,11 @@ Integrate one simulation timestep: advection, deposition, decay.
             new_mass = current_mass * decay_params[comp].decayrate
             set_rad!(particle, comp, Float32(new_mass))
         end
+    end
+
+    # Close trace file handle (opened once before the particle loop)
+    if trace_io !== nothing
+        close(trace_io)
     end
 
     return n_deposited
@@ -1760,7 +1596,6 @@ function run_simulation!(state::SimulationState{T},
                         met_files::Vector{String};
                         particle_size_config::ParticleSizeConfig=ParticleSizeConfig(),
                         deposition_config::DepositionConfig{T}=DepositionConfig{T}(),
-                        diffusion_config::TurbulentDiffusionConfig{T}=TurbulentDiffusionConfig{T}(),
                         hanna_config::Union{Nothing,HannaTurbulenceConfig{T}}=nothing,
                         decay_params::Vector{DecayParams{T}}=DecayParams{T}[],
                         config::SimulationConfig{T}=SimulationConfig{T}(),
@@ -1813,7 +1648,7 @@ function run_simulation!(state::SimulationState{T},
     meteo_params = MeteoParams()
     init_meteo_params!(meteo_params, "era5_grib")
 
-    # Detect meteorological data format (ERA5 or GFS) - use override if provided (thread-safe)
+    # Detect meteorological data format - use override if provided (thread-safe)
     met_format = if !isnothing(met_format_override)
         met_format_override
     else
@@ -1995,13 +1830,11 @@ function run_simulation!(state::SimulationState{T},
 
     # Proper initialization: set sigma from desired release height using hybrid profile at t=0
     # Then compute altitude from sigma consistently (no cheating) — this yields ~91 m exactly.
-    # CRITICAL FIX (Issue #1): GFS needs w-wind negation to match reference sigma-dot convention
-    negate_w_gfs = isa(met_format, GFSFormat)
     # CRITICAL: Use correct time span for winds0 (not 1.0s!) to enable proper time interpolation
     winds0 = create_wind_interpolants(met_fields, 0.0, init_time_diff,
                                       config=numerical_config,
                                       negate_v = false,  # ERA5 already has northward-positive v after lat flip
-                                      negate_w = negate_w_gfs,  # GFS: true (fixes sigma), ERA5: false (unchanged)
+                                      negate_w = false,
                                       lon_min=state.domain.lon_min,
                                       lon_max=state.domain.lon_max,
                                       lat_min=state.domain.lat_min,
@@ -2076,7 +1909,6 @@ function run_simulation!(state::SimulationState{T},
     _ = integrate_timestep!(state, winds0, T(config.dt_particle),
                            particle_size_config, deposition_config,
                            decay_params, config,
-                           diffusion_config=diffusion_config,
                            hanna_config=hanna_config,
                            advection_enabled=advection_enabled,
                            settling_enabled=settling_enabled,
@@ -2086,7 +1918,6 @@ function run_simulation!(state::SimulationState{T},
                            local_time_offset=T(0.0),
                            numerical_config=numerical_config,
                            trace_filename=trace_filename,
-                           is_era5=isa(met_format, ERA5Format),
                            trace_time_override=T(0.0),  # Write trace at t=0 like reference istep=0
                            output_config=config.output_config)
 
@@ -2164,12 +1995,10 @@ function run_simulation!(state::SimulationState{T},
                 # The interpolator must know the actual time span to interpolate correctly
                 # Use physical v for advection; y-grid increases northward (no negation)
                 negate_v_for_advection = false  # Keep v as physical northward (no negation)
-                # CRITICAL FIX (Issue #1): GFS needs w-wind negation, ERA5 does not
-                negate_w_for_advection = isa(met_format, GFSFormat)
                 winds = create_wind_interpolants(met_fields, 0.0, time_diff,
                                                 config=numerical_config,
                                                 negate_v=negate_v_for_advection,
-                                                negate_w=negate_w_for_advection,
+                                                negate_w=false,
                                                 lon_min=state.domain.lon_min,
                                                 lon_max=state.domain.lon_max,
                                                 lat_min=state.domain.lat_min,
@@ -2344,7 +2173,6 @@ function run_simulation!(state::SimulationState{T},
                     n_deposited = integrate_timestep!(state, winds, dt_sub,
                                                      particle_size_config, deposition_config,
                                                      decay_params, config,
-                                                     diffusion_config=diffusion_config,
                                                      hanna_config=hanna_config,
                                                      advection_enabled=advection_enabled,
                                                      settling_enabled=settling_enabled,
@@ -2354,7 +2182,6 @@ function run_simulation!(state::SimulationState{T},
                                                      local_time_offset=local_time,
                                                      numerical_config=numerical_config,
                                                      trace_filename=trace_filename,
-                                                     is_era5=isa(met_format, ERA5Format),
                                                      output_config=config.output_config)
 
                     current_time += dt_sub
@@ -2442,5 +2269,5 @@ end
 export OutputConfig, TraceFrequency, Verbosity
 export TRACE_EVERY_TIMESTEP, TRACE_HOURLY, TRACE_DISABLED
 export VERBOSITY_QUIET, VERBOSITY_NORMAL, VERBOSITY_DEBUG
-export SimulationConfig, DepositionConfig, TurbulentDiffusionConfig, HannaTurbulenceConfig, ParticleSizeConfig, SimulationSnapshot
+export SimulationConfig, DepositionConfig, HannaTurbulenceConfig, ParticleSizeConfig, SimulationSnapshot
 export run_simulation!, integrate_timestep!

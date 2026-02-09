@@ -25,6 +25,8 @@ struct HybridProfile{T<:Real}
     sigma_levels::Vector{T}
     heights::Vector{T}
     ascending::Bool
+    h_min::T
+    h_max::T
 end
 
 """
@@ -32,13 +34,21 @@ end
 
 Build a vertical column profile for location `(x, y)` at time `t`.
 """
-function hybrid_profile(winds::WindFields{T}, x::Real, y::Real, t::Real) where T
+function hybrid_profile(winds::WindFields{T}, x::Real, y::Real, t::Real;
+                        heights_buffer::Union{Nothing,Vector{Float64}}=nothing) where T
     # Clamp horizontal indices to valid grid range to avoid extrapolation artifacts
     xq = clamp(Float64(x), 1.0, Float64(winds.nx))
     yq = clamp(Float64(y), 1.0, Float64(winds.ny))
+    # winds.z_grid is already sorted ascending by create_wind_interpolants()
     σ_levels = Float64.(winds.z_grid)
     n_levels = length(σ_levels)
-    heights = Vector{Float64}(undef, n_levels)
+    # Re-use caller-provided buffer when available to avoid allocation
+    heights = if heights_buffer !== nothing
+        resize!(heights_buffer, n_levels)
+        heights_buffer
+    else
+        Vector{Float64}(undef, n_levels)
+    end
 
     # Sample geopotential heights at each sigma level, guarding against NaNs
     for (idx, σ) in enumerate(winds.z_grid)
@@ -90,12 +100,7 @@ function hybrid_profile(winds::WindFields{T}, x::Real, y::Real, t::Real) where T
         end
     end
 
-    # Ensure sigma levels are strictly increasing
-    order = sortperm(σ_levels)
-    if any(i -> order[i] != i, eachindex(order))
-        σ_levels = σ_levels[order]
-        heights = heights[order]
-    end
+    # σ_levels are guaranteed sorted ascending by create_wind_interpolants()
 
     # EXPERIMENTAL: Commenting out aggressive monotonicity enforcement
     # This was creating large plateaus where many sigma values mapped to the same height,
@@ -120,7 +125,13 @@ function hybrid_profile(winds::WindFields{T}, x::Real, y::Real, t::Real) where T
     # Still need to determine if profile is ascending or descending for sigma_from_height
     descending = heights[1] >= heights[end]
 
-    return HybridProfile(σ_levels, heights, !descending)
+    # Pre-compute extrema to avoid O(n) scans in height_from_sigma
+    h_min, h_max = extrema(heights)
+
+    # When using a shared buffer, copy heights so the profile owns its data
+    owned_heights = heights_buffer !== nothing ? copy(heights) : heights
+
+    return HybridProfile(σ_levels, owned_heights, !descending, h_min, h_max)
 end
 
 """
@@ -192,12 +203,10 @@ function height_from_sigma(profile::HybridProfile{T},
         return fallback_height === nothing ? h : Float64(fallback_height)
     end
 
-    h_min = minimum(heights)
-    h_max = maximum(heights)
-    h_final = clamp(h, h_min, h_max)
+    h_final = clamp(h, profile.h_min, profile.h_max)
 
     if verbose_debug && h != h_final
-        println("DEBUG height_from_sigma: Clamped $h m → $h_final m (range: $h_min to $h_max)")
+        println("DEBUG height_from_sigma: Clamped $h m → $h_final m (range: $(profile.h_min) to $(profile.h_max))")
     end
 
     return h_final

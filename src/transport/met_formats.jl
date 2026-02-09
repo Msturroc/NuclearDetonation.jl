@@ -1,6 +1,6 @@
 # Met Data Format Dispatch
 #
-# Support for different meteorological data formats (ERA5, GFS, etc.)
+# Support for different meteorological data formats (ERA5 reanalysis)
 # using Julia's multiple dispatch.
 
 using NCDatasets
@@ -16,7 +16,7 @@ Abstract type for meteorological data formats.
 
 Concrete implementations:
 - `ERA5Format`: ECMWF ERA5 reanalysis (model levels)
-- `GFSFormat`: NOAA GFS forecasts (sigma-hybrid levels via fimex)
+- `ERA5RawFormat`: Raw CDS ERA5 (model levels)
 """
 abstract type MetFormat end
 
@@ -52,19 +52,6 @@ The raw format uses `model_level` dimension instead of `hybrid`.
 """
 struct ERA5RawFormat <: MetFormat end
 
-"""
-    GFSFormat <: MetFormat
-
-GFS forecast data preprocessed via fimex.
-
-Variable names:
-- Dimensions: `longitude`, `latitude`, `hybrid`
-- Wind: `x_wind_pl`, `y_wind_pl`
-- Temperature: `air_temperature_pl`
-- Surface pressure: `surface_air_pressure`
-- Vertical: `ap`, `b` coefficients
-"""
-struct GFSFormat <: MetFormat end
 
 """
     detect_met_format(filepath::String) -> MetFormat
@@ -74,28 +61,23 @@ Automatically detect meteorological data format from NetCDF file.
 Supported formats:
 - ERA5Format: ERA5 preprocessed via fimex (x_wind_ml, y_wind_ml, air_temperature_ml)
 - ERA5RawFormat: Raw CDS ERA5 (u, v, t with model_level dimension)
-- GFSFormat: GFS preprocessed via fimex (x_wind_pl, y_wind_pl, air_temperature_pl)
 """
 function detect_met_format(filepath::String)
     NCDataset(filepath) do ds
-        # Both ERA5 and GFS use "hybrid" dimension in preprocessed format
+        # ERA5 preprocessed uses "hybrid" dimension
         # Raw ERA5 uses "model_level" dimension
         # Distinguish by checking variable names:
         # - ERA5 preprocessed: x_wind_ml, y_wind_ml, air_temperature_ml (model levels)
         # - ERA5 Raw: u, v, t (with model_level dimension)
-        # - GFS preprocessed: x_wind_pl, y_wind_pl, air_temperature_pl (pressure levels)
         if haskey(ds.dim, "hybrid") || haskey(ds.dim, "model_level")
             # Check for ERA5-specific preprocessed variable names
             if haskey(ds, "x_wind_ml") || haskey(ds, "air_temperature_ml")
                 return ERA5Format()
-            # Check for GFS-specific preprocessed variable names
-            elseif haskey(ds, "x_wind_pl") || haskey(ds, "air_temperature_pl")
-                return GFSFormat()
             # Check for raw CDS ERA5 format (model_level dimension with u, v, t variables)
             elseif haskey(ds.dim, "model_level") && haskey(ds, "u") && haskey(ds, "v") && haskey(ds, "t")
                 return ERA5RawFormat()
             else
-                error("Unknown met format: found hybrid/model_level dimension but cannot identify ERA5 or GFS variables")
+                error("Unknown met format: found hybrid/model_level dimension but cannot identify ERA5 variables")
             end
         else
             error("Unknown met format: file must have 'model_level' or 'hybrid' dimension")
@@ -126,13 +108,6 @@ function get_met_dimensions(::ERA5RawFormat, ds::NCDataset)
     )
 end
 
-function get_met_dimensions(::GFSFormat, ds::NCDataset)
-    return (
-        length(ds["longitude"]),
-        length(ds["latitude"]),
-        length(ds["hybrid"])
-    )
-end
 
 """
     get_vertical_levels(format::MetFormat, ds::NCDataset) -> (vlevel, blevel)
@@ -140,7 +115,7 @@ end
 Get vertical level coefficients for the given format.
 
 Returns (vlevel, blevel) where:
-- vlevel = (ap/p0 + b) for ERA5/GFS sigma-hybrid coordinates
+- vlevel = (ap/p0 + b) for ERA5 sigma-hybrid coordinates
 - blevel = b coefficients
 """
 function get_vertical_levels(::ERA5Format, ds::NCDataset)
@@ -175,13 +150,6 @@ function get_vertical_levels(::ERA5RawFormat, ds::NCDataset)
     end
 end
 
-function get_vertical_levels(::GFSFormat, ds::NCDataset)
-    ap = ds["ap"][:]
-    b = ds["b"][:]
-    p0_pa = 100000.0
-    vlevel = (ap ./ p0_pa .+ b)
-    return (vlevel, b)
-end
 
 """
     get_time_variable(format::MetFormat, ds::NCDataset) -> Vector
@@ -198,9 +166,6 @@ function get_time_variable(::ERA5RawFormat, ds::NCDataset)
     return ds["valid_time"][:]
 end
 
-function get_time_variable(::GFSFormat, ds::NCDataset)
-    return ds["time"][:]
-end
 
 """
     read_initial_met_fields!(format::MetFormat, met_fields, ds::NCDataset,
@@ -485,145 +450,6 @@ function read_initial_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
     compute_boundary_layer!(ERA5Format, met_fields, time_level=2)
 end
 
-function read_initial_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
-                                  window_idx::Int, next_idx::Int)
-    # This is EXACTLY like read_met_fields!(::GFSFormat...) but loads BOTH timesteps without swapping
-    # Copy the exact structure from the working read_met_fields! to ensure consistency
-    T = eltype(met_fields.u1)
-
-    # GFS data uses standard hybrid coefficients (like ERA5)
-    # Reference pressure: standard atmosphere
-    ap = T.(ds["ap"][:])
-    b = T.(ds["b"][:])
-    p0_pa = T(101325.0) # Standard atmosphere in Pa
-
-    nk = length(ap)
-
-    # Half-levels (interfaces) - same structure as ERA5
-    for k in 1:nk
-        met_fields.ahalf[k] = ap[k]
-        met_fields.bhalf[k] = b[k]
-    end
-    # Surface boundary (nk+1 = surface level)
-    met_fields.ahalf[nk + 1] = zero(T)   # a at surface is 0
-    met_fields.bhalf[nk + 1] = one(T)    # b at surface is 1
-
-    # Full-levels (centers)
-    for k in 1:nk
-        met_fields.alevel[k] = (met_fields.ahalf[k] + met_fields.ahalf[k + 1]) * T(0.5)
-        met_fields.blevel[k] = (met_fields.bhalf[k] + met_fields.bhalf[k + 1]) * T(0.5)
-        # vlevel is a sigma-like coordinate based on a reference pressure profile
-        met_fields.vlevel[k] = met_fields.alevel[k] / p0_pa + met_fields.blevel[k]
-    end
-    for k in 1:(nk + 1)
-        met_fields.vhalf[k] = met_fields.ahalf[k] / p0_pa + met_fields.bhalf[k]
-    end
-
-    # GFS variable names (from fimex conversion)
-    # Now using same coordinate order as ERA5 (top-to-bottom = ascending sigma)
-    # LOAD BOTH TIMESTEPS (no swapping - this is initialization)
-    met_fields.u1 .= ds["x_wind_pl"][:, :, :, window_idx]
-    met_fields.v1 .= ds["y_wind_pl"][:, :, :, window_idx]
-    met_fields.t1 .= ds["air_temperature_pl"][:, :, :, window_idx]
-    met_fields.ps1 .= ds["surface_air_pressure"][:, :, window_idx] ./ 100.0f0  # Pa → hPa
-
-    met_fields.u2 .= ds["x_wind_pl"][:, :, :, next_idx]
-    met_fields.v2 .= ds["y_wind_pl"][:, :, :, next_idx]
-    met_fields.t2 .= ds["air_temperature_pl"][:, :, :, next_idx]
-    met_fields.ps2 .= ds["surface_air_pressure"][:, :, next_idx] ./ 100.0f0
-
-    # Compute map scale factors (CRITICAL for correct horizontal wind advection!)
-    # GFS uses latitude coordinate (no reversal needed like ERA5)
-    lats = collect(T.(ds["latitude"]))
-    Transport.compute_map_scale_factors!(met_fields.xm, met_fields.ym, lats)
-
-    # Convert absolute temperature to potential temperature
-    # θ = T * (p₀/p)^(R/cp) where p₀ = 1000 hPa
-    # NOTE: alevel is in Pa (from NetCDF ap), ps is in hPa (converted above)
-    # So we need to convert alevel/100 + blevel*ps to get pressure in hPa
-    R_CP = 287.058 / 1005.0  # R/cp ≈ 0.286
-    for k in 1:size(met_fields.t1, 3)
-        for j in 1:size(met_fields.t1, 2)
-            for i in 1:size(met_fields.t1, 1)
-                # Compute pressure at this grid point (hybrid coordinates) in hPa
-                # p = ap/100 + b*ps, where ap is in Pa and ps is in hPa
-                p1 = met_fields.alevel[k]/100.0 + met_fields.blevel[k] * met_fields.ps1[i, j]
-                p2 = met_fields.alevel[k]/100.0 + met_fields.blevel[k] * met_fields.ps2[i, j]
-
-                # Convert to potential temperature: θ = T × (1000/p)^(R/cp)
-                met_fields.t1[i, j, k] *= Float32(1.0 / ((p1 * 0.001)^R_CP))
-                met_fields.t2[i, j, k] *= Float32(1.0 / ((p2 * 0.001)^R_CP))
-            end
-        end
-    end
-
-    # GFS lacks vertical velocity - compute from continuity equation (edcomp)
-    met_fields.w1 .= 0.0f0
-    met_fields.w2 .= 0.0f0
-
-    # Compute vertical velocity from horizontal wind divergence
-    # GFS doesn't provide omega/w field, so we use the continuity equation
-    @info "Computing vertical velocity from continuity equation (edcomp) for GFS initial data"
-
-    # Grid spacing for GFS 0.25° data
-    # Domain: lon[-120,-110], lat[32,45], 41x53 grid → 0.25° spacing
-    # At mid-latitude 38.5°:
-    #   dx = 0.25° × 111.32 km/° × cos(38.5°) = 21,780 m
-    #   dy = 0.25° × 111.32 km/° = 27,830 m
-    dx_m = T(21780.0)  # meters (longitude spacing at mid-latitude)
-    dy_m = T(27830.0)  # meters (latitude spacing)
-
-    # Compute for both time levels
-    compute_etadot_from_continuity!(
-        GFSFormat(),
-        met_fields.w1, met_fields.u1, met_fields.v1, met_fields.ps1,
-        met_fields.xm, met_fields.ym,
-        met_fields.ahalf, met_fields.bhalf, met_fields.vhalf,
-        dx_m, dy_m
-    )
-    # edcomp averages output with input; when input is zero, output is halved,
-    # so multiply by 2 for the correct value.
-    met_fields.w1 .*= T(2.0)
-
-    compute_etadot_from_continuity!(
-        GFSFormat(),
-        met_fields.w2, met_fields.u2, met_fields.v2, met_fields.ps2,
-        met_fields.xm, met_fields.ym,
-        met_fields.ahalf, met_fields.bhalf, met_fields.vhalf,
-        dx_m, dy_m
-    )
-    # edcomp averages output with input; when input is zero, output is halved,
-    # so multiply by 2 for the correct value.
-    met_fields.w2 .*= T(2.0)
-
-    # Load precipitation (check both precipitation_flux and precipitation_rate)
-    precip_var = haskey(ds, "precipitation_flux") ? "precipitation_flux" :
-                 haskey(ds, "precipitation_rate") ? "precipitation_rate" : nothing
-    if precip_var !== nothing
-        precip = ds[precip_var]
-        units = haskey(precip.attrib, "units") ? String(precip.attrib["units"]) : ""
-        scale = occursin("kg", lowercase(units)) && occursin("s", lowercase(units)) ? T(3600.0) : T(1.0)
-        met_fields.precip1 .= precip[:, :, window_idx] .* scale
-        met_fields.precip2 .= precip[:, :, next_idx] .* scale
-    else
-        fill!(met_fields.precip1, zero(T))
-        fill!(met_fields.precip2, zero(T))
-    end
-
-    # Compute 3D pressure fields from hybrid coordinates
-    # CRITICAL: p(i,j,k) = alevel(k) + blevel(k)*ps(i,j) - needed for correct vgrav!
-    compute_pressure_from_hybrid!(met_fields, 1)
-    compute_pressure_from_hybrid!(met_fields, 2)
-
-    # Derive geopotential heights for both time slices
-    compute_model_heights!(GFSFormat, met_fields, 1)
-    compute_model_heights!(GFSFormat, met_fields, 2)
-
-    compute_boundary_layer!(GFSFormat, met_fields, time_level=1)
-    compute_boundary_layer!(GFSFormat, met_fields, time_level=2)
-
-    @info "GFS initial met fields loaded"
-end
 
 function read_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
                          window_idx::Int, next_idx::Int)
@@ -774,135 +600,7 @@ function read_met_fields!(::ERA5Format, met_fields, ds::NCDataset,
     compute_boundary_layer!(ERA5Format, met_fields, time_level=2)
 end
 
-function read_met_fields!(::GFSFormat, met_fields, ds::NCDataset,
-                         window_idx::Int, next_idx::Int)
-    T = eltype(met_fields.u1)
 
-    # STEP 1: ALWAYS swap *2 → *1 to maintain temporal continuity
-    # This preserves the previous timestep's data across file boundaries
-    met_fields.u1 .= met_fields.u2
-    met_fields.v1 .= met_fields.v2
-    met_fields.t1 .= met_fields.t2
-    met_fields.ps1 .= met_fields.ps2
-    met_fields.w1 .= met_fields.w2
-    met_fields.p1 .= met_fields.p2
-    met_fields.hlevel1 .= met_fields.hlevel2
-    met_fields.hlayer1 .= met_fields.hlayer2
-    met_fields.precip1 .= met_fields.precip2
-    met_fields.hbl1 .= met_fields.hbl2
-    met_fields.bl1 .= met_fields.bl2
-
-    # GFS data uses standard hybrid coefficients (like ERA5)
-    # Reference pressure: standard atmosphere
-    ap = T.(ds["ap"][:])
-    b = T.(ds["b"][:])
-    p0_pa = T(101325.0) # Standard atmosphere in Pa
-
-    nk = length(ap)
-
-    # Half-levels (interfaces) - same structure as ERA5
-    for k in 1:nk
-        met_fields.ahalf[k] = ap[k]
-        met_fields.bhalf[k] = b[k]
-    end
-    # Surface boundary (nk+1 = surface level)
-    met_fields.ahalf[nk + 1] = zero(T)   # a at surface is 0
-    met_fields.bhalf[nk + 1] = one(T)    # b at surface is 1
-
-    # Full-levels (centers)
-    for k in 1:nk
-        met_fields.alevel[k] = (met_fields.ahalf[k] + met_fields.ahalf[k + 1]) * T(0.5)
-        met_fields.blevel[k] = (met_fields.bhalf[k] + met_fields.bhalf[k + 1]) * T(0.5)
-        # vlevel is a sigma-like coordinate based on a reference pressure profile
-        met_fields.vlevel[k] = met_fields.alevel[k] / p0_pa + met_fields.blevel[k]
-    end
-    for k in 1:(nk + 1)
-        met_fields.vhalf[k] = met_fields.ahalf[k] / p0_pa + met_fields.bhalf[k]
-    end
-
-    # GFS variable names (from fimex conversion)
-    # Now using same coordinate order as ERA5 (top-to-bottom = ascending sigma)
-    # STEP 2: Load ONLY the next timestep into *2 fields
-    met_fields.u2 .= ds["x_wind_pl"][:, :, :, next_idx]
-    met_fields.v2 .= ds["y_wind_pl"][:, :, :, next_idx]
-    met_fields.t2 .= ds["air_temperature_pl"][:, :, :, next_idx]
-    met_fields.ps2 .= ds["surface_air_pressure"][:, :, next_idx] ./ 100.0f0
-
-    # Compute map scale factors (CRITICAL for correct horizontal wind advection!)
-    # GFS uses latitude coordinate (no reversal needed like ERA5)
-    lats = collect(T.(ds["latitude"]))
-    Transport.compute_map_scale_factors!(met_fields.xm, met_fields.ym, lats)
-
-    # Convert absolute temperature to potential temperature
-    # θ = T * (p₀/p)^(R/cp) where p₀ = 1000 hPa
-    # NOTE: alevel is in Pa (from NetCDF ap), ps is in hPa (converted above)
-    # So we need to convert alevel/100 + blevel*ps to get pressure in hPa
-    # IMPORTANT: Only convert t2 since t1 was already converted in the previous timestep
-    R_CP = 287.058 / 1005.0  # R/cp ≈ 0.286
-    for k in 1:size(met_fields.t2, 3)
-        for j in 1:size(met_fields.t2, 2)
-            for i in 1:size(met_fields.t2, 1)
-                # Compute pressure at this grid point (hybrid coordinates) in hPa
-                # p = ap/100 + b*ps, where ap is in Pa and ps is in hPa
-                p2 = met_fields.alevel[k]/100.0 + met_fields.blevel[k] * met_fields.ps2[i, j]
-
-                # Convert to potential temperature: θ = T × (1000/p)^(R/cp)
-                met_fields.t2[i, j, k] *= Float32(1.0 / ((p2 * 0.001)^R_CP))
-            end
-        end
-    end
-
-    # GFS lacks vertical velocity - compute from continuity equation (edcomp)
-    # w1 was already swapped from previous w2, so only zero w2 before computing
-    met_fields.w2 .= 0.0f0
-
-    # Compute vertical velocity from horizontal wind divergence
-    # GFS doesn't provide omega/w field, so we use the continuity equation
-    @info "Computing vertical velocity from continuity equation (edcomp) for GFS time level 2"
-
-    # Grid spacing for GFS 0.25° data
-    # Domain: lon[-120,-110], lat[32,45], 41x53 grid → 0.25° spacing
-    # At mid-latitude 38.5°:
-    #   dx = 0.25° × 111.32 km/° × cos(38.5°) = 21,780 m
-    #   dy = 0.25° × 111.32 km/° = 27,830 m
-    dx_m = T(21780.0)  # meters (longitude spacing at mid-latitude)
-    dy_m = T(27830.0)  # meters (latitude spacing)
-
-    # Compute ONLY for time level 2 (w1 was already swapped from previous w2)
-    compute_etadot_from_continuity!(
-        GFSFormat(),
-        met_fields.w2, met_fields.u2, met_fields.v2, met_fields.ps2,
-        met_fields.xm, met_fields.ym,
-        met_fields.ahalf, met_fields.bhalf, met_fields.vhalf,
-        dx_m, dy_m
-    )
-    # edcomp averages output with input; when input is zero, output is halved,
-    # so multiply by 2 for the correct value.
-    met_fields.w2 .*= 2.0
-
-    # Load precipitation for next timestep only (precip1 was already swapped)
-    if haskey(ds, "precipitation_flux")
-        precip = ds["precipitation_flux"]
-        units = haskey(precip.attrib, "units") ? String(precip.attrib["units"]) : ""
-        scale = units == "kg/m^2/s" ? T(3600.0) : T(1.0)
-        met_fields.precip2 .= precip[:, :, next_idx] .* scale
-    else
-        fill!(met_fields.precip2, zero(T))
-    end
-
-    # Compute 3D pressure fields from hybrid coordinates
-    # CRITICAL: p(i,j,k) = alevel(k) + blevel(k)*ps(i,j) - needed for correct vgrav!
-    compute_pressure_from_hybrid!(met_fields, 1)
-    compute_pressure_from_hybrid!(met_fields, 2)
-
-    # Derive geopotential heights for both time slices
-    compute_model_heights!(GFSFormat, met_fields, 1)
-    compute_model_heights!(GFSFormat, met_fields, 2)
-
-    compute_boundary_layer!(GFSFormat, met_fields, time_level=1)
-    compute_boundary_layer!(GFSFormat, met_fields, time_level=2)
-end
-
-export MetFormat, ERA5Format, ERA5RawFormat, GFSFormat
+export MetFormat, ERA5Format, ERA5RawFormat
 export detect_met_format, get_met_dimensions, get_vertical_levels
 export get_time_variable, read_initial_met_fields!, read_met_fields!

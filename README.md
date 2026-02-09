@@ -7,7 +7,7 @@ Nuclear detonation effects and atmospheric dispersion modelling in Julia.
 
 ## Overview
 
-**NuclearDetonation.jl** is a Julia package for modelling nuclear weapon effects and simulating post-detonation atmospheric transport of radioactive fallout. It couples Glasstone-based weapon effects calculations with a Lagrangian particle dispersion model driven by ERA5 or GFS meteorological data.
+**NuclearDetonation.jl** is a Julia package for modelling nuclear weapon effects and simulating post-detonation atmospheric transport of radioactive fallout. It couples Glasstone-based weapon effects calculations with a Lagrangian particle dispersion model driven by ERA5 meteorological data.
 
 <p align="center">
   <img src="examples/mushroom_cloud_geometry.png" width="100%" alt="Mushroom cloud release geometry — 3D particle views and KDE cross-section for the Nancy 24 kT test"/>
@@ -28,7 +28,7 @@ Nuclear detonation effects and atmospheric dispersion modelling in Julia.
 - **Dry and wet deposition** — resistance-based and simplified schemes with configurable deposition velocities
 - **Gravitational settling** — Stokes-Cunningham settling with Sutherland viscosity correction and bimodal particle size distributions
 - **Radioactive decay** — exponential half-life decay and Glasstone t^(-1.2) bomb decay law
-- **Multiple dispatch met formats** — separate code paths for ERA5 reanalysis and GFS forecast data, selected automatically from the input files
+- **ERA5 meteorological data** — ECMWF ERA5 reanalysis on 137 hybrid model levels
 
 ### Weapon effects (Glasstone & Dolan)
 
@@ -127,12 +127,11 @@ config = ERA5NumericalConfig(
 
 ## Meteorological data
 
-The package supports two met data formats via multiple dispatch:
+The package uses ERA5 reanalysis data:
 
 | Format | Source | Variables | Vertical |
 |--------|--------|-----------|----------|
 | `ERA5Format` | ECMWF ERA5 reanalysis | `x_wind_ml`, `y_wind_ml`, `air_temperature_ml`, `omega_ml` | 137 hybrid model levels |
-| `GFSFormat` | NCEP GFS forecast | `x_wind_pl`, `y_wind_pl`, `air_temperature_pl` | Pressure levels |
 
 ERA5 data for the Nancy test case is available as a Julia Artifact (~96 MB, [Zenodo DOI: 10.5281/zenodo.18529331](https://doi.org/10.5281/zenodo.18529331)). It downloads automatically on first use via `nancy_era5_files()`.
 

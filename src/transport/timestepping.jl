@@ -53,7 +53,6 @@ Collection of all physics parameters for the simulation.
 - `decay_params::Vector{DecayParams{T}}`: Decay parameters per component
 - `dry_deposition_params::DryDepositionParams{T}`: Dry deposition parameters
 - `wet_deposition_params::WetDepositionParams{T}`: Wet deposition parameters
-- `random_walk_params::RandomWalkParams{T}`: Turbulent diffusion parameters
 - `boundary_layer_height::T`: PBL top (m MSL)
 """
 struct PhysicsParams{T<:Real}
@@ -61,7 +60,6 @@ struct PhysicsParams{T<:Real}
     decay_params::Vector{DecayParams{T}}
     dry_deposition_params::DryDepositionParams{T}
     wet_deposition_params::WetDepositionParams{T}
-    random_walk_params::RandomWalkParams{T}
     boundary_layer_height::T
 end
 

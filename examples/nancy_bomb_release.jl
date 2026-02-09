@@ -258,13 +258,6 @@ hanna = HannaTurbulenceConfig{Float64}(
     sigma_scale=p.sigma_h_scale, sigma_scale_vertical=p.sigma_w_scale,
     tl_scale=p.tl_scale, use_cbl=true)
 
-base_tmix = 900.0 * p.tmix_scale
-diff = Transport.TurbulentDiffusionConfig{Float64}(
-    apply_diffusion=true,
-    tmix_h=base_tmix / max(p.h_diff_scale, 0.1), tmix_v=base_tmix,
-    horizontal_a_bl=0.5 * p.h_diff_scale, horizontal_a_above=0.25 * p.h_diff_scale,
-    hmax=2500.0 * p.mixing_height_scale)
-
 dep = Transport.DepositionConfig{Float64}(
     apply_dry_deposition=true, apply_wet_deposition=false,
     use_simple_deposition=true, simple_deposition_velocity=0.002 * p.vd_scale,
@@ -283,7 +276,7 @@ sim_cfg = Transport.SimulationConfig{Float64}(
 
 println("\n5. Running 12-hour simulation...")
 Transport.run_simulation!(state, era5_files,
-    particle_size_config=psc, deposition_config=dep, diffusion_config=diff,
+    particle_size_config=psc, deposition_config=dep,
     hanna_config=hanna, decay_params=decay_params, config=sim_cfg,
     numerical_config=num_cfg, advection_enabled=true, settling_enabled=true,
     dry_deposition_enabled=true, wet_deposition_enabled=false,

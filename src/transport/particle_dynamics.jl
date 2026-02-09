@@ -7,7 +7,6 @@ using Interpolations
 using Dierckx  # For cubic splines on irregular sigma grid (Modern 2)
 using LinearAlgebra
 
-# Note: If we add random walk later, we'll need StochasticDiffEq.jl for SDE support
 
 """
     WindFields
@@ -433,7 +432,7 @@ end
 
     # Ensure z_grid is sorted and unique (copy to avoid modifying met_fields)
     # Interpolations.jl requires ASCENDING order (top→surface: low σ → high σ)
-    # Both ERA5 and GFS data should now be in this order from met_formats.jl
+    # Data should now be in this order from met_formats.jl
     z_grid = copy(met_fields.vlevel)
     level_perm = sortperm(z_grid)  # Get permutation for ascending order
 

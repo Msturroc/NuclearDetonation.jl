@@ -6,7 +6,7 @@ using OrdinaryDiffEq
 
 export NumericalConfig, ValidationMode, ModernMode, InterpolationOrder
 export ERA5NumericalConfig, ERA5ValidationMode, ERA5ModernMode
-export TurbulenceModel, RandomWalk, OrnsteinUhlenbeck, HannaTurbulence
+export TurbulenceModel, OrnsteinUhlenbeck, HannaTurbulence
 export create_numerical_config, get_ode_solver, get_interpolation_scheme, get_solve_kwargs
 export LinearInterp, CubicInterp, ReferenceInterp
 
@@ -32,12 +32,10 @@ end
 Enumeration of supported turbulence parameterisations for ERA5 simulations.
 
 # Options
-- `RandomWalk`: Simple uncorrelated random walk (baseline)
 - `OrnsteinUhlenbeck`: Temporally correlated turbulence via O-U process
 - `HannaTurbulence`: Hanna (1982) height-dependent parameterisation with O-U
 """
 @enum TurbulenceModel begin
-    RandomWalk = 0        # Simple random walk (baseline)
     OrnsteinUhlenbeck = 1 # O-U process with temporal correlation
     HannaTurbulence = 2   # Full Hanna (1982) with stability dependence
 end
@@ -106,8 +104,8 @@ Extends NumericalConfig with ERA5-specific options for turbulence.
 - `abstol::T`: Absolute tolerance for adaptive solvers
 
 ## ERA5-Specific Options
-- `turbulence::TurbulenceModel`: Turbulence parameterisation (default: RandomWalk)
-- `store_turbulent_velocities::Bool`: Store u'/v'/w' for O-U process (default: false)
+- `turbulence::TurbulenceModel`: Turbulence parameterisation (default: OrnsteinUhlenbeck)
+- `store_turbulent_velocities::Bool`: Store u'/v'/w' for O-U process (default: true)
 - `name::String`: Configuration name for output files
 
 # Solver Types
@@ -116,19 +114,18 @@ Extends NumericalConfig with ERA5-specific options for turbulence.
 - `:AutoTsit5`: Tsit5 with adaptive timestepping
 
 # Turbulence Models
-- `RandomWalk`: Simple uncorrelated random walk (baseline)
 - `OrnsteinUhlenbeck`: Temporally correlated turbulence via O-U process
 - `HannaTurbulence`: Hanna (1982) height-dependent with O-U
 
 # Examples
 
 ```julia
-# Baseline mode - matches reference implementation exactly (DEFAULT)
+# Baseline mode with O-U turbulence (DEFAULT)
 config = ERA5NumericalConfig(
     interpolation_order = LinearInterp,
     ode_solver_type = :Euler,
     fixed_dt = 300.0,
-    turbulence = RandomWalk,
+    turbulence = OrnsteinUhlenbeck,
     name = "baseline"
 )
 
@@ -222,15 +219,15 @@ This is the DEFAULT configuration for ERA5 simulations.
 - Linear interpolation (reference-compatible)
 - Forward Euler integration
 - Fixed timestep (default 300s)
-- Simple random walk turbulence
+- Ornstein-Uhlenbeck turbulence
 """
 function ERA5ValidationMode(dt::T=300.0; name::String="era5_baseline") where T<:Real
     return ERA5NumericalConfig{T}(
         interpolation_order = LinearInterp,
         ode_solver_type = :Euler,
         fixed_dt = dt,
-        turbulence = RandomWalk,
-        store_turbulent_velocities = false,
+        turbulence = OrnsteinUhlenbeck,
+        store_turbulent_velocities = true,
         name = name
     )
 end
@@ -273,7 +270,7 @@ function ERA5ModernMode(T::Type=Float64;
         reltol = T(reltol),
         abstol = T(abstol),
         turbulence = turbulence,
-        store_turbulent_velocities = (turbulence != RandomWalk),
+        store_turbulent_velocities = true,
         name = name
     )
 end

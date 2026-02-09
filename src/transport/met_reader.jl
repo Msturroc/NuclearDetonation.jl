@@ -343,8 +343,8 @@ function compute_pressure_from_hybrid!(fields::MeteoFields{T}, time_level::Int=2
 
     # Compute pressure at each level using hybrid coordinate formula
     # Handle alevel units:
-    #  - ERA5 path stores alevel in hPa (met_formats divides ap by 100)
-    #  - GFS path stores alevel in Pa
+    #  - ERA5 stores alevel in hPa (met_formats divides ap by 100)
+    #  - Some datasets may store alevel in Pa
     # Use a simple heuristic: if alevel magnitudes are large (>5000), treat as Pa
     # Then convert to hPa when needed, so p is in hPa consistently
     alevel_is_pa = maximum(abs.(fields.alevel)) > T(5000.0)
@@ -736,10 +736,10 @@ function read_meteo_timestep!(fields::MeteoFields, filename::String,
             # TODO: Dry deposition fields (if needed)
 
             # CRITICAL FIX: Handle vertical velocity
-            # GFS and some other data lack omega/w field, requiring diagnostic computation
+            # Some datasets lack omega/w field, requiring diagnostic computation
             if params.sigmadotv == ""
                 # No vertical velocity in data - compute from continuity equation
-                # This is the critical path for GFS data
+                # This is the critical path when vertical velocity is missing
                 @info "Computing vertical velocity from continuity equation (edcomp)"
 
                 # Initialize w2 to zeros

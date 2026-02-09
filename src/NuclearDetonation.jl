@@ -48,7 +48,6 @@ include("transport/decay.jl")
 include("transport/numerical_config.jl")  # Numerical method configuration
 include("transport/particle_dynamics.jl")
 include("transport/hybrid_coordinates.jl")
-include("transport/random_walk.jl")
 include("transport/turbulence_hanna.jl")  # Hanna (1982) turbulence with O-U process and CBL
 include("transport/release.jl")
 include("transport/deposition.jl")

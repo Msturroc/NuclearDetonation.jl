@@ -136,8 +136,6 @@ dep = Transport.DepositionConfig{Float64}(
     apply_dry_deposition=true, apply_wet_deposition=false,
     use_simple_deposition=true, simple_deposition_velocity=0.002)
 
-diff = Transport.TurbulentDiffusionConfig{Float64}(apply_diffusion=true)
-
 # Tsit5 solver with O-U turbulence
 num_cfg = ERA5NumericalConfig{Float64}(
     interpolation_order=Transport.LinearInterp,
@@ -159,7 +157,7 @@ sim_cfg = Transport.SimulationConfig{Float64}(
 
 println("\n4. Running 12-hour point release simulation (Tsit5 solver)...")
 Transport.run_simulation!(state, era5_files,
-    particle_size_config=psc, deposition_config=dep, diffusion_config=diff,
+    particle_size_config=psc, deposition_config=dep,
     hanna_config=hanna, decay_params=decay_params, config=sim_cfg,
     numerical_config=num_cfg, advection_enabled=true, settling_enabled=false,
     dry_deposition_enabled=true, wet_deposition_enabled=false,

@@ -3,39 +3,25 @@
 # Computes sigma/eta coordinate of boundary layer top and mixing height
 # by evaluating Richardson numbers in hybrid vertical coordinates.
 
-# Helper for met-format-specific hybrid coefficient units
-# GFS stores ahalf/alevel in Pa, needs conversion to hPa for consistent units
-# ERA5 stores ahalf/alevel in hPa already (converted in met_formats)
-_hybrid_coeff_to_hpa(::Type{GFSFormat}, a::T) where T = a / T(100.0)
+# Hybrid coefficient unit helper — coefficients are stored in hPa (converted in met_formats)
 _hybrid_coeff_to_hpa(::Type{ERA5Format}, a::T) where T = a
 
-# Helper for met-format-specific height calculation sign
-# ERA5 data is REVERSED during loading → surface-to-top (k=1 surface, k=nk TOA)
-#   → pih[k] > pih[k+1], need PLUS sign: zh[k+1] = zh[k] + T*(pih[k]-pih[k+1])/g
-# GFS data is NOT reversed → top-to-surface (k=1 TOA, k=nk surface)
-#   → pih[k] < pih[k+1], need MINUS sign: zh[k+1] = zh[k] - T*(pih[k]-pih[k+1])/g
-#
-# Note: oct29_test GFS code used PLUS for initial (k=2) and MINUS for loop (k>=2)
-# To preserve exact GFS behaviour from oct29_test, we need separate signs:
+# Height calculation sign helpers
+# ERA5 data is reversed during loading → surface-to-top (k=1 surface, k=nk TOA)
+#   → pih[k] > pih[k+1], use +1: zh[k+1] = zh[k] + T*(pih[k]-pih[k+1])/g
 _height_sign_initial(::Type{ERA5Format}) = 1   # +1 for surface-to-top integration
-_height_sign_initial(::Type{GFSFormat}) = 1    # Preserve: oct29_test used +1
 _height_sign_loop(::Type{ERA5Format}) = 1      # +1 for surface-to-top integration
-_height_sign_loop(::Type{GFSFormat}) = -1      # Preserve: oct29_test used -1
 
-# Helper for met-format-specific temperature conversion for boundary layer calculation
-# The reference implementation converts T → θ via t2thetafac before boundary layer computation
+# Temperature → potential temperature conversion for boundary layer calculation
 # ERA5 stores absolute temperature T → needs conversion to potential temperature θ
-# GFS: keep as-is (oct29_test worked with raw values)
 # Formula: θ = T * (1000/p)^(R/cp) = T * t2thetafac(p)
 _t2theta(::Type{ERA5Format}, T_val::TT, p_hpa::TT, rcp::TT) where TT = T_val * (TT(1000.0) / p_hpa)^rcp
-_t2theta(::Type{GFSFormat}, T_val::TT, p_hpa::TT, rcp::TT) where TT = T_val  # Keep as-is for GFS
 
 """
     compute_boundary_layer!(::Type{F}, fields::MeteoFields{T}; ...) where {F<:MetFormat, T}
 
 Compute boundary layer with met-format-specific unit handling.
-GFS hybrid coefficients (Pa) are converted to hPa for consistent pressure calculations.
-ERA5 coefficients are already in hPa.
+ERA5 hybrid coefficients are in hPa for consistent pressure calculations.
 """
 function compute_boundary_layer!(::Type{F}, fields::MeteoFields{T};
                                  time_level::Int=2,
@@ -63,10 +49,8 @@ end
     _compute_boundary_layer_impl!(fmt_type, fields; ...)
 
 Internal implementation with format-specific unit and sign handling.
-Vertical indexing differs by format:
-- ERA5: surface-to-top (k=1 surface, k=nk TOA) - data is reversed during loading
-- GFS: top-to-surface (k=1 TOA, k=nk surface) - native order
-Height calculation sign is handled via _height_sign(F).
+Vertical indexing: surface-to-top (k=1 surface, k=nk TOA) — ERA5 data is reversed during loading.
+Height calculation sign is handled via _height_sign_initial(F) and _height_sign_loop(F).
 """
 function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
                                         time_level::Int=2,
@@ -165,8 +149,8 @@ function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
 
         zh[1] = zero(T)
         zf[1] = zero(T)
-        # Format-specific sign: ERA5 (+1) for surface-to-top, GFS (+1) preserves oct29_test
-        # Convert T→θ for ERA5 (reference does this via t2thetafac before BL computation)
+        # Format-specific sign: +1 for surface-to-top integration
+        # Convert T→θ (reference does this via t2thetafac before BL computation)
         theta_2 = _t2theta(F, t_field[i, j, 2], p_level[2], rcp)
         zh[2] = zh[1] + _height_sign_initial(F) * theta_2 * (pih[1] - pih[2]) * ginv
         denom = pih[1] - pih[2]
@@ -193,7 +177,7 @@ function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
             p_level[k + 1] = _hybrid_coeff_to_hpa(F, fields.alevel[k + 1]) + fields.blevel[k + 1] * ps
             pif[k + 1] = exner(p_level[k + 1])
 
-            # Convert T→θ for ERA5 (reference does this via t2thetafac before BL computation)
+            # Convert T→θ (reference does this via t2thetafac before BL computation)
             theta_k = _t2theta(F, t_field[i, j, k], p_level[k], rcp)
             theta_kp1 = _t2theta(F, t_field[i, j, k + 1], p_level[k + 1], rcp)
 
@@ -204,8 +188,7 @@ function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
             end
 
             # Format-specific sign for height calculation (see _height_sign_loop helper)
-            # ERA5 (surface-to-top): pih[k] > pih[k+1], use +1 → heights increase with k
-            # GFS (top-to-surface): use -1 to preserve oct29_test behaviour
+            # Surface-to-top: pih[k] > pih[k+1], use +1 → heights increase with k
             zh[k + 1] = zh[k] + _height_sign_loop(F) * theta_kp1 * (pih[k] - pih[k + 1]) * ginv
             denom_half = pih[k] - pih[k + 1]
             if abs(denom_half) > eps(T)
@@ -226,7 +209,6 @@ function _compute_boundary_layer_impl!(::Type{F}, fields::MeteoFields{T};
                 end
 
                 # Use potential temperature difference (dθ) for Richardson number
-                # ERA5: converted T→θ above; GFS: kept as-is
                 dth = theta_kp1 - theta_k
                 denom_ri = thh[k] * pih[k] * dv2
                 ri_val = abs(denom_ri) > eps(T) ? cp * g * dth * dz / denom_ri : zero(T)

@@ -17,8 +17,6 @@ using NuclearDetonation.Transport:
     DecayParams, NoDecay, ExponentialDecay,
     # Deposition
     DryDepositionParams, WetDepositionParams, GRASSLAND, SUMMER,
-    # Random walk
-    RandomWalkParams,
     # VGrav
     VGravTables, ParticleProperties, build_vgrav_tables,
     # Simulation structures
@@ -249,16 +247,12 @@ using NuclearDetonation.Transport:
         # Wet deposition
         wet_dep_params = WetDepositionParams(1e-6, 2500.0)
 
-        # Random walk
-        rwalk_params = RandomWalkParams(timestep=1.0, tmix_vertical=100.0, tmix_horizontal=1000.0)
-
         # Physics params
         physics = PhysicsParams(
             vgrav_tables,
             decay_params,
             dry_dep_params,
             wet_dep_params,
-            rwalk_params,
             1000.0
         )
 

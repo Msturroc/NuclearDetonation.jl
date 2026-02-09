@@ -3,6 +3,7 @@
 
 using Test
 using Random
+using Statistics: mean
 
 # Import release module
 using NuclearDetonation.Transport:

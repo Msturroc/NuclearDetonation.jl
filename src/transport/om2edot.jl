@@ -25,7 +25,7 @@ function convert_omega_to_sigmadot!(w_field::Array{T,3},
                 omega = w_field[i, j, k]  # Original omega value (Pa/s)
 
                 # Pressure at layer interfaces (Pa)
-                # Note: Handle both Pa (GFS) and hPa (ERA5) units for coefficients
+                # Note: Handle hPa (ERA5) units for coefficients
                 p_upper = ahalf[k] + bhalf[k] * ps_field[i, j]
                 p_lower = ahalf[k-1] + bhalf[k-1] * ps_field[i, j]
 
@@ -71,27 +71,6 @@ function compute_etadot_from_continuity!(::ERA5Format,
                                          dy::T;
                                          averaging::Bool=true) where T<:Real
     # Use fields as stored (k=1 = surface) — arrays and coefficients are aligned.
-    compute_etadot_from_continuity!(edot, u, v, ps, xm, ym, ahalf, bhalf, vhalf, dx, dy, averaging=averaging)
-end
-
-"""
-    compute_etadot_from_continuity!(::GFSFormat, ...)
-
-GFS-specific vertical velocity computation.
-"""
-function compute_etadot_from_continuity!(::GFSFormat,
-                                         edot::Array{T,3},
-                                         u::Array{T,3},
-                                         v::Array{T,3},
-                                         ps::Matrix{T},
-                                         xm::Matrix{T},
-                                         ym::Matrix{T},
-                                         ahalf::Vector{T},
-                                         bhalf::Vector{T},
-                                         vhalf::Vector{T},
-                                         dx::T,
-                                         dy::T;
-                                         averaging::Bool=true) where T<:Real
     compute_etadot_from_continuity!(edot, u, v, ps, xm, ym, ahalf, bhalf, vhalf, dx, dy, averaging=averaging)
 end
 
@@ -207,7 +186,7 @@ function compute_etadot_from_continuity!(edot::Array{T,3},
                 # No dp guard — matches the reference implementation exactly
                 etadot = etadot * deta / dp
 
-                # Mean with input value (will be zero for GFS case)
+                # Mean with input value
                 if averaging
                     edot[i, j, k] = (edot[i, j, k] + etadot) * 0.5
                 else

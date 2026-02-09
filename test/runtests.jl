@@ -32,11 +32,6 @@ import NuclearDetonation.Transport:
     DecayType, NoDecay, ExponentialDecay, BombDecay,
     DecayParams, BombDecayState,
     prepare_decay_rates!, apply_decay, apply_decay!,
-    # Random walk types
-    RandomWalkParams, RandomWalkState, initialize_random_walk,
-    horizontal_diffusion_length, vertical_diffusion_coefficient,
-    random_walk_noise!, apply_boundary_layer_reflection!,
-    create_random_walk_sde_problem, particle_velocity_with_rwalk!,
     # Release / source term types
     ReleaseProfile, ConstantRelease, BombRelease, LinearRelease, StepRelease,
     ReleaseGeometry, ColumnRelease, CylinderRelease, MushroomCloudRelease,
@@ -82,7 +77,6 @@ import NuclearDetonation.Transport:
     @testset "Transport Phase 3: Particle Physics" begin
         include("transport/test_vgravtables.jl")
         include("transport/test_decay.jl")
-        include("transport/test_random_walk.jl")
     end
 
     # Phase 4 Tests: Source Term Modelling

@@ -550,7 +550,6 @@ function update_domain_vertical!(domain::SimulationDomain{T}, met_fields) where 
 
     # CRITICAL FIX (Issue #16): Check if data needs reversal
     # ERA5 data is already reversed (k=1 surface, k=nk TOA) during loading
-    # GFS data may be in native order (k=1 TOA, k=nk surface)
     # Only reverse if data is in descending order (TOA→surface)
     needs_reversal = raw_hlevel[1] > raw_hlevel[end]
 
@@ -831,6 +830,9 @@ particle mass to the surrounding 8 grid cells.
     n_out_z = 0
     n_accumulated = 0
 
+    # Pre-allocate heights buffer to avoid per-particle allocation in hybrid_profile
+    heights_buffer = Vector{Float64}(undef, length(winds.z_grid))
+
     for (pidx, particle) in enumerate(ensemble.particles)
         n_total += 1
 
@@ -854,7 +856,7 @@ particle mass to the surrounding 8 grid cells.
         # Note: x, y are in domain coordinates (from ensemble.positions), but hybrid_profile
         # expects met coordinates. However, if domain and met grids have the same resolution
         # and bounds, this works out correctly.
-        profile = hybrid_profile(winds, x, y, T(0.0))
+        profile = hybrid_profile(winds, x, y, T(0.0); heights_buffer=heights_buffer)
         z_height = height_from_sigma(profile, σ; fallback_height=T(5000.0))
 
         # Check bounds

@@ -2,6 +2,7 @@
 # Dry and wet deposition tests
 
 using Test
+using Statistics: mean
 using NuclearDetonation.Transport:
     LandUseClass, SeasonCategory,
     WATER, DECIDUOUS_FOREST, CONIFEROUS_FOREST, MIXED_FOREST,
