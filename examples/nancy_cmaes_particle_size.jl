@@ -495,16 +495,6 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
         use_cbl = true
     )
 
-    base_tmix = 900.0 * tmix_scale
-    diffusion_config = Transport.TurbulentDiffusionConfig{Float64}(
-        apply_diffusion = true,
-        tmix_h = base_tmix / max(h_diff_scale, 0.1),
-        tmix_v = base_tmix,
-        horizontal_a_bl = 0.5 * h_diff_scale,
-        horizontal_a_above = 0.25 * h_diff_scale,
-        hmax = 2500.0 * mixing_height_scale
-    )
-
     deposition_config = Transport.DepositionConfig{Float64}(
         apply_dry_deposition = true,
         apply_wet_deposition = false,
@@ -521,7 +511,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
         interpolation_order = Transport.LinearInterp,
         ode_solver_type = :Euler,
         fixed_dt = 300.0,
-        turbulence = turb_scheme == :OU ? Transport.OrnsteinUhlenbeck : Transport.RandomWalk
+        turbulence = Transport.OrnsteinUhlenbeck
     )
 
     sim_config = Transport.SimulationConfig{Float64}(
@@ -538,7 +528,6 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
     Transport.run_simulation!(state, ERA5_FILES,
         particle_size_config=particle_size_config,
         deposition_config=deposition_config,
-        diffusion_config=diffusion_config,
         hanna_config=hanna_config,
         decay_params=decay_params,
         config=sim_config,
