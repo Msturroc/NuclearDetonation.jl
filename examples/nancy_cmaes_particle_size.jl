@@ -22,8 +22,8 @@
 #   CALIBRATION (2):              activity_scale (×1e15 Bq), smooth_sigma (Gaussian cells)
 #
 # Usage:
-#   julia --threads=12 --project=.. nancy_cmaes_particle_size.jl RW    # RandomWalk
-#   julia --threads=12 --project=.. nancy_cmaes_particle_size.jl OU    # Ornstein-Uhlenbeck
+#   julia --threads=12 --project=. examples/nancy_cmaes_particle_size.jl RW    # RandomWalk
+#   julia --threads=12 --project=. examples/nancy_cmaes_particle_size.jl OU    # Ornstein-Uhlenbeck
 #
 # Environment variables:
 #   MAX_EVALS=6000       Total evaluation budget (default: 6000)
@@ -530,7 +530,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
         max_duration = 12.0 * 3600.0,
         save_snapshots = true,
         dt_particle = 300.0,
-        use_fortran_stepping = true,
+        use_reference_stepping = true,
         max_files = CACHE_END_FILE - CACHE_START_FILE + 1,
         omega_scale = omega_scale
     )
