@@ -364,3 +364,17 @@ Legend(fig[2, 1], legend_elements, legend_labels, "Dose Rate (H+12)",
 outfile = joinpath(@__DIR__, "nancy_bomb_release.png")
 save(outfile, fig, px_per_unit=2)
 println("\nSaved: $(outfile)")
+
+# Save dose rate grid as NetCDF for consortium comparison
+ncfile = joinpath(@__DIR__, "nancy_dosegrid_ou.nc")
+NCDataset(ncfile, "c") do ds
+    defDim(ds, "lon", length(lon_grid))
+    defDim(ds, "lat", length(lat_grid))
+    ds_lon = defVar(ds, "lon", Float64, ("lon",))
+    ds_lat = defVar(ds, "lat", Float64, ("lat",))
+    ds_dose = defVar(ds, "doserate", Float64, ("lon", "lat"))
+    ds_lon[:] = collect(lon_grid)
+    ds_lat[:] = collect(lat_grid)
+    ds_dose[:,:] = dose_mRh  # raw (unsmoothed) mR/h at H+12
+end
+println("Saved dose grid: $(ncfile)")

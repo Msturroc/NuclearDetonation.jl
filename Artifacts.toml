@@ -10,3 +10,16 @@ lazy = true
     [[nancy_era5_data.download]]
     url = "https://zenodo.org/records/18529331/files/nancy_era5_data.tar.gz"
     sha256 = "85404fef982edc9b911f8dde40b372fa835c66bebe6698e2fbd82cb294423d1e"
+
+# ERA5 reanalysis data for the Plumbbob Smoky nuclear test
+# 31 Aug – 2 Sep 1957, subdomain lat [35,41] lon [-118,-109], 137 hybrid levels
+#
+# DOI: 10.5281/zenodo.18681346
+
+[smoky_era5_data]
+git-tree-sha1 = "8966357b72a8f3ccfcdbddb7c083181719eec1a8"
+lazy = true
+
+    [[smoky_era5_data.download]]
+    url = "https://zenodo.org/records/18681346/files/smoky_era5_data.tar.gz"
+    sha256 = "1fd983b57943ea65209371235e40dabe6e3103ba63576fedb8aee79f41827c0e"

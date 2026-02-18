@@ -149,6 +149,22 @@ struct NancyObservations
     detonation_utc::String  # ISO 8601 format
 end
 
+"""
+    SmokyObservations
+
+Complete set of digitised observations from the Smoky nuclear test (Plumbbob).
+"""
+struct SmokyObservations
+    dose_rate_contours::Vector{DoseRateContour}
+    toa_contours::Vector{TOAContour}
+    # Test metadata
+    detonation_lat::Float64
+    detonation_lon::Float64
+    yield_kt::Float64
+    hob_m::Float64
+    detonation_utc::String  # ISO 8601 format
+end
+
 
 # ============================================================================
 # GeoJSON Parsing
@@ -274,8 +290,144 @@ obs = NuclearDetonation.Transport.load_nancy_observations()
 ```
 """
 function load_nancy_observations()
-    contour_dir = joinpath(pkgdir(NuclearDetonation), "data", "nancy_observations")
+    contour_dir = joinpath(pkgdir(parentmodule(@__MODULE__)), "data", "nancy_observations")
     load_nancy_observations(contour_dir)
+end
+
+
+# ============================================================================
+# Smoky GeoJSON Loading (WGS84 — no coordinate conversion needed)
+# ============================================================================
+
+"""
+    convert_wgs84_lonlat(coords) -> Vector{Tuple{Float64,Float64}}
+
+Convert GeoJSON [lon, lat] coordinate pairs to (lat, lon) tuples.
+No projection conversion needed — coordinates are already WGS84.
+"""
+function convert_wgs84_lonlat(coords)
+    result = Tuple{Float64,Float64}[]
+    for c in coords
+        lon = Float64(c[1])
+        lat = Float64(c[2])
+        push!(result, (lat, lon))
+    end
+    return result
+end
+
+"""
+    load_doserate_geojson_wgs84(filepath::String; rate_key::String="Exposure_rate") -> Vector{DoseRateContour}
+
+Load dose rate contours from a WGS84 GeoJSON file (no coordinate conversion needed).
+"""
+function load_doserate_geojson_wgs84(filepath::String; rate_key::String="Exposure_rate")
+    json_str = read(filepath, String)
+    geojson = JSON3.read(json_str)
+
+    contours = DoseRateContour[]
+
+    for feature in geojson.features
+        props = feature.properties
+        dose_rate = Float64(props[Symbol(rate_key)])
+
+        geom = feature.geometry
+        polygons = Vector{Tuple{Float64,Float64}}[]
+
+        if geom.type == "MultiPolygon"
+            for polygon in geom.coordinates
+                for ring in polygon
+                    latlon_coords = convert_wgs84_lonlat(ring)
+                    push!(polygons, latlon_coords)
+                end
+            end
+        elseif geom.type == "Polygon"
+            for ring in geom.coordinates
+                latlon_coords = convert_wgs84_lonlat(ring)
+                push!(polygons, latlon_coords)
+            end
+        end
+
+        push!(contours, DoseRateContour(dose_rate, polygons))
+    end
+
+    return contours
+end
+
+"""
+    load_toa_geojson_wgs84(filepath::String; hour_key::String="Time of arrival") -> Vector{TOAContour}
+
+Load time-of-arrival contours from a WGS84 GeoJSON file (no coordinate conversion needed).
+"""
+function load_toa_geojson_wgs84(filepath::String; hour_key::String="Time of arrival")
+    json_str = read(filepath, String)
+    geojson = JSON3.read(json_str)
+
+    contours = TOAContour[]
+
+    for feature in geojson.features
+        props = feature.properties
+        hour = Float64(props[Symbol(hour_key)])
+
+        geom = feature.geometry
+        lines = Vector{Tuple{Float64,Float64}}[]
+
+        if geom.type == "MultiLineString"
+            for line in geom.coordinates
+                latlon_coords = convert_wgs84_lonlat(line)
+                push!(lines, latlon_coords)
+            end
+        elseif geom.type == "LineString"
+            latlon_coords = convert_wgs84_lonlat(geom.coordinates)
+            push!(lines, latlon_coords)
+        end
+
+        push!(contours, TOAContour(hour, lines))
+    end
+
+    return contours
+end
+
+"""
+    load_smoky_observations(contour_dir::String) -> SmokyObservations
+
+Load all Smoky test observation data from the digitised contour directory.
+
+# Arguments
+- `contour_dir`: Path to directory containing Smoky_doserate_contours.geojson and Smoky_TOA.geojson
+"""
+function load_smoky_observations(contour_dir::String)
+    doserate_file = joinpath(contour_dir, "Smoky_doserate_contours.geojson")
+    toa_file = joinpath(contour_dir, "Smoky_TOA.geojson")
+
+    dose_contours = load_doserate_geojson_wgs84(doserate_file)
+    toa_contours = load_toa_geojson_wgs84(toa_file)
+
+    # Smoky test metadata (Plumbbob, 31 August 1957)
+    return SmokyObservations(
+        dose_contours,
+        toa_contours,
+        37.177,       # Detonation latitude
+        -116.046,     # Detonation longitude
+        44.0,         # Yield (kT)
+        213.0,        # Height of burst (m) — 700 ft tower
+        "1957-08-31T12:00:00Z"  # Detonation time UTC
+    )
+end
+
+"""
+    load_smoky_observations() -> SmokyObservations
+
+Convenience overload that loads Smoky observations from the package's bundled data directory.
+
+# Example
+```julia
+using NuclearDetonation
+obs = NuclearDetonation.Transport.load_smoky_observations()
+```
+"""
+function load_smoky_observations()
+    contour_dir = joinpath(pkgdir(parentmodule(@__MODULE__)), "data", "smoky_observations")
+    load_smoky_observations(contour_dir)
 end
 
 
@@ -725,6 +877,32 @@ end
 # ============================================================================
 
 """
+    compute_validation_score(model_dose_rate, smoky_obs::SmokyObservations, ...) -> ValidationScore
+
+Overload for Smoky observations — delegates to the generic contour-based scoring.
+"""
+function compute_validation_score(model_dose_rate::Matrix{Float64},
+                                   smoky_obs::SmokyObservations,
+                                   lat_grid::Vector{Float64},
+                                   lon_grid::Vector{Float64};
+                                   model_snapshots::Union{Nothing, Vector{Matrix{Float64}}}=nothing,
+                                   snapshot_times_hours::Union{Nothing, Vector{Float64}}=nothing,
+                                   dose_weight::Float64=0.7,
+                                   toa_weight::Float64=0.3)
+    obs_masks = rasterise_all_contours(smoky_obs.dose_rate_contours, lat_grid, lon_grid)
+    fms_results = compute_multi_threshold_fms(model_dose_rate, obs_masks, lat_grid, lon_grid)
+
+    toa_result = nothing
+    if !isnothing(model_snapshots) && !isnothing(snapshot_times_hours)
+        toa_result = compute_toa_score(model_snapshots, snapshot_times_hours,
+                                       smoky_obs.toa_contours, lat_grid, lon_grid)
+    end
+
+    return compute_combined_score(fms_results, toa_result;
+                                  dose_weight=dose_weight, toa_weight=toa_weight)
+end
+
+"""
     contour_bounds(contours::Vector{DoseRateContour}) -> (lat_min, lat_max, lon_min, lon_max)
 
 Get bounding box of all dose rate contours.
@@ -760,8 +938,8 @@ Suggest a grid for model output that covers the observation contours.
 # Returns
 - (lat_grid, lon_grid) vectors for model output
 """
-function suggest_grid(nancy_obs::NancyObservations; resolution_km::Float64=2.0, buffer_fraction::Float64=0.1)
-    lat_min, lat_max, lon_min, lon_max = contour_bounds(nancy_obs.dose_rate_contours)
+function suggest_grid(obs::Union{NancyObservations, SmokyObservations}; resolution_km::Float64=2.0, buffer_fraction::Float64=0.1)
+    lat_min, lat_max, lon_min, lon_max = contour_bounds(obs.dose_rate_contours)
 
     # Add buffer around observation contours
     lat_range = lat_max - lat_min
