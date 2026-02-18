@@ -1,0 +1,226 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{siunitx}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{hyperref}
+\usepackage{amsmath}
+
+\title{Preliminary Model Comparison Results\\[0.5em]
+\large NuclearDetonation.jl --- Lagrangian Particle Dispersion}
+\author{NuclearDetonation.jl}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+%% ====================================================================
+\section{Model Overview}
+%% ====================================================================
+
+NuclearDetonation.jl is a Lagrangian particle dispersion model for
+simulating atmospheric transport of radioactive debris from nuclear
+detonations. Particles are released into a three-dimensional wind field
+(ERA5 reanalysis on the full 137-level hybrid sigma-pressure grid) and
+advected forward in time, with sub-grid turbulence, gravitational settling,
+and dry deposition acting on each particle individually.
+
+Figure~\ref{fig:release} shows the release geometry for a representative
+test case: particles are distributed across a three-layer mushroom cloud
+structure (lower stem, mid-cap, upper cap) with mass fractions derived from
+DASA-1251 cloud observations.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{mushroom_cloud_geometry.png}
+\caption{Three-layer mushroom cloud release geometry. Left: 3D particle
+positions coloured by release layer. Right: kernel density cross-section
+showing the vertical activity distribution.}
+\label{fig:release}
+\end{figure}
+
+\subsection{Ornstein--Uhlenbeck Turbulence}
+
+Atmospheric turbulence is represented by an Ornstein--Uhlenbeck (OU)
+stochastic process rather than a simple random walk. In a random walk, each
+turbulent velocity perturbation is drawn independently at every timestep,
+producing unrealistically jagged trajectories. The OU process treats the
+turbulent velocity as a variable with temporal memory: it decays
+exponentially towards zero with a Lagrangian timescale $\tau_L$, while a
+stochastic forcing term continually injects energy:
+\begin{equation}
+    u'(t + \Delta t) = u'(t)\,\exp\!\bigl(-\Delta t / \tau_L\bigr)
+    + \sigma_u \sqrt{1 - \exp\!\bigl(-2\,\Delta t / \tau_L\bigr)}\;\xi,
+\end{equation}
+where $\sigma_u$ is the turbulent velocity standard deviation and
+$\xi \sim \mathcal{N}(0,1)$. The standard deviations $\sigma_u$,
+$\sigma_v$, $\sigma_w$ and timescales $\tau_L$ are computed from the Hanna
+(1982) parameterisation, which uses boundary-layer stability class and
+height above ground. Separate OU processes are maintained for the horizontal
+and vertical components.
+
+The practical effect is that particles ``remember'' their turbulent velocity
+over timescales of tens of seconds to minutes, producing smoother, more
+physically plausible dispersion than an uncorrelated walk.
+
+\subsection{Gravitational Settling}
+
+Each particle is assigned a diameter drawn from a bimodal lognormal
+distribution (fine and coarse fractions), representing the range of debris
+sizes from sub-micron fission products to hundreds-of-micron soil
+particles. The gravitational settling velocity for each particle is computed
+from Stokes drag with a Cunningham slip correction for small particles:
+\begin{equation}
+    v_g = \frac{\rho_p\, d_p^2\, g\, C_s}{18\,\mu}
+\end{equation}
+where $\rho_p$ is the particle density, $d_p$ is the diameter, $\mu$ is the
+dynamic viscosity of air (Sutherland's formula, temperature-dependent), and
+$C_s$ is the Cunningham slip correction factor:
+\begin{equation}
+    C_s = 1 + \frac{2\lambda}{d_p}\left(1.257 + 0.4\,\exp\!\left(-\frac{0.55\,d_p}{\lambda}\right)\right)
+\end{equation}
+with $\lambda$ the mean free path of air. The settling velocity is added to
+the vertical component of the particle velocity at each timestep, so large
+particles fall out quickly and deposit close to ground zero while fine
+particles remain aloft and travel long distances.
+
+\subsection{Dry Deposition}
+
+Surface removal of particles uses a resistance analogy following Zhang et
+al.\ (2001). The deposition velocity is:
+\begin{equation}
+    v_d = v_g + \frac{1}{R_a + R_s}
+\end{equation}
+where $R_a$ is the aerodynamic resistance (from Monin--Obukhov similarity
+theory, accounting for atmospheric stability) and $R_s$ is the surface
+resistance. The surface resistance depends on three collection mechanisms:
+Brownian diffusion ($E_B \propto \mathrm{Sc}^{-0.54}$), inertial impaction
+($E_{\mathrm{IM}}$ via the Stokes number), and interception ($E_{\mathrm{IN}}$
+via the ratio of particle diameter to collector radius). A rebound correction
+$R_1 = 1 - \exp(-\sqrt{\mathrm{St}})$ accounts for particles bouncing off
+surfaces rather than sticking.
+
+When a particle's height drops below a threshold near the surface, its mass
+is reduced exponentially at a rate $k = v_d / h_{\mathrm{mix}}$, transferring
+activity to the ground-level deposition field.
+
+%% ====================================================================
+\section{Nancy 24\,kT: Consortium Comparison}
+%% ====================================================================
+
+The model was first validated against the Upshot-Knothole Nancy test
+(24\,kT, 24 March 1953). Simulated dose rate contours at H+12 hours are
+compared with digitised observations using the Figure of Merit in Space:
+\begin{equation}
+    \mathrm{FMS} = \frac{A_{\text{obs}} \cap A_{\text{model}}}{A_{\text{obs}} \cup A_{\text{model}}}
+\end{equation}
+Six dose rate thresholds are evaluated: 0.4, 1, 4, 10, 40, and
+100\,mR/h. Each consortium member submitted output in their native format,
+interpolated onto a common 2\,km grid for scoring.
+
+Table~\ref{tab:nancy_fms} summarises the results. Our model achieves a mean
+FMS of 45.9\%, roughly 17 percentage points above the next-best consortium
+member (UKMO, 28.8\%).
+
+\begin{table}[htbp]
+\centering
+\caption{FMS scores for Nancy 24\,kT at H+12.}
+\label{tab:nancy_fms}
+\begin{tabular}{lrrrrrr}
+\toprule
+Dose Rate (mR/h) & Our Model & UKMO & BfS & KIT & DSA/MET & DEMA \\
+\midrule
+0.4 & 67.1\% & 60.4\% & 52.9\% & 33.8\% & 45.6\% & 0.7\% \\
+1 & 58.7\% & 47.3\% & 31.1\% & 27.7\% & 28.1\% & --- \\
+4 & 55.6\% & 22.4\% & 18.2\% & 18.9\% & 16.9\% & --- \\
+10 & 40.1\% & 15.9\% & 9.9\% & 12.1\% & 9.2\% & --- \\
+40 & 28.7\% & 16.2\% & 5.4\% & 4.4\% & 5.5\% & --- \\
+100 & 25.2\% & 10.5\% & 2.8\% & 0.5\% & 2.2\% & --- \\
+\midrule
+Mean & \textbf{45.9\%} & \textbf{28.8\%} & \textbf{20.0\%} & \textbf{16.2\%} & \textbf{17.9\%} & \textbf{0.1\%} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+%% ====================================================================
+\section{Side-by-Side Comparisons}
+%% ====================================================================
+
+The following figures show the digitised observation contours (left panel) and
+each model's predicted dose rate contours (right panel) for the six
+thresholds.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{nancy_fms_OurModel.png}
+\caption{Our Model --- Mean FMS 45.9\%.}
+\label{fig:fms_ours}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{nancy_fms_UKMO.png}
+\caption{UKMO (UK Met Office NAME model) --- Mean FMS 28.8\%.}
+\label{fig:fms_ukmo}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{nancy_fms_BfS.png}
+\caption{BfS (Germany, JRODOS) --- Mean FMS 20.0\%.}
+\label{fig:fms_bfs}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{nancy_fms_KIT.png}
+\caption{KIT (Germany, JRODOS) --- Mean FMS 16.2\%.}
+\label{fig:fms_kit}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{nancy_fms_DSA.png}
+\caption{DSA/MET Norway (SNAP model) --- Mean FMS 17.9\%.}
+\label{fig:fms_dsa}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{nancy_fms_DEMA.png}
+\caption{DEMA (Denmark, ARGOS/RIMPUFF) --- Mean FMS 0.1\%.}
+\label{fig:fms_dema}
+\end{figure}
+
+\clearpage
+%% ====================================================================
+\section{Smoky 44\,kT: Preliminary Results}
+%% ====================================================================
+
+The same model and OU turbulence scheme were applied to the Plumbbob Smoky
+test (44\,kT tower shot, 31 August 1957, Nevada Test Site). The three-layer
+release geometry was initialised from DASA-1251 cloud observations (stem top
+10,600\,ft, cap centre 22,800\,ft, cloud top 35,000\,ft MSL), converted to
+AGL using the NTS surface elevation of 1,409\,m. ERA5 reanalysis provides
+the driving meteorology.
+
+The current best parameter set achieves a geometric-mean FMS of 9\%, with
+the modelled plume correctly reproducing the eastward fallout lobe driven by
+mid-tropospheric westerlies documented in DNA~6004F. Calibration is ongoing
+and we expect further improvement as the parameter space is explored.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{smoky_bomb_release.png}
+\caption{Smoky 44\,kT --- Observed (left) vs model (right) dose rate
+contours at H+12.}
+\label{fig:smoky}
+\end{figure}
+
+\end{document}

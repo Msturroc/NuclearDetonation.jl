@@ -1,0 +1,202 @@
+==============================================================================
+ERA5 Wind Profile Analysis -- Shot Smoky, H-hour
+==============================================================================
+
+Target: 37.177N, 116.046W (lon 0-360: 243.954E)
+Time:   12:00 UTC, 31 August 1957 (H-hour ~ 12:30 UTC)
+File:   examples/smoky_example/ERA5_data/era5_smoky_19570831_12-14_snap.nc
+
+Grid: 33 x 22 points, 3 timesteps
+Lat range: 35.0 to 40.90625
+Lon range: 242.0 to 251.0
+Times: 1957-08-31T12:00:00, 1957-08-31T13:00:00, 1957-08-31T14:00:00
+
+Nearest grid cell: lat=37.25N, lon=243.96875E (116.031W)
+  Grid indices: ilon=8, ilat=14
+  Distance: dlat=0.073, dlon=0.015
+
+Surface pressure: 83295.7 Pa = 833.0 hPa
+
+Pressure sanity check:
+  p_half[138] (surface) = 83295.7 Pa = 833.0 hPa
+  p_half[1]   (TOA)     = 0.0 Pa
+  p_full[137] (lowest)  = 83197.0 Pa = 832.0 hPa
+  p_full[1]   (highest) = 1.0002 Pa
+
+==============================================================================
+VERTICAL WIND PROFILE AT SMOKY GROUND ZERO (12 UTC, 31 AUG 1957)
+==============================================================================
+
+Lvl       z(m)   p(hPa)    T(K)  u(m/s)  v(m/s)    spd   dir  from
+----------------------------------------------------------------------
+ 137        10    832.0   284.7    1.22   -1.07    1.6   311    NW
+ 136        31    829.9   286.4    1.46   -0.99    1.8   304    NW
+ 135        53    827.7   286.7    1.59   -0.83    1.8   297   WNW
+ 134        78    825.3   286.8    1.71   -0.70    1.8   292   WNW
+ 133       104    822.7   286.9    1.81   -0.64    1.9   289   WNW
+ 132       133    819.8   286.8    1.92   -0.64    2.0   288   WNW
+ 131       164    816.8   286.7    2.03   -0.69    2.1   289   WNW
+ 130       198    813.5   286.6    2.13   -0.78    2.3   290   WNW
+ 129       235    810.0   286.4    2.23   -0.93    2.4   293   WNW
+ 128       275    806.1   286.2    2.34   -1.17    2.6   297   WNW
+ 127       318    802.0   285.9    2.48   -1.50    2.9   301   WNW
+ 126       365    797.5   285.6    2.64   -1.90    3.2   306    NW
+ 125       416    792.6   285.2    2.81   -2.32    3.6   310    NW
+ 124       471    787.4   284.8    2.87   -2.75    4.0   314    NW
+ 123       531    781.7   284.4    2.75   -3.14    4.2   319    NW
+ 122       596    775.7   284.0    2.48   -3.34    4.2   323    NW
+ 121       666    769.1   283.6    2.18   -3.35    4.0   327   NNW
+ 120       742    762.1   283.1    1.88   -3.20    3.7   330   NNW
+ 119       824    754.6   282.6    1.66   -2.87    3.3   330   NNW
+ 118       912    746.6   282.0    1.54   -2.56    3.0   329   NNW
+ 117      1007    738.1   281.3    1.53   -2.40    2.8   328   NNW
+ 116      1110    728.9   280.6    1.58   -2.51    3.0   328   NNW
+ 115      1219    719.3   279.8    1.70   -2.73    3.2   328   NNW
+ 114      1337    709.0   279.0    1.86   -2.92    3.5   327   NNW
+ 113      1462    698.2   278.0    1.96   -2.92    3.5   326    NW
+ 112      1596    686.7   276.9    1.88   -2.59    3.2   324    NW
+ 111      1739    674.7   275.7    1.63   -1.92    2.5   320    NW
+ 110      1890    662.2   274.4    1.39   -1.10    1.8   308    NW
+ 109      2051    649.1   272.9    1.20   -0.31    1.2   285   WNW
+ 108      2220    635.4   271.3    0.99    0.39    1.1   249   WSW
+ 107      2398    621.3   269.8    0.76    0.77    1.1   224    SW
+ 106      2585    606.8   268.4    0.92    0.74    1.2   231    SW
+ 105      2780    591.8   267.1    2.20    0.14    2.2   266     W
+ 104      2985    576.5   266.0    4.18   -0.98    4.3   283   WNW
+ 103      3198    560.9   264.9    6.02   -2.07    6.4   289   WNW
+ 102      3419    545.1   263.5    7.19   -2.84    7.7   292   WNW
+ 101      3648    529.1   262.0    7.86   -3.55    8.6   294   WNW
+ 100      3883    513.1   260.3    8.43   -4.54    9.6   298   WNW
+  99      4124    497.1   258.6    9.18   -5.54   10.7   301   WNW
+  98      4371    481.1   256.8   10.32   -6.30   12.1   301   WNW
+  97      4621    465.3   255.0   11.92   -6.59   13.6   299   WNW
+  96      4875    449.7   253.1   13.80   -6.45   15.2   295   WNW
+  95      5130    434.4   251.3   15.63   -5.91   16.7   291   WNW
+  94      5385    419.5   249.4   17.12   -5.19   17.9   287   WNW
+  93      5641    405.0   247.3   18.08   -4.55   18.6   284   WNW
+  92      5897    390.9   245.2   18.56   -4.24   19.0   283   WNW
+  91      6152    377.2   242.8   18.79   -4.28   19.3   283   WNW
+  90      6408    363.8   240.4   18.96   -4.48   19.5   283   WNW
+  89      6663    350.7   238.0   19.18   -4.76   19.8   284   WNW
+  88      6919    338.1   235.7   19.45   -5.18   20.1   285   WNW
+  87      7174    325.7   233.6   19.68   -5.78   20.5   286   WNW
+  86      7430    313.7   231.5   19.98   -6.35   21.0   288   WNW
+  85      7686    302.0   229.6   20.56   -6.67   21.6   288   WNW
+  84      7943    290.7   227.9   21.32   -6.86   22.4   288   WNW
+  83      8201    279.6   226.4   21.79   -7.15   22.9   288   WNW
+  82      8461    268.8   225.4   21.77   -7.06   22.9   288   WNW
+  81      8722    258.4   224.6   22.02   -5.72   22.7   285   WNW
+  80      8986    248.2   223.9   23.19   -3.75   23.5   279     W
+  79      9252    238.3   223.1   24.76   -2.63   24.9   276     W
+  78      9520    228.7   222.7   25.39   -3.01   25.6   277     W
+  77      9793    219.4   223.0   24.04   -3.67   24.3   279     W
+  76     10069    210.3   223.7   21.06   -3.05   21.3   278     W
+  75     10349    201.5   224.2   17.36   -1.12   17.4   274     W
+  74     10634    192.9   224.0   14.20    1.82   14.3   263     W
+  73     10922    184.6   223.1   12.70    5.14   13.7   248   WSW
+  72     11212    176.6   222.0   13.05    7.62   15.1   240   WSW
+  71     11506    168.8   220.9   14.56    8.34   16.8   240   WSW
+  70     11801    161.2   219.9   16.01    7.56   17.7   245   WSW
+  69     12100    153.9   219.0   16.50    6.00   17.6   250   WSW
+  68     12402    146.8   218.3   15.82    4.71   16.5   253   WSW
+  67     12707    139.9   217.6   14.65    4.55   15.3   253   WSW
+  66     13016    133.3   216.9   13.74    5.21   14.7   249   WSW
+  65     13327    126.9   216.2   13.27    5.91   14.5   246   WSW
+  64     13642    120.8   215.7   12.84    6.01   14.2   245   WSW
+  63     13959    114.8   215.5   11.72    5.86   13.1   243   WSW
+  62     14281    109.1   215.5   10.34    5.89   11.9   240   WSW
+  61     14606    103.6   215.7    9.65    6.20   11.5   237   WSW
+  60     14936     98.4   216.1    8.57    6.14   10.5   234    SW
+
+==============================================================================
+WIND SUMMARY BY ALTITUDE BAND
+==============================================================================
+
+  Surface - 500m AGL (boundary layer)
+    Mean wind: 2.09 m/s (E), -1.21 m/s (N)
+    Mean speed: 2.4 m/s, direction: 300.0 (WNW)
+    Speed range: 1.6 - 4.0 m/s
+    Levels: 14 (k=124 to k=137)
+
+  500m - 1 km AGL
+    Mean wind: 2.08 m/s (E), -3.08 m/s (N)
+    Mean speed: 3.7 m/s, direction: 326.0 (NW)
+    Speed range: 3.0 - 4.2 m/s
+    Levels: 6 (k=118 to k=123)
+
+  1 - 2 km AGL
+    Mean wind: 1.69 m/s (E), -2.39 m/s (N)
+    Mean speed: 2.9 m/s, direction: 325.0 (NW)
+    Speed range: 1.8 - 3.5 m/s
+    Levels: 8 (k=110 to k=117)
+
+  2 - 3 km AGL
+    Mean wind: 1.71 m/s (E), 0.13 m/s (N)
+    Mean speed: 1.7 m/s, direction: 266.0 (W)
+    Speed range: 1.1 - 4.3 m/s
+    Levels: 6 (k=104 to k=109)
+
+  3 - 5 km AGL
+    Mean wind: 9.34 m/s (E), -4.73 m/s (N)
+    Mean speed: 10.5 m/s, direction: 297.0 (WNW)
+    Speed range: 6.4 - 15.2 m/s
+    Levels: 8 (k=96 to k=103)
+
+  5 - 7 km AGL
+    Mean wind: 18.22 m/s (E), -4.82 m/s (N)
+    Mean speed: 18.8 m/s, direction: 285.0 (WNW)
+    Speed range: 16.7 - 20.1 m/s
+    Levels: 8 (k=88 to k=95)
+
+  7 - 9 km AGL
+    Mean wind: 21.29 m/s (E), -6.17 m/s (N)
+    Mean speed: 22.2 m/s, direction: 286.0 (WNW)
+    Speed range: 20.5 - 23.5 m/s
+    Levels: 8 (k=80 to k=87)
+
+  9 - 11 km AGL
+    Mean wind: 19.93 m/s (E), -0.93 m/s (N)
+    Mean speed: 20.0 m/s, direction: 273.0 (W)
+    Speed range: 13.7 - 25.6 m/s
+    Levels: 7 (k=73 to k=79)
+
+  11 - 13 km AGL (tropopause region)
+    Mean wind: 15.1 m/s (E), 6.46 m/s (N)
+    Mean speed: 16.4 m/s, direction: 247.0 (WSW)
+    Speed range: 15.1 - 17.7 m/s
+    Levels: 6 (k=67 to k=72)
+
+==============================================================================
+TRANSPORT ANALYSIS
+==============================================================================
+
+Q: At 1-3 km AGL, are winds from the north (northerlies) as DNA 6004F says?
+   Mean u = 1.7 m/s, mean v = -1.31 m/s
+   Speed = 2.1 m/s from 308.0 (NW)
+   ANSWER: YES -- southward component (v < 0) confirms northerly flow.
+
+Q: At 3-7 km AGL, are winds from the west (westerlies)?
+   Mean u = 13.78 m/s, mean v = -4.78 m/s
+   Speed = 14.6 m/s from 289.0 (WNW)
+   ANSWER: YES -- strong eastward component (u > 0) confirms westerly flow.
+
+Q: At 8-11 km AGL, what direction do winds come from? Is there a northward component?
+   Mean u = 20.75 m/s, mean v = -2.75 m/s
+   Speed = 20.9 m/s from 278.0 (W)
+   ANSWER: Winds have a SOUTHWARD component (v < 0), no northward flow.
+
+Q: Does the ERA5 wind profile support ESE transport of debris?
+
+   Column mean (0-12 km): 9.7 m/s from 284.0 (WNW)
+   Stem (0-6 km):         5.2 m/s from 298.0 (WNW)
+   Cloud (6-14 km):       18.2 m/s from 271.0 (W)
+
+   DNA 6004F reference:
+     - Northerly winds at 1-3 km (debris blown southward)
+     - Westerly winds at 3-7 km (debris blown eastward)
+     - Combined effect: ESE-directed fallout plume
+
+   CONCLUSION: ERA5 SUPPORTS ESE transport.
+   The stem-region mean wind has eastward (u>0) and southward (v<0) components,
+   consistent with debris transport toward the ESE, matching DNA 6004F.
+
