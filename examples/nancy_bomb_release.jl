@@ -270,7 +270,7 @@ num_cfg = ERA5NumericalConfig{Float64}(
     turbulence=Transport.OrnsteinUhlenbeck)
 
 sim_cfg = Transport.SimulationConfig{Float64}(
-    saveat=[12.0 * 3600.0], verbose=false, max_duration=12.0 * 3600.0,
+    saveat=[Float64(h) * 3600.0 for h in 1:12], verbose=false, max_duration=12.0 * 3600.0,
     save_snapshots=true, dt_particle=300.0, use_reference_stepping=true,
     max_files=7, omega_scale=p.omega_scale)
 
@@ -293,9 +293,22 @@ println("   Simulation complete")
 
 println("\n6. Building dose rate field...")
 
-# Fine output grid (2 km resolution)
-lon_grid = range(-117.5, -112.0, step=0.023)
-lat_grid = range(36.5, 41.0, step=0.018)
+# Try to load observations; if unavailable, use hardcoded grid
+obs_dir = joinpath(pkgdir(NuclearDetonation), "data", "nancy_observations")
+has_observations = isdir(obs_dir) &&
+    isfile(joinpath(obs_dir, "Nancy_doserate_contours.geojson")) &&
+    isfile(joinpath(obs_dir, "Nancy_TOA.geojson"))
+
+if has_observations
+    nancy_obs = Transport.load_nancy_observations()
+    lat_grid, lon_grid = Transport.suggest_grid(nancy_obs; resolution_km=2.0, buffer_fraction=0.5)
+    println("   Observations loaded — will produce side-by-side plot")
+else
+    lon_grid = range(-117.5, -112.0, step=0.023)
+    lat_grid = range(36.5, 41.0, step=0.018)
+    nancy_obs = nothing
+    println("   No observations found — standalone simulation mode")
+end
 nx_out, ny_out = length(lon_grid), length(lat_grid)
 
 fine_dep = zeros(nx_out, ny_out)
@@ -310,8 +323,8 @@ for evt in state.deposition_log
 end
 
 # Convert deposition (Bq per cell) to dose rate (mR/h at H+12)
-dlat = step(lat_grid)
-dlon = step(lon_grid)
+dlat = length(lat_grid) > 1 ? abs(lat_grid[2] - lat_grid[1]) : 0.018
+dlon = length(lon_grid) > 1 ? abs(lon_grid[2] - lon_grid[1]) : 0.023
 ref_lat = 0.5 * (first(lat_grid) + last(lat_grid))
 dy_m = dlat * 111_000.0
 dx_m = dlon * 111_000.0 * cosd(ref_lat)
@@ -325,41 +338,176 @@ dose_factor = K_DOSE * decay_12h * mSv_to_mR / cell_area_m2
 dose_mRh = fine_dep .* dose_factor
 dose_smooth = gaussian_smooth(dose_mRh, p.smooth_sigma)
 
-println("   Max dose rate: $(round(maximum(dose_smooth), digits=1)) mR/h")
+max_dose = maximum(dose_smooth)
+println("   Max dose rate: $(round(max_dose, digits=1)) mR/h")
 println("   Cell area: $(round(cell_area_m2 / 1e6, digits=2)) km²")
+println("   Grid: $(nx_out) x $(ny_out) cells")
+println("   Deposition events: $(length(state.deposition_log))")
+
+# Build cumulative hourly deposition snapshots and compute model TOA
+println("\n   Computing model time-of-arrival...")
+sorted_events = sort(state.deposition_log, by=e -> e.time)
+model_toa = fill(NaN, nx_out, ny_out)
+
+model_snapshots = Vector{Matrix{Float64}}()
+snapshot_hours = Float64[]
+for hour in 1:12
+    hour_end_time = Float64(hour) * 3600.0
+    cumulative_dep = zeros(nx_out, ny_out)
+    for evt in sorted_events
+        if evt.time <= hour_end_time
+            lat, lon = Transport.grid_to_latlon(domain, evt.x, evt.y)
+            lon > 180.0 && (lon -= 360.0)
+            i = searchsortedlast(lon_grid, lon)
+            j = searchsortedlast(lat_grid, lat)
+            if 1 <= i <= nx_out && 1 <= j <= ny_out
+                cumulative_dep[i, j] += evt.mass
+            end
+        end
+    end
+    push!(model_snapshots, cumulative_dep)
+    push!(snapshot_hours, Float64(hour))
+end
+
+# Smooth cumulative snapshots with a larger kernel for TOA visualisation
+toa_smooth_sigma = max(p.smooth_sigma * 5.0, 5.0)
+model_snapshots_smooth = [gaussian_smooth(snap, toa_smooth_sigma) for snap in model_snapshots]
+
+# Threshold-based first-arrival detection
+max_dose_toa = maximum(model_snapshots_smooth[end])
+threshold = max_dose_toa * 0.001
+for i in 1:nx_out, j in 1:ny_out
+    for (t_idx, snap) in enumerate(model_snapshots_smooth)
+        if snap[i, j] >= threshold
+            model_toa[i, j] = snapshot_hours[t_idx]
+            break
+        end
+    end
+end
+println("   TOA coverage: $(sum(.!isnan.(model_toa))) cells with arrival times")
 
 # ============================================================================
-# 8. Plot model-predicted dose rate contours
+# 8. Plot dose rate contours and time of arrival
 # ============================================================================
 
 println("\n7. Creating figure...")
 
 contour_levels = [0.4, 1.0, 4.0, 10.0, 40.0, 100.0]
 contour_colors = [:blue, :cyan, :green, :yellow, :orange, :red]
+toa_hours = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0]
+toa_cmap = cgrad(:viridis, length(toa_hours), categorical=true)
 
-fig = Figure(size=(700, 800), fontsize=14)
+if has_observations
+    # --- 2x2: dose rate (top) + TOA (bottom), obs (left) vs model (right) ---
+    obs_bounds = Transport.contour_bounds(nancy_obs.dose_rate_contours)
+    lat_buf = 0.1 * (obs_bounds[2] - obs_bounds[1])
+    lon_buf = 0.1 * (obs_bounds[4] - obs_bounds[3])
+    ax_lon_min = obs_bounds[3] - lon_buf
+    ax_lon_max = obs_bounds[4] + lon_buf
+    ax_lat_min = obs_bounds[1] - lat_buf
+    ax_lat_max = obs_bounds[2] + lat_buf
 
-ax = Axis(fig[1, 1],
-    title = "Nancy 24 kT — Model Dose Rate at H+12",
-    xlabel = "Longitude (°)",
-    ylabel = "Latitude (°)",
-    limits = (-117.5, -113.0, 36.5, 40.5),
-    aspect = DataAspect(),
-)
+    fig = Figure(size=(1400, 1400), fontsize=14)
 
-for (level, col) in zip(contour_levels, contour_colors)
-    contour!(ax, collect(lon_grid), collect(lat_grid), dose_smooth,
-        levels=[level], color=col, linewidth=2.5)
+    # --- Row 1: Dose rate ---
+    ax_obs = Axis(fig[1, 1],
+        title = "Observed Dose Rate at H+12",
+        xlabel = "Longitude (°)", ylabel = "Latitude (°)",
+        limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
+        aspect = DataAspect(),
+    )
+
+    for (level, col) in zip(contour_levels, contour_colors)
+        for contour_obj in nancy_obs.dose_rate_contours
+            contour_obj.dose_rate_mR_hr != level && continue
+            for polygon in contour_obj.polygons
+                lats = [pt[1] for pt in polygon]
+                lons = [pt[2] for pt in polygon]
+                lines!(ax_obs, lons, lats, color=col, linewidth=2.5)
+            end
+        end
+    end
+    scatter!(ax_obs, [-116.1028], [37.0956], marker=:star5, markersize=20, color=:black)
+
+    ax_mod = Axis(fig[1, 2],
+        title = "Model Dose Rate at H+12",
+        xlabel = "Longitude (°)", ylabel = "Latitude (°)",
+        limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
+        aspect = DataAspect(),
+    )
+
+    for (level, col) in zip(contour_levels, contour_colors)
+        contour!(ax_mod, collect(lon_grid), collect(lat_grid), dose_smooth,
+            levels=[level], color=col, linewidth=2.5)
+    end
+    scatter!(ax_mod, [-116.1028], [37.0956], marker=:star5, markersize=20, color=:black)
+
+    legend_elements = [LineElement(color=c, linewidth=3) for c in contour_colors]
+    legend_labels = ["$(l) mR/h" for l in contour_levels]
+    Legend(fig[2, :], legend_elements, legend_labels, "Dose Rate (H+12)",
+        orientation=:horizontal, tellwidth=false, tellheight=true)
+
+    # --- Row 2: Time of Arrival ---
+    ax_toa_obs = Axis(fig[3, 1],
+        title = "Observed Time of Arrival",
+        xlabel = "Longitude (°)", ylabel = "Latitude (°)",
+        limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
+        aspect = DataAspect(),
+    )
+
+    for toa_c in nancy_obs.toa_contours
+        ci = searchsortedlast(toa_hours, toa_c.hour)
+        ci = clamp(ci, 1, length(toa_hours))
+        col = toa_cmap[ci]
+        for line in toa_c.lines
+            lats = [pt[1] for pt in line]
+            lons = [pt[2] for pt in line]
+            lines!(ax_toa_obs, lons, lats, color=col, linewidth=2.5)
+        end
+    end
+    scatter!(ax_toa_obs, [-116.1028], [37.0956], marker=:star5, markersize=20, color=:black)
+
+    ax_toa_mod = Axis(fig[3, 2],
+        title = "Model Time of Arrival",
+        xlabel = "Longitude (°)", ylabel = "Latitude (°)",
+        limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
+        aspect = DataAspect(),
+    )
+
+    for (hi, h) in enumerate(toa_hours)
+        contour!(ax_toa_mod, collect(lon_grid), collect(lat_grid), model_toa,
+            levels=[h], color=toa_cmap[hi], linewidth=2.5)
+    end
+    scatter!(ax_toa_mod, [-116.1028], [37.0956], marker=:star5, markersize=20, color=:black)
+
+    toa_legend_elements = [LineElement(color=toa_cmap[i], linewidth=3) for i in eachindex(toa_hours)]
+    toa_legend_labels = ["H+$(Int(h))" for h in toa_hours]
+    Legend(fig[4, :], toa_legend_elements, toa_legend_labels, "Time of Arrival",
+        orientation=:horizontal, tellwidth=false, tellheight=true)
+
+    Label(fig[0, :], "Nancy 24 kT — Observed vs Model", fontsize=18, font=:bold)
+else
+    # --- Standalone: model-only plot ---
+    fig = Figure(size=(700, 800), fontsize=14)
+
+    ax = Axis(fig[1, 1],
+        title = "Nancy 24 kT — Model Dose Rate at H+12",
+        xlabel = "Longitude (°)", ylabel = "Latitude (°)",
+        limits = (first(lon_grid), last(lon_grid), first(lat_grid), last(lat_grid)),
+        aspect = DataAspect(),
+    )
+
+    for (level, col) in zip(contour_levels, contour_colors)
+        contour!(ax, collect(lon_grid), collect(lat_grid), dose_smooth,
+            levels=[level], color=col, linewidth=2.5)
+    end
+    scatter!(ax, [-116.1028], [37.0956], marker=:star5, markersize=20, color=:black)
+
+    legend_elements = [LineElement(color=c, linewidth=3) for c in contour_colors]
+    legend_labels = ["$(l) mR/h" for l in contour_levels]
+    Legend(fig[2, 1], legend_elements, legend_labels, "Dose Rate (H+12)",
+        orientation=:horizontal, tellwidth=false, tellheight=true)
 end
-
-# Ground zero
-scatter!(ax, [-116.1028], [37.0956], marker=:star5, markersize=20, color=:black)
-
-# Legend
-legend_elements = [LineElement(color=c, linewidth=3) for c in contour_colors]
-legend_labels = ["$(l) mR/h" for l in contour_levels]
-Legend(fig[2, 1], legend_elements, legend_labels, "Dose Rate (H+12)",
-    orientation=:horizontal, tellwidth=false, tellheight=true)
 
 outfile = joinpath(@__DIR__, "nancy_bomb_release.png")
 save(outfile, fig, px_per_unit=2)

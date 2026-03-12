@@ -1,11 +1,11 @@
 #!/usr/bin/env julia
-# Smoky BIPOP-CMA-ES v4 — 3-layer release structure
+# Smoky BIPOP-CMA-ES v5 — 3-layer release structure + bearing penalty
 #
 # Finds ONE best parameter set for a given turbulence scheme (RW or OU).
 # Uses BIPOP restarts and per-generation CRN for noise handling.
-# Scoring: 35% FMS + 20% shape (inertia ellipse matching) + 15% extent + 30% TOA
-# Shape score penalises symmetric blobs by comparing aspect ratio + orientation
-# of the model plume against the observed Smoky contours at each dose level.
+# Scoring: 30% FMS + 10% shape + 20% bearing + 10% extent + 30% TOA
+# v5: Added centroid bearing penalty to reward ESE plume direction.
+# Tightened bounds: d_fine≥10 μm, frac_fine≤0.70, omega≤3, tmix≤5.
 #
 # v4: 3 CylinderRelease sources scaled for 44 kT (Smoky) from NOAA 1984 layers:
 #   Lower  (0–5,000 m, r=650 m)      — transported NNW
@@ -52,15 +52,15 @@ end
 const TURB_NAME = TURB_SCHEME == :OU ? "Ornstein-Uhlenbeck" : "RandomWalk"
 
 println("="^70)
-println("SMOKY BIPOP-CMA-ES v4 — $(TURB_NAME) ($(nthreads()) threads)")
-println("Pure optimiser: finds ONE best parameter set at d=20")
+println("SMOKY BIPOP-CMA-ES v5 — $(TURB_NAME) ($(nthreads()) threads)")
+println("Pure optimiser: finds ONE best parameter set at d=23")
 println("Noise handling: per-generation CRN (common random numbers)")
 println("Restarts: BIPOP (alternating large/small population)")
-println("v4: 3-layer release (NOAA 1984), tighter density/h_diff bounds")
+println("v5: bearing penalty, tighter d_fine/frac_fine/omega/tmix bounds")
 println("="^70)
 
 # ============================================================================
-# PARAMETER BOUNDS — v4: 3-layer release, tighter density and h_diff
+# PARAMETER BOUNDS — v5: bearing penalty, tighter particle/physics bounds
 # ============================================================================
 
 const PARAM_NAMES = [
@@ -74,7 +74,7 @@ const PARAM_NAMES = [
 ]
 
 const LB = Float64[
-    1.0, 1.1, 50.0, 1.1, 0.05,           # particle size: d_fine≥1 μm, sigma_g min 1.1
+    20.0, 1.1, 80.0, 1.1, 0.05,          # particle size: d_fine≥20 μm (settles from 5km in <12h), d_coarse≥80 μm
     0.01, 0.01,                            # layer fractions (normalised in rho_core)
     0.01, 0.1, 0.05, 0.1,                # turbulence: sigma_w, sigma_h, h_diff, tl_scale
     0.1, 0.1, 0.1, 0.1, 0.1,             # physics: vd, vgrav, omega, mixing_height, tmix
@@ -84,13 +84,13 @@ const LB = Float64[
 ]
 
 const UB = Float64[
-    150.0, 3.5, 300.0, 3.5, 0.95,        # particle size: wider d_median and sigma_g
-    0.85, 0.70,                            # layer fractions (normalised in rho_core)
-    5.0, 8.0, 2.0, 5.0,                  # turbulence: sigma_w, sigma_h, h_diff, tl_scale≤5
-    10.0, 5.0, 6.0, 5.0, 10.0,            # physics: vd≤10, vgrav≤5, omega≤6, mixing_height≤5, tmix≤10
-    5.0, 5.0,                              # deposition: surface_height, roughness
-    200.0, 5.0,                            # calibration: activity ×[10,200]e15 Bq, smooth σ [0.5,5] cells
-    5000.0, 9000.0, 9500.0                # layer heights (m AGL): stem_top, cap_mid, cloud_top (capped below tropopause)
+    100.0, 3.5, 200.0, 5.0, 0.70,        # particle size: d_fine≤100, d_coarse≤200, sigma_g_coarse≤5, frac_fine≤0.70
+    0.50, 0.50,                            # layer fractions: cap at 0.50 each (ensure ≥15% upper cap)
+    10.0, 8.0, 2.0, 10.0,                # turbulence: sigma_w≤10, sigma_h, h_diff, tl_scale≤10
+    20.0, 10.0, 5.0, 5.0, 5.0,            # physics: vd≤20, vgrav≤10, omega≤5, mixing_height≤5, tmix≤5
+    10.0, 5.0,                             # deposition: surface_height≤10, roughness
+    500.0, 5.0,                            # calibration: activity ×[10,500]e15 Bq, smooth σ [0.5,5] cells
+    8000.0, 9000.0, 12000.0               # layer heights (m AGL): stem_top≤8km, cap_mid, cloud_top≤12km
 ]
 
 const N_DIM = length(LB)
@@ -352,6 +352,53 @@ const OBS_SHAPES = let
 end
 println("   Computed observed shapes for $(length(OBS_SHAPES)) contour levels")
 
+# Pre-compute observed centroid bearings per contour level.
+# Used for bearing scoring: penalises models whose plume centroid points
+# in the wrong direction (e.g. ENE instead of ESE).
+
+"""
+    centroid_bearing(mask, lat_grid, lon_grid, source_lat, source_lon; min_cells=10)
+
+Compute the bearing (degrees, 0=N, 90=E) from `source` to the centroid of
+binary `mask`. Returns nothing if too few cells.
+"""
+function centroid_bearing(mask::AbstractMatrix, lat_grid, lon_grid,
+                          source_lat::Float64, source_lon::Float64;
+                          min_cells::Int=10)
+    ref_lat = 0.5 * (first(lat_grid) + last(lat_grid))
+    sum_x = 0.0
+    sum_y = 0.0
+    n = 0
+    for i in eachindex(lon_grid)
+        for j in eachindex(lat_grid)
+            if mask isa AbstractMatrix{Bool} ? mask[i, j] : mask[i, j] > 0
+                sum_x += (lon_grid[i] - source_lon) * cosd(ref_lat)
+                sum_y += lat_grid[j] - source_lat
+                n += 1
+            end
+        end
+    end
+    n < min_cells && return nothing
+    cx = sum_x / n
+    cy = sum_y / n
+    bearing = atand(cx, cy)  # atan2(east, north) → degrees from north
+    bearing < 0 && (bearing += 360.0)
+    return bearing
+end
+
+const OBS_BEARINGS = let
+    bearings = Dict{Float64, Float64}()
+    for (dose_rate, obs_mask) in OBS_MASKS
+        b = centroid_bearing(obs_mask, LAT_GRID, LON_GRID, SOURCE_LAT, SOURCE_LON)
+        if !isnothing(b)
+            bearings[dose_rate] = b
+            println("   Contour $(dose_rate) mR/h: bearing=$(round(b, digits=1))°")
+        end
+    end
+    bearings
+end
+println("   Computed observed bearings for $(length(OBS_BEARINGS)) contour levels")
+
 # Layer geometry now tuneable via CMA-ES parameters (stem_top_m, cap_mid_m, cloud_top_m)
 # Warm start from DASA-1251 (AGL): stem top 1822 m, cap mid 5541 m, cloud top 9259 m
 println("\n4. Layer geometry: tuneable (warm start from DASA-1251 Smoky cloud obs, AGL)")
@@ -463,7 +510,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
 
     if isempty(positions_m)
         GC.gc(false)
-        return (loss = 1.0, fms = 0.0, shape = 0.0, extent = 0.0, toa = 0.0, combined_old = 0.0)
+        return (loss = 1.0, fms = 0.0, shape = 0.0, bearing = 0.0, extent = 0.0, toa = 0.0, combined_old = 0.0)
     end
 
     n_part = length(positions_m)
@@ -598,7 +645,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
     total = sum(final_dose)
     if total <= 0
         GC.gc(false)
-        return (loss = 1.0, fms = 0.0, shape = 0.0, extent = 0.0, toa = 0.0, combined_old = 0.0)
+        return (loss = 1.0, fms = 0.0, shape = 0.0, bearing = 0.0, extent = 0.0, toa = 0.0, combined_old = 0.0)
     end
 
     # Convert to dose rate (mR/h at H+12) and smooth for FMS
@@ -641,6 +688,33 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
     geo_mean_fms = exp(mean(log(max(s, 0.005)) for s in fms_scores))
     geo_mean_shape = exp(mean(log(max(s, 0.005)) for s in shape_scores))
 
+    # Bearing score: compare model centroid bearing to observed bearing per contour.
+    # Dose-rate-weighted so close-in contours (50-1000 mR/h at ~100° ESE) dominate
+    # over far-field (1 mR/h at ~80° ENE). Uses cos⁴(Δ) for sharp penalty:
+    #   10° error → 0.94,  20° → 0.77,  30° → 0.56,  45° → 0.25
+    bearing_sum = 0.0
+    bearing_weight_sum = 0.0
+    for (dose_rate, obs_mask) in OBS_MASKS
+        obs_bearing = get(OBS_BEARINGS, dose_rate, nothing)
+        isnothing(obs_bearing) && continue
+        model_mask = dose_smooth .>= dose_rate
+        model_bearing = if sum(model_mask) > 0
+            centroid_bearing(model_mask, LAT_GRID, LON_GRID, SOURCE_LAT, SOURCE_LON)
+        else
+            nothing
+        end
+        w = dose_rate  # weight by dose rate: 1000 mR/h gets 1000× weight of 1 mR/h
+        if !isnothing(model_bearing)
+            diff_deg = abs(model_bearing - obs_bearing)
+            diff_deg > 180.0 && (diff_deg = 360.0 - diff_deg)
+            bearing_sum += w * cosd(diff_deg)^4
+        else
+            # No model contour at this level → zero score with full weight
+        end
+        bearing_weight_sum += w
+    end
+    bearing_score = bearing_weight_sum > 0 ? bearing_sum / bearing_weight_sum : 0.0
+
     # Plume extent
     model_max_dist_km = 0.0
     for i in 1:nx_obs
@@ -675,8 +749,8 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
         max(0.0, 1.0 - toa_result.mean_arrival_error_hours / 6.0)
     end
 
-    # New combined (used for CMA-ES ranking): 30% FMS + 30% shape + 10% extent + 30% TOA
-    combined = 0.30 * geo_mean_fms + 0.30 * geo_mean_shape + 0.10 * extent_score + 0.30 * toa_score
+    # v6 combined (used for CMA-ES ranking): 35% FMS + 20% shape + 15% extent + 30% TOA (matches Nancy)
+    combined = 0.35 * geo_mean_fms + 0.20 * geo_mean_shape + 0.15 * extent_score + 0.30 * toa_score
     # Old combined (for apples-to-apples comparison with APMC v7/v9): 50% FMS + 20% extent + 30% TOA
     combined_old = 0.50 * geo_mean_fms + 0.20 * extent_score + 0.30 * toa_score
 
@@ -684,6 +758,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
     return (loss = 1.0 - combined,
             fms = geo_mean_fms,
             shape = geo_mean_shape,
+            bearing = bearing_score,
             extent = extent_score,
             toa = toa_score,
             combined_old = combined_old)
@@ -885,12 +960,13 @@ struct EvalResult
     loss::Float64
     fms::Float64
     shape::Float64
+    bearing::Float64
     extent::Float64
     toa::Float64
     combined_old::Float64
 end
 
-const FAILED_EVAL = EvalResult(1.0, 0.0, 0.0, 0.0, 0.0, 0.0)
+const FAILED_EVAL = EvalResult(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 
 function evaluate_generation(candidates::Vector{Vector{Float64}},
                               turb_scheme::Symbol, gen_seed::UInt64)
@@ -899,7 +975,7 @@ function evaluate_generation(candidates::Vector{Vector{Float64}},
     Threads.@threads for i in 1:n
         try
             r = rho_core(candidates[i], turb_scheme, gen_seed)
-            results[i] = EvalResult(r.loss, r.fms, r.shape, r.extent, r.toa, r.combined_old)
+            results[i] = EvalResult(r.loss, r.fms, r.shape, r.bearing, r.extent, r.toa, r.combined_old)
         catch e
             @warn "Evaluation failed for candidate $i" exception=e
             results[i] = FAILED_EVAL
@@ -912,7 +988,7 @@ end
 # BIPOP-CMA-ES MAIN LOOP
 # ============================================================================
 
-const MAX_EVALS = parse(Int, get(ENV, "MAX_EVALS", "6000"))
+const MAX_EVALS = parse(Int, get(ENV, "MAX_EVALS", "250"))
 const USE_WARM_START = parse(Int, get(ENV, "WARM_START", "1")) == 1
 
 const DEFAULT_LAMBDA = 4 + floor(Int, 3 * log(N_DIM))  # 12 for d=18
@@ -1059,6 +1135,7 @@ while total_evals < MAX_EVALS
                 println(f, "# score_old\t$(round(global_best_diag.combined_old * 100, digits=2))%")
                 println(f, "# fms\t$(global_best_diag.fms)")
                 println(f, "# shape\t$(global_best_diag.shape)")
+                println(f, "# bearing\t$(global_best_diag.bearing)")
                 println(f, "# extent\t$(global_best_diag.extent)")
                 println(f, "# toa\t$(global_best_diag.toa)")
             end
@@ -1067,9 +1144,9 @@ while total_evals < MAX_EVALS
         marker = improved ? " ***" : ""
         elapsed = time() - t_start
         # Print both old-style score (comparable to APMC) and component breakdown
-        @printf("  Gen %3d [%5d/%d] FMS=%.2f shp=%.2f ext=%.2f toa=%.2f | old=%.1f%% new=%.1f%% | σ=%.3f [%.0fs]%s\n",
+        @printf("  Gen %3d [%5d/%d] FMS=%.2f shp=%.2f brg=%.2f ext=%.2f toa=%.2f | old=%.1f%% new=%.1f%% | σ=%.3f [%.0fs]%s\n",
                 es.generation, total_evals, MAX_EVALS,
-                gen_best_r.fms, gen_best_r.shape, gen_best_r.extent, gen_best_r.toa,
+                gen_best_r.fms, gen_best_r.shape, gen_best_r.bearing, gen_best_r.extent, gen_best_r.toa,
                 gen_best_r.combined_old * 100,
                 (1.0 - gen_best_val) * 100,
                 es.sigma, elapsed, marker)
@@ -1109,10 +1186,11 @@ println("Best loss: $(round(global_best_val, digits=6))")
 println("\nScore breakdown (best particle):")
 println("  FMS (geo mean):   $(round(global_best_diag.fms, digits=4))")
 println("  Shape:            $(round(global_best_diag.shape, digits=4))")
+println("  Bearing:          $(round(global_best_diag.bearing, digits=4))")
 println("  Extent:           $(round(global_best_diag.extent, digits=4))")
 println("  TOA:              $(round(global_best_diag.toa, digits=4))")
 println("  Old combined (50%FMS+20%ext+30%TOA): $(round(global_best_diag.combined_old * 100, digits=2))%  <- compare to APMC")
-println("  New combined (35%FMS+20%shp+15%ext+30%TOA): $(round((1.0 - global_best_val) * 100, digits=2))%")
+println("  New combined (30%FMS+10%shp+20%brg+10%ext+30%TOA): $(round((1.0 - global_best_val) * 100, digits=2))%")
 
 println("\nBest parameters:")
 for (j, pname) in enumerate(PARAM_NAMES)

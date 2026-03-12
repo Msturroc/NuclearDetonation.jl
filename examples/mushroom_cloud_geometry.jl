@@ -255,9 +255,13 @@ xlims!(ax3, -max_r, max_r * 1.5)
 ylims!(ax3, 0, cap_h_km * 1.15)
 
 # Supertitle
-Label(fig[0, :], "Mushroom Cloud Release Geometry — Nancy (24 kT, 91 m HOB)",
+Label(fig[0, :], "Mushroom Cloud Release Geometry: Nancy (24 kT, 91 m HOB)",
     fontsize=20, font=:bold)
 
 outfile = joinpath(@__DIR__, "mushroom_cloud_geometry.png")
 save(outfile, fig, px_per_unit=2)
 println("Saved: $(outfile)")
+
+outfile2 = joinpath(@__DIR__, "nancy_fms_plots", "nancy_mushroom_cloud.png")
+save(outfile2, fig, px_per_unit=2)
+println("Saved: $(outfile2)")

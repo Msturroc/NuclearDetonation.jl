@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NuclearDetonation.jl — Atmospheric Dispersion</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; display: flex; background: #f5f5f5; }
+
+/* Left panel */
+#panel {
+    width: 340px; min-width: 340px; padding: 20px; overflow-y: auto;
+    background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; gap: 16px;
+}
+#panel h1 { font-size: 18px; color: #333; line-height: 1.3; }
+#panel h1 small { display: block; font-weight: normal; font-size: 12px; color: #888; margin-top: 2px; }
+
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group input, .form-group select {
+    padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #4A90D9; box-shadow: 0 0 0 2px rgba(74,144,217,0.2); }
+.form-row { display: flex; gap: 10px; }
+.form-row .form-group { flex: 1; }
+
+.note {
+    font-size: 11px; color: #888; background: #f9f9f9; padding: 8px; border-radius: 4px;
+    border-left: 3px solid #ddd; line-height: 1.4;
+}
+
+#btn-run {
+    padding: 12px; font-size: 15px; font-weight: 600; border: none; border-radius: 6px;
+    cursor: pointer; transition: all 0.2s;
+    background: #4A90D9; color: #fff;
+}
+#btn-run:hover { background: #357ABD; }
+#btn-run:disabled { background: #aaa; cursor: not-allowed; }
+
+/* Progress */
+#progress-box { display: none; }
+#progress-box.active { display: block; }
+#progress-bar-track {
+    height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 4px;
+}
+#progress-bar {
+    height: 100%; background: #4A90D9; border-radius: 4px; transition: width 0.3s; width: 0%;
+}
+#progress-msg { font-size: 12px; color: #666; margin-top: 4px; }
+
+/* Results */
+#results { display: none; }
+#results.active { display: block; }
+#results .stat { font-size: 14px; color: #333; margin-bottom: 4px; }
+#results .stat strong { color: #c00; }
+#btn-export {
+    margin-top: 8px; padding: 8px 12px; font-size: 13px; border: 1px solid #4A90D9;
+    background: #fff; color: #4A90D9; border-radius: 4px; cursor: pointer;
+}
+#btn-export:hover { background: #f0f6ff; }
+
+#error-box { display: none; padding: 10px; background: #ffeaea; border: 1px solid #c00; border-radius: 4px; color: #900; font-size: 13px; }
+#error-box.active { display: block; }
+
+/* Mode toggle */
+.mode-toggle { display: flex; gap: 0; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }
+.mode-toggle input[type="radio"] { display: none; }
+.mode-toggle label {
+    flex: 1; padding: 8px 12px; text-align: center; font-size: 13px; font-weight: 600;
+    cursor: pointer; background: #f5f5f5; color: #555; transition: all 0.2s;
+}
+.mode-toggle input[type="radio"]:checked + label { background: #4A90D9; color: #fff; }
+.mode-fields { display: none; }
+.mode-fields.active { display: block; }
+
+/* Legend */
+#legend { margin-top: auto; padding-top: 12px; border-top: 1px solid #eee; }
+#legend h3 { font-size: 12px; color: #555; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #444; margin-bottom: 3px; }
+.legend-swatch { width: 24px; height: 4px; border-radius: 2px; }
+
+/* Map */
+#map-container { flex: 1; position: relative; }
+#map { width: 100%; height: 100%; }
+
+/* Map overlay instruction */
+#map-hint {
+    position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000;
+    background: rgba(0,0,0,0.7); color: #fff; padding: 8px 16px; border-radius: 20px;
+    font-size: 13px; pointer-events: none; transition: opacity 0.5s;
+}
+#map-hint.hidden { opacity: 0; }
+</style>
+</head>
+<body>
+
+<div id="panel">
+    <h1>Atmospheric Dispersion<small>NuclearDetonation.jl</small></h1>
+
+    <div class="mode-toggle">
+        <input type="radio" name="release_mode" id="mode-bomb" value="bomb" checked>
+        <label for="mode-bomb">Bomb Release</label>
+        <input type="radio" name="release_mode" id="mode-npp" value="npp">
+        <label for="mode-npp">Point Release (NPP)</label>
+    </div>
+
+    <div class="note">
+        ERA5 data covers Nevada Test Site region (lat 35-42, lon -120 to -110),
+        24-27 March 1953. Click the map to place the release.
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Latitude</label>
+            <input type="number" id="inp-lat" value="37.0956" step="0.01" min="35" max="42">
+        </div>
+        <div class="form-group">
+            <label>Longitude</label>
+            <input type="number" id="inp-lon" value="-116.1028" step="0.01" min="-120" max="-110">
+        </div>
+    </div>
+
+    <div id="bomb-fields" class="mode-fields active">
+        <div class="form-group">
+            <label>Yield (kT)</label>
+            <input type="number" id="inp-yield" value="24.0" step="1" min="0.1" max="1000">
+        </div>
+    </div>
+
+    <div id="npp-fields" class="mode-fields">
+        <div class="form-group">
+            <label>Activity (TBq)</label>
+            <input type="number" id="inp-activity" value="1.0" step="0.1" min="0.001" max="100000">
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Stack Height (m)</label>
+                <input type="number" id="inp-stack-height" value="100" step="10" min="10" max="500">
+            </div>
+            <div class="form-group">
+                <label>Isotope</label>
+                <select id="inp-isotope">
+                    <option value="Cs-137" selected>Cs-137</option>
+                    <option value="I-131">I-131</option>
+                    <option value="Sr-90">Sr-90</option>
+                    <option value="Generic">Generic (no decay)</option>
+                </select>
+            </div>
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Start date</label>
+            <input type="date" id="inp-date" value="1953-03-24" min="1953-03-24" max="1953-03-27">
+        </div>
+        <div class="form-group">
+            <label>Hour (UTC)</label>
+            <input type="number" id="inp-hour" value="13" step="1" min="0" max="23">
+        </div>
+    </div>
+
+    <div class="form-row">
+        <div class="form-group">
+            <label>Duration (hours)</label>
+            <input type="number" id="inp-duration" value="12" step="1" min="1" max="48">
+        </div>
+        <div class="form-group">
+            <label>Particles</label>
+            <input type="number" id="inp-particles" value="5000" step="1000" min="100" max="50000">
+        </div>
+    </div>
+
+    <button id="btn-run" onclick="runSimulation()">Run Simulation</button>
+
+    <div id="progress-box">
+        <div id="progress-bar-track"><div id="progress-bar"></div></div>
+        <div id="progress-msg"></div>
+    </div>
+
+    <div id="error-box"></div>
+
+    <div id="results">
+        <div class="stat">Peak dose: <strong id="res-max-dose"></strong></div>
+        <div class="stat">Deposition events: <span id="res-n-events"></span></div>
+        <button id="btn-export" onclick="exportCSV()">Export CSV</button>
+    </div>
+
+    <div id="legend">
+        <h3 id="legend-title">Dose Rate at H+12 (mR/h)</h3>
+        <div id="legend-items">
+            <div class="legend-item"><span class="legend-swatch" style="background:#CC0000"></span> 100</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#FF8800"></span> 40</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#CCCC00"></span> 10</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#33AA33"></span> 4</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#00CCCC"></span> 1</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#3366FF"></span> 0.4</div>
+        </div>
+    </div>
+</div>
+
+<div id="map-container">
+    <div id="map-hint">Click the map to place detonation</div>
+    <div id="map"></div>
+</div>
+
+<script>
+// --- Map setup ---
+const map = L.map('map').setView([37.0956, -116.1028], 7);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 18,
+}).addTo(map);
+
+// Detonation marker
+const starIcon = L.divIcon({
+    html: '<svg width="24" height="24" viewBox="0 0 24 24"><polygon points="12,2 15,9 22,9 16,14 18,22 12,17 6,22 8,14 2,9 9,9" fill="#c00" stroke="#800" stroke-width="1"/></svg>',
+    iconSize: [24, 24],
+    iconAnchor: [12, 12],
+    className: '',
+});
+let marker = L.marker([37.0956, -116.1028], {icon: starIcon}).addTo(map);
+let contourLayer = null;
+
+// Click to place detonation
+map.on('click', function(e) {
+    const lat = Math.round(e.latlng.lat * 10000) / 10000;
+    const lon = Math.round(e.latlng.lng * 10000) / 10000;
+    document.getElementById('inp-lat').value = lat;
+    document.getElementById('inp-lon').value = lon;
+    marker.setLatLng([lat, lon]);
+    document.getElementById('map-hint').classList.add('hidden');
+});
+
+// Sync marker when fields change
+['inp-lat', 'inp-lon'].forEach(id => {
+    document.getElementById(id).addEventListener('change', function() {
+        const lat = parseFloat(document.getElementById('inp-lat').value);
+        const lon = parseFloat(document.getElementById('inp-lon').value);
+        if (!isNaN(lat) && !isNaN(lon)) marker.setLatLng([lat, lon]);
+    });
+});
+
+// --- Mode toggle ---
+function getSelectedMode() {
+    return document.querySelector('input[name="release_mode"]:checked').value;
+}
+
+document.querySelectorAll('input[name="release_mode"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        const mode = getSelectedMode();
+        document.getElementById('bomb-fields').classList.toggle('active', mode === 'bomb');
+        document.getElementById('npp-fields').classList.toggle('active', mode === 'npp');
+    });
+});
+
+// Legend definitions
+const BOMB_LEGEND = {
+    title: 'Dose Rate (mR/h)',
+    levels: [100, 40, 10, 4, 1, 0.4],
+    colors: ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'],
+};
+const NPP_LEGEND = {
+    title: 'Deposition (kBq/m²)',
+    levels: [1480, 555, 185, 37, 10, 1],
+    colors: ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'],
+};
+
+function updateLegend(units) {
+    const legend = units === 'kBq/m²' ? NPP_LEGEND : BOMB_LEGEND;
+    document.getElementById('legend-title').textContent = legend.title;
+    const container = document.getElementById('legend-items');
+    container.innerHTML = legend.levels.map((lv, i) =>
+        `<div class="legend-item"><span class="legend-swatch" style="background:${legend.colors[i]}"></span> ${lv}</div>`
+    ).join('');
+}
+
+// --- Simulation ---
+let pollTimer = null;
+
+async function runSimulation() {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = true;
+    btn.textContent = 'Running...';
+
+    document.getElementById('progress-box').classList.add('active');
+    document.getElementById('results').classList.remove('active');
+    document.getElementById('error-box').classList.remove('active');
+    document.getElementById('progress-bar').style.width = '0%';
+    document.getElementById('progress-msg').textContent = 'Starting...';
+
+    // Clear previous contours
+    if (contourLayer) { map.removeLayer(contourLayer); contourLayer = null; }
+
+    const mode = getSelectedMode();
+    const params = {
+        lat: parseFloat(document.getElementById('inp-lat').value),
+        lon: parseFloat(document.getElementById('inp-lon').value),
+        start_date: document.getElementById('inp-date').value,
+        start_hour: parseInt(document.getElementById('inp-hour').value),
+        duration_hours: parseInt(document.getElementById('inp-duration').value),
+        n_particles: parseInt(document.getElementById('inp-particles').value),
+        release_mode: mode,
+    };
+    if (mode === 'bomb') {
+        params.yield_kt = parseFloat(document.getElementById('inp-yield').value);
+    } else {
+        params.activity_tbq = parseFloat(document.getElementById('inp-activity').value);
+        params.stack_height_m = parseFloat(document.getElementById('inp-stack-height').value);
+        params.isotope = document.getElementById('inp-isotope').value;
+    }
+
+    try {
+        const resp = await fetch('/api/simulate', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(params),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || 'Failed to start simulation');
+        }
+        // Start polling
+        pollTimer = setInterval(pollStatus, 1000);
+    } catch (e) {
+        showError(e.message);
+        btn.disabled = false;
+        btn.textContent = 'Run Simulation';
+    }
+}
+
+async function pollStatus() {
+    try {
+        const resp = await fetch('/api/status');
+        const s = await resp.json();
+
+        document.getElementById('progress-bar').style.width = s.progress_pct + '%';
+        document.getElementById('progress-msg').textContent = s.progress_msg;
+
+        if (s.error_msg) {
+            clearInterval(pollTimer);
+            showError(s.error_msg);
+            resetButton();
+            return;
+        }
+
+        if (!s.running && s.complete) {
+            clearInterval(pollTimer);
+            showResults(s);
+            resetButton();
+        }
+    } catch (e) {
+        // Network error, keep polling
+    }
+}
+
+function showResults(s) {
+    document.getElementById('results').classList.add('active');
+    document.getElementById('progress-box').classList.remove('active');
+    const units = s.units || 'mR/h';
+    document.getElementById('res-max-dose').textContent = s.max_dose_mRh.toFixed(1) + ' ' + units;
+    document.getElementById('res-n-events').textContent = s.n_events.toLocaleString();
+    updateLegend(units);
+
+    // Parse and render contours
+    if (s.geojson) {
+        const geojson = JSON.parse(s.geojson);
+        contourLayer = L.geoJSON(geojson, {
+            style: function(feature) {
+                return {
+                    color: feature.properties.color,
+                    weight: 2.5,
+                    opacity: 0.9,
+                };
+            },
+            onEachFeature: function(feature, layer) {
+                layer.bindTooltip(feature.properties.label, {sticky: true});
+            },
+        }).addTo(map);
+
+        // Zoom to contour bounds
+        if (contourLayer.getBounds().isValid()) {
+            map.fitBounds(contourLayer.getBounds().pad(0.1));
+        }
+    }
+}
+
+function showError(msg) {
+    const box = document.getElementById('error-box');
+    box.textContent = msg;
+    box.classList.add('active');
+    document.getElementById('progress-box').classList.remove('active');
+}
+
+function resetButton() {
+    const btn = document.getElementById('btn-run');
+    btn.disabled = false;
+    btn.textContent = 'Run Simulation';
+}
+
+function exportCSV() {
+    window.open('/api/results.csv', '_blank');
+}
+</script>
+</body>
+</html>

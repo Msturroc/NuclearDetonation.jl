@@ -25,6 +25,7 @@ using NCDatasets
 using StaticArrays
 using Random
 using Dates
+using Statistics
 
 println("="^70)
 println("SMOKY BOMB RELEASE — Ornstein-Uhlenbeck Diagnostic")
@@ -337,7 +338,7 @@ num_cfg = ERA5NumericalConfig{Float64}(
     turbulence=Transport.OrnsteinUhlenbeck)
 
 sim_cfg = Transport.SimulationConfig{Float64}(
-    saveat=[12.0 * 3600.0], verbose=false, max_duration=12.0 * 3600.0,
+    saveat=[Float64(h) * 3600.0 for h in 1:12], verbose=false, max_duration=12.0 * 3600.0,
     save_snapshots=true, dt_particle=300.0, use_reference_stepping=true,
     max_files=cache_end_file - cache_start_file + 1, omega_scale=omega_scale)
 
@@ -412,6 +413,52 @@ println("   Cell area: $(round(cell_area_m2 / 1e6, digits=2)) km^2")
 println("   Grid: $(nx_out) x $(ny_out) cells")
 println("   Deposition events: $(length(state.deposition_log))")
 
+# Build cumulative hourly deposition snapshots and compute model TOA
+# (matching the CMA-ES scoring logic in smoky_cmaes_particle_size.jl)
+println("\n   Computing model time-of-arrival...")
+sorted_events = sort(state.deposition_log, by=e -> e.time)
+model_toa = fill(NaN, nx_out, ny_out)
+
+model_snapshots = Vector{Matrix{Float64}}()
+snapshot_hours = Float64[]
+for hour in 1:12
+    hour_end_time = Float64(hour) * 3600.0
+    cumulative_dep = zeros(nx_out, ny_out)
+    for evt in sorted_events
+        if evt.time <= hour_end_time
+            lat, lon = Transport.grid_to_latlon(domain, evt.x, evt.y)
+            lon > 180.0 && (lon -= 360.0)
+            i = searchsortedlast(lon_grid, lon)
+            j = searchsortedlast(lat_grid, lat)
+            if 1 <= i <= nx_out && 1 <= j <= ny_out
+                cumulative_dep[i, j] += evt.mass
+            end
+        end
+    end
+    push!(model_snapshots, cumulative_dep)
+    push!(snapshot_hours, Float64(hour))
+end
+
+# Smooth cumulative snapshots with a larger kernel than dose rate — individual
+# hourly snapshots are much sparser than the total field, so need more
+# smoothing to produce a continuous front for contouring.
+toa_smooth_sigma = max(smooth_sigma * 5.0, 5.0)
+model_snapshots_smooth = [gaussian_smooth(snap, toa_smooth_sigma) for snap in model_snapshots]
+
+# Threshold = 0.1% of the final (H+12) smoothed peak — low enough to
+# detect arrival in far-field cells where deposits are sparse.
+max_dose_toa = maximum(model_snapshots_smooth[end])
+threshold = max_dose_toa * 0.001
+for i in 1:nx_out, j in 1:ny_out
+    for (t_idx, snap) in enumerate(model_snapshots_smooth)
+        if snap[i, j] >= threshold
+            model_toa[i, j] = snapshot_hours[t_idx]
+            break
+        end
+    end
+end
+println("   TOA coverage: $(sum(.!isnan.(model_toa))) cells with arrival times")
+
 # ============================================================================
 # 8. Plot dose rate contours
 # ============================================================================
@@ -420,9 +467,11 @@ println("\n8. Creating figure...")
 
 contour_levels = [1.0, 10.0, 50.0, 100.0, 500.0, 1000.0]
 contour_colors = [:blue, :cyan, :green, :yellow, :orange, :red]
+toa_hours = [1.0, 2.0, 3.0, 4.0, 6.0, 8.0, 10.0, 12.0]
+toa_cmap = cgrad(:viridis, length(toa_hours), categorical=true)
 
 if has_observations
-    # --- Side-by-side: observations (left) vs model (right) ---
+    # --- 2x2: dose rate (top) + TOA (bottom), obs (left) vs model (right) ---
     obs_bounds = Transport.contour_bounds(smoky_obs.dose_rate_contours)
     lat_buf = 0.1 * (obs_bounds[2] - obs_bounds[1])
     lon_buf = 0.1 * (obs_bounds[4] - obs_bounds[3])
@@ -431,10 +480,17 @@ if has_observations
     ax_lat_min = obs_bounds[1] - lat_buf
     ax_lat_max = obs_bounds[2] + lat_buf
 
-    fig = Figure(size=(1400, 800), fontsize=14)
+    # Size figure to match the geographic aspect ratio (wide plume → wide figure)
+    geo_width = (ax_lon_max - ax_lon_min) * cosd(0.5 * (ax_lat_min + ax_lat_max))
+    geo_height = ax_lat_max - ax_lat_min
+    panel_aspect = geo_width / geo_height  # ~2:1 for Smoky's ESE plume
+    fig_width = 1400
+    fig_height = round(Int, fig_width / (panel_aspect * 0.85))  # 0.85 accounts for legends/title
+    fig = Figure(size=(fig_width, fig_height), fontsize=14)
 
+    # --- Row 1: Dose rate ---
     ax_obs = Axis(fig[1, 1],
-        title = "Smoky 44 kT — Observed Dose Rate at H+12",
+        title = "Observed Dose Rate at H+12",
         xlabel = "Longitude (°)", ylabel = "Latitude (°)",
         limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
         aspect = DataAspect(),
@@ -453,7 +509,7 @@ if has_observations
     scatter!(ax_obs, [-116.046], [37.177], marker=:star5, markersize=20, color=:black)
 
     ax_mod = Axis(fig[1, 2],
-        title = "Smoky 44 kT — Model Dose Rate at H+12",
+        title = "Model Dose Rate at H+12",
         xlabel = "Longitude (°)", ylabel = "Latitude (°)",
         limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
         aspect = DataAspect(),
@@ -469,6 +525,48 @@ if has_observations
     legend_labels = ["$(Int(l)) mR/h" for l in contour_levels]
     Legend(fig[2, :], legend_elements, legend_labels, "Dose Rate (H+12)",
         orientation=:horizontal, tellwidth=false, tellheight=true)
+
+    # --- Row 2: Time of Arrival ---
+    ax_toa_obs = Axis(fig[3, 1],
+        title = "Observed Time of Arrival",
+        xlabel = "Longitude (°)", ylabel = "Latitude (°)",
+        limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
+        aspect = DataAspect(),
+    )
+
+    for (k, toa_c) in enumerate(smoky_obs.toa_contours)
+        # Colour by hour
+        ci = searchsortedlast(toa_hours, toa_c.hour)
+        ci = clamp(ci, 1, length(toa_hours))
+        col = toa_cmap[ci]
+        for line in toa_c.lines
+            lats = [p[1] for p in line]
+            lons = [p[2] for p in line]
+            lines!(ax_toa_obs, lons, lats, color=col, linewidth=2.5)
+        end
+    end
+    scatter!(ax_toa_obs, [-116.046], [37.177], marker=:star5, markersize=20, color=:black)
+
+    ax_toa_mod = Axis(fig[3, 2],
+        title = "Model Time of Arrival",
+        xlabel = "Longitude (°)", ylabel = "Latitude (°)",
+        limits = (ax_lon_min, ax_lon_max, ax_lat_min, ax_lat_max),
+        aspect = DataAspect(),
+    )
+
+    # Plot each TOA level individually with explicit colours (matching observed side)
+    for (hi, h) in enumerate(toa_hours)
+        contour!(ax_toa_mod, collect(lon_grid), collect(lat_grid), model_toa,
+            levels=[h], color=toa_cmap[hi], linewidth=2.5)
+    end
+    scatter!(ax_toa_mod, [-116.046], [37.177], marker=:star5, markersize=20, color=:black)
+
+    toa_legend_elements = [LineElement(color=toa_cmap[i], linewidth=3) for i in eachindex(toa_hours)]
+    toa_legend_labels = ["H+$(Int(h))" for h in toa_hours]
+    Legend(fig[4, :], toa_legend_elements, toa_legend_labels, "Time of Arrival",
+        orientation=:horizontal, tellwidth=false, tellheight=true)
+
+    Label(fig[0, :], "Smoky 44 kT — Observed vs Model", fontsize=18, font=:bold)
 else
     # --- Standalone: model-only plot ---
     fig = Figure(size=(700, 800), fontsize=14)
@@ -496,15 +594,34 @@ outfile = joinpath(@__DIR__, "smoky_bomb_release.png")
 save(outfile, fig, px_per_unit=2)
 println("\nSaved: $(outfile)")
 
+# Compute per-threshold FMS scores
+if has_observations
+    println("\n9. Computing FMS scores...")
+    obs_masks = Transport.rasterise_all_contours(smoky_obs.dose_rate_contours,
+        collect(Float64, lat_grid), collect(Float64, lon_grid))
+    fms_scores = Float64[]
+    for (dose_rate, obs_mask) in obs_masks
+        model_mask = dose_smooth .>= dose_rate
+        inter = Float64(sum(model_mask .& obs_mask))
+        uni = Float64(sum(model_mask .| obs_mask))
+        fms = uni > 0 ? inter / uni : 0.0
+        push!(fms_scores, fms)
+        println("   $(dose_rate) mR/h: FMS = $(round(fms * 100, digits=1))%")
+    end
+    geo_mean = exp(mean(log(max(s, 0.005)) for s in fms_scores))
+    println("   Geometric mean FMS: $(round(geo_mean * 100, digits=1))%")
+end
+
 # Print diagnostic summary
 println("\n" * "="^70)
 println("DIAGNOSTIC SUMMARY")
 println("="^70)
 println("Max model dose rate: $(round(max_dose, digits=1)) mR/h")
-println("\nParameters at/near bounds:")
-println("  frac_lower     = $(round(frac_lower, digits=4))  (UB=0.60, $(round((frac_lower-0.01)/(0.60-0.01)*100, digits=1))% of range)")
-println("  omega_scale    = $(round(omega_scale, digits=4))  (UB=3.0, $(round((omega_scale-0.1)/(3.0-0.1)*100, digits=1))% of range)")
-println("  d_median_fine  = $(round(d_median_fine, digits=4))  (LB=5.0, $(round((d_median_fine-5.0)/(150.0-5.0)*100, digits=1))% of range)")
+println("\nParameters at/near bounds (v5 bounds):")
+println("  d_median_fine  = $(round(d_median_fine, digits=4))  (bounds=[10, 100], $(round((d_median_fine-10.0)/(100.0-10.0)*100, digits=1))% of range)")
+println("  frac_fine      = $(round(frac_fine, digits=4))  (bounds=[0.05, 0.70], $(round((frac_fine-0.05)/(0.70-0.05)*100, digits=1))% of range)")
+println("  frac_lower     = $(round(frac_lower, digits=4))  (bounds=[0.01, 0.50], $(round((frac_lower-0.01)/(0.50-0.01)*100, digits=1))% of range)")
+println("  omega_scale    = $(round(omega_scale, digits=4))  (bounds=[0.1, 3.0], $(round((omega_scale-0.1)/(3.0-0.1)*100, digits=1))% of range)")
 println("\nTotal activity: $(round(activity_scale, digits=1)) x 10^15 Bq")
 println("Smooth sigma: $(round(smooth_sigma, digits=2)) cells")
 println("="^70)
