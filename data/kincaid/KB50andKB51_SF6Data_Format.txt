@@ -1,0 +1,56 @@
+Original archive format used for SF6 concentration data
+
+Header Record for each day: 
+MMDDYY        Key                Num   YYJJJ
+ 42080 000000000000011100000000  140   80111
+
+MM  = Month, DD=Day, YY=last two digits of year
+Key = 24 values to indicate when SF6 samples are available [0=no samples, 1=samples available]
+Num = Number of receptors for this day
+YY  = last two digits of year
+JJJ = Julian day number
+
+
+For each receptor there are two (2) lines of data:
+  DD.ID    UTM-E   UTM-W  Hgt   Conc (twelve values)
+   3.0002  289.05 4385.25 183. -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9                   
+
+                                Conc (twelve values)
+                               -999.9     .0   50.4     .0 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9                   
+
+Line 1: DD    = Nominal distance to receptor 
+                (Note: A DD value of 99, is used for receptors that 
+                were deemed to likely be redundate).
+        ID    = ID of receptor along the arc.
+        UTM-E = East-West Universal Mecador Transverse Coordinate (km).
+        UTM-N = North-South Universal Mecador Transverse Coordinate (km).
+        Conc  = SF6 concentration values (PPB) for hours 1 through 12.
+
+Line 2: Conc  = SF6 concentration values (PPB) for hours 13 through 24.
+        
+
+
+Example:
+  42080 000000000000011100000000     3   80111                                                                                        
+   3.0002  289.05 4385.25 183. -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9                   
+                               -999.9     .0   50.4     .0 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9                   
+   3.0003  289.05 4385.37 183. -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9                   
+                               -999.9   45.9    5.5   17.0 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9                   
+   3.0004  289.05 4385.48 183. -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9                   
+                               -999.9 -999.9   75.0 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 -999.9 
+
+ 
+
+           FORTRAN STATEMENT TO READ HEADER RECORD
+            READ(ISF6,1000) month,day,year,key,num,jday
+      1000  FORMAT(3i2,1x,24i1,3x,i3,5x,i5)
+
+            FORTRAN STATEMENTS TO READ DATA FOR DAY
+            do i=1,NUM
+            READ(ISF6,1010) (Receptor(i,j),j=1,4),(Conc(i,k),k=1,12)
+       1010 FORMAT(f8.4,2f8.2,f5.0,12f7.1)
+            READ(ISF6,1020) (Conc(i,k),k=13,24)
+       1020 FORMAT(29x,12f7.1)
+            end do
+
+        

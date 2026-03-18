@@ -1,0 +1,8 @@
+First Tracer Release
+
+The first tracer release started on 23 October, 16:00 UTC, 
+and ended on 24 October, 3:50 UTC. During these 12 hours a 
+total of 340 kg of PMCH were emitted, resulting in an 
+average release rate of 7.95 g/s. The air stream (67 m3/h) 
+at the top of the chimney (8 m above ground) had an average 
+temperature of 84 degC and a velocity of about 45 m/s. 

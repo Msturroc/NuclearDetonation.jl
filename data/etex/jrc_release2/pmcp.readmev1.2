@@ -1,0 +1,79 @@
+Filename: pmcp.readme                 last updated 17 April 1997
+
+The files pmcp.dat and pmcp.cod contain the PMCP tracer concentration
+and the quality control flags, respectively. The data is still 
+restricted and only to be used by the ETEX and ATMES participants.
+When making reference to the data, please always quote the version number 
+(now etex2_v1.1.970411). A detailed description of the data is in 
+preparation in will be send to you later. 
+
+for further information contact
+Katrin Nodop
+CEC / Joint Research Centre
+Environment Institute, T.P. 510
+I - 21020 ISPRA (VA) ITALY
+Tel: +39 332 785119, Secretary + 39 332 789952
+Fax: +39 332 785924
+e-mail:  katrin.nodop@jrc.it
+
+
+
+************************************************************************
+pmcp.dat
+********
+1. Line	File information 
+2. Line	Time interval after the release on 14 November 1994
+		1 = 14 Nov 94, 15 to 18 UTC
+		2 = 14 Nov 94, 18 to 21 UTC
+		3....30 , as above, time step 3 hours
+		Format (9x,30I6)
+
+3. Line	Number of site, site name, PMCP concentration for the 30 time 
+to		intervals
+170.		Format (1x,I3,2x,A4,30F6.3)
+
+Concentrations are given in ng/m3. The ambient background concentration 
+has been subtracted, so the concentrations are representing only 
+the tracer released.
+
+The following values are given:
+
+0.00	 valid sample, no tracer has been found
+value	 valid sample, tracer concentration
+-.99	 no sampling or no analysis performed
+-.88	 tracer has been detected, but can't be quantified
+
+
+************************************************************************
+pmcp.cod
+********
+1. Line	File information
+2. Line	Time interval after the release on 14 November 1994
+		1 = 14 Nov 94, 15 to 18 UTC
+		2 = 14 Nov 94, 18 to 21 UTC
+		3....30 , as above, time step 3 hours
+		Format (9x,30I6)
+
+3. Line	Number of site, site name, quality flags for the 30 time 
+to		intervals
+170.		Format (1x,I3,2x,A4,30I6)
+
+The flags give a measure of the quality of the PMCP data in the file pmcp.dat
+
+The following values are given:
+
+01	valid sample, no tracer found
+11	valid sample, tracer found
+21	concentration within 2std of background variation
+31	concentration given or higher
+41	tracer detected, but can't be quantified
+00	not sampled
+10	lost in sampling
+20	lost in analysis
+30	lost in shipment
+	
+
+************************************************************************
+changes made after  11 April 1994
+*********************************
+F21 changed sequence

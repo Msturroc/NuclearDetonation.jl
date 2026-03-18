@@ -1,0 +1,7 @@
+Second Tracer Release
+
+The second tracer release started on 14 November, 15:00 UTC and 
+ended on 15 November, 2:45 UTC. During these 12 hours a total of 
+490 kg of PMCP were emitted, resulting in an average release rate 
+of 11.56 g/s. The air stream (71 m3/h) at the top of the chimney 
+had an average temperature of 73 degC and a velocity of about 50 m/s.

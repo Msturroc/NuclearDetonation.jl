@@ -1,0 +1,37 @@
+  1ST LINE IS A HEADER RECORD
+  RAWIN SERIES INDICATOR (5600 OE 6201)
+    |        5-DIGIT STATION ID (148442 = PEORIA, IL)
+    |         |       YYMMDDHH
+    |         |         |        TOTAL NUMBER OF LEVELS
+    |         |         |        IN THE SOUNDING
+    |         |         |          |                                NUMBER OF LEVELS EXTRACTED
+    |         |         |          |                                AND LISTED   
+    |         |         |          |                                 |
+   5600     14842     80 224 0     64                               16                                                              
+    993.7/ 200./273.1/270/  4    963.0/ 451./271.2/300/  8    950.0/ 559./270.4/299/  9    910.0/ 899./267.7/294/ 11                
+    901.0/ 977./270.1/293/ 12    900.0/ 986./270.1/293/ 12    883.0/1137./270.9/290/ 12    850.0/1440./271.9/287/ 13                
+    826.0/1668./270.7/286/ 14    800.0/1921./268.8/285/ 14    791.0/2010./268.1/286/ 14    772.0/2201./267.8/286/ 15                
+    752.0/2407./267.4/284/ 16    750.0/2428./267.4/284/ 16    723.0/2715./266.3/285/ 17    700.0/2967./264.8/286/ 17                
+       |    |     |    |    |
+     PPPPP HHHHH TTTTT DDD  SS
+     DATA RECORDS 
+
+    YY    = YEAR (LAST TWO DIGITS)
+    MM    = MONTH
+    DD    = DAY
+    HH    = UTC HOUR
+    PPPPP = PRESURE (MB)
+    HHHHH = MSL HEIGHT (M)
+    TTTTT = TEMPERATURE (K)
+    DDD   = WIND DIRECTION (DEG)
+    SS    = WIND SPEED (M/S)   
+
+       FORTRAN STATEMENT TO READ HEADER RECORD
+            READ(IRAWIN,5600) stnid,year,month,day,hour,hlev,istop
+       5600 FORMAT(12x,a5,5x,4i2,4x,i3,30x,i3)
+
+       FORTRAN STATEMENT TO READ DATA RECORDS
+            do i=1,istop
+            READ(IRAWIN,5610) pres(i),height(i),temp(i),wd(i),ws(i)
+       5610 FORMAT(4(3x,f6.1,1x,f5.0,1x,f5.1,1x,i3,1x,i3))
+            end do

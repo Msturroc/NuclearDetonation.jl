@@ -1,0 +1,42 @@
+Dear Participant
+
+Please find enclosed the tracer data from the first release during 
+the ETEX experiment.
+
+The data is given in 3 files: pmch.dat, pmch.cod, read.me.
+
+pmch.dat    contains the PMCH tracer concentration in ng/m3
+pmch.cod    contains the quality flags for the data
+read.me     contains the description and information about 
+the data files.
+
+We are sending you this information via email and via normal mail 
+for those of you without an internet connection.
+You can download these files from the following address:
+
+host:         rea.ei.jrc.it
+login name:   anonymous
+password:     YOUR email address 
+
+Change to directory incoming/nodop/outgoing 
+for YOU to receive files from US
+
+Use the ftp commands to get or put files. 
+
+Read the READ.CONTENTS file in the outgoing directory 
+for a description of files.
+
+The data is still restricted and only to be used by the ATMES
+participants. When making reference to the data, please always
+quote the version number (now etex1_v1.1.960505). A detailed 
+description of the data is in preparation in will be send to
+you later. The files on the ftp site will be available for the 
+month of May 1996.
+
+
+If you have any question concerning the data or the format, 
+please don't hesitate to contact me.
+
+Yours sincerely
+
+Katrin Nodop

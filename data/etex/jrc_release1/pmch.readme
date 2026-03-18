@@ -1,0 +1,83 @@
+Filename: read.me 
+
+The files pmch.dat and pmch.cod contain the PMCH tracer concentration
+and the quality control flags, respectively. The data is still 
+restricted and only to be used by the ATMES participants. When making 
+reference to the data, please always quote the version number 
+(now etex1_v1.1.960505). A detailed description of the data is in 
+preparation in will be send to you later. The files on the ftp site 
+will be available for the 
+month of May 1996.
+
+for further information contact
+Katrin Nodop
+CEC / Joint Research Centre
+Environment Institute, T.P. 510
+I - 21020 ISPRA (VA) ITALY
+Tel: +39 332 785119, Secretary + 39 332 789952
+Fax: +39 332 785924
+e-mail:  katrin.nodop@jrc.it
+
+
+
+************************************************************************
+pmch.dat
+********
+1. Line	File information 
+2. Line	Time interval after the release on 23 October 1994
+		1 = 23 Oct 94, 15 to 18 UTC
+		2 = 23 Oct 94, 18 to 21 UTC
+		3....30 , as above, time step 3 hours
+		Format (9x,30I6)
+
+3. Line	Number of site, site name, PMCH concentration for the 30 time 
+to		intervals
+170.		Format (1x,I3,2x,A4,30F6.2)
+
+Concentrations are given in ng/m3. The ambient background concentration 
+has been subtracted, so the concentrations are representing only 
+the tracer released.
+
+The following values are given:
+
+0.00	 valid sample, no tracer has been found
+value	 valid sample, tracer concentration
+-.99	 no sampling or no analysis performed
+-.88	 tracer has been detected, but can't be quantified
+
+
+************************************************************************
+pmch.cod
+********
+1. Line	File information
+2. Line	Time interval after the release on 23 October 1994
+		1 = 23 Oct 94, 15 to 18 UTC
+		2 = 23 Oct 94, 18 to 21 UTC
+		3....30 , as above, time step 3 hours
+		Format (9x,30I6)
+
+3. Line	Number of site, site name, quality flags for the 30 time 
+to		intervals
+170.		Format (1x,I3,2x,A4,30I6)
+
+The flags give a measure of the quality of the PMCH data in the file pmch.dat
+
+The following values are given:
+
+01	valid sample, no tracer found
+11	valid sample, tracer found
+21	concentration within 2std of background variation
+31	concentration given or higher
+41	tracer detected, but can't be quantified
+00	not sampled
+10	lost in sampling
+20	lost in analysis
+30	lost in shipment
+	
+
+************************************************************************
+changes made after  5 May 1996
+******************************
+pmch.dat: Station D10, interval 2, old value = 1.76; new value = -.88
+pmch.cod: Station D10, interval 2, old value = 11; new value = 41
+pmch.cod: Station D06, interval 13, old value = 89; new value = .89
