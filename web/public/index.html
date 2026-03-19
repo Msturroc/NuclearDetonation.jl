@@ -21,11 +21,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
 .form-group input, .form-group select {
-    padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; min-width: 0;
+    padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; min-width: 0; width: 100%; box-sizing: border-box;
 }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: #4A90D9; box-shadow: 0 0 0 2px rgba(74,144,217,0.2); }
 .form-row { display: flex; gap: 10px; }
-.form-row .form-group { flex: 1; }
+.form-row .form-group { flex: 1; min-width: 0; }
 
 .note {
     font-size: 11px; color: #888; background: #f9f9f9; padding: 8px; border-radius: 4px;
