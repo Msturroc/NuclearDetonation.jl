@@ -68,6 +68,10 @@ function handle_request(req::HTTP.Request)
             return api_results_csv()
         elseif path == "/api/era5-bounds" && method == "GET"
             return api_era5_bounds()
+        elseif path == "/api/load-dataset" && method == "POST"
+            return api_load_dataset(req)
+        elseif path == "/api/active-dataset" && method == "GET"
+            return api_active_dataset()
         elseif path == "/api/upload-arl" && method == "POST"
             return api_upload_arl(req)
         elseif path == "/api/load-arl" && method == "POST"
@@ -223,6 +227,48 @@ function api_era5_bounds()
         "lon_min" => minimum(display_lons),
         "lon_max" => maximum(display_lons),
     ))
+    headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+    return HTTP.Response(200, headers, body)
+end
+
+# --- Dataset switching ---
+
+function api_load_dataset(req::HTTP.Request)
+    s = APP[]
+    if s.running
+        body = JSON3.write(Dict("error" => "Cannot switch dataset while simulation is running"))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(409, headers, body)
+    end
+
+    params = JSON3.read(String(req.body))
+    dataset = String(get(params, :dataset, "nancy"))
+
+    try
+        preload_era5!(dataset=dataset,
+            progress_callback = (pct, msg) -> @info "[$pct%] $msg")
+
+        era5 = ERA5_STATE[]
+        lons = era5.lon_range
+        display_lons = [l > 180.0 ? l - 360.0 : l for l in lons]
+        body = JSON3.write(Dict(
+            "dataset" => dataset,
+            "lat_min" => minimum(era5.lat_range),
+            "lat_max" => maximum(era5.lat_range),
+            "lon_min" => minimum(display_lons),
+            "lon_max" => maximum(display_lons),
+        ))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
+end
+
+function api_active_dataset()
+    body = JSON3.write(Dict("dataset" => ACTIVE_DATASET[]))
     headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
     return HTTP.Response(200, headers, body)
 end

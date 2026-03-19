@@ -150,6 +150,14 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 <div id="panel">
     <h1>Atmospheric Dispersion<small>NuclearDetonation.jl</small></h1>
 
+    <div class="form-group">
+        <label>Dataset</label>
+        <select id="dataset-select" onchange="switchDataset(this.value)">
+            <option value="nancy" selected>Nancy (NTS) — Nevada, Mar 1953</option>
+            <option value="etex">ETEX (Europe) — Monterfil, Oct 1994</option>
+        </select>
+    </div>
+
     <div class="mode-toggle">
         <input type="radio" name="release_mode" id="mode-bomb" value="bomb" checked>
         <label for="mode-bomb">Bomb Release</label>
@@ -189,11 +197,11 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div class="form-row">
         <div class="form-group">
             <label>Latitude</label>
-            <input type="number" id="inp-lat" value="37.0956" step="0.01" min="35" max="42">
+            <input type="number" id="inp-lat" value="37.0956" step="0.01">
         </div>
         <div class="form-group">
             <label>Longitude</label>
-            <input type="number" id="inp-lon" value="-116.1028" step="0.01" min="-120" max="-110">
+            <input type="number" id="inp-lon" value="-116.1028" step="0.01">
         </div>
     </div>
 
@@ -229,7 +237,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div class="form-row">
         <div class="form-group">
             <label>Start date</label>
-            <input type="date" id="inp-date" value="1953-03-24" min="1953-03-24" max="1953-03-27">
+            <input type="date" id="inp-date" value="1953-03-24">
         </div>
         <div class="form-group">
             <label>Hour (UTC)</label>
@@ -240,7 +248,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div class="form-row">
         <div class="form-group">
             <label>Duration (hours)</label>
-            <input type="number" id="inp-duration" value="12" step="1" min="1" max="48">
+            <input type="number" id="inp-duration" value="12" step="1" min="1" max="168">
         </div>
         <div class="form-group">
             <label>Particles</label>
@@ -322,7 +330,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 <script>
 // --- Map setup ---
-const map = L.map('map').setView([53.5, -7.5], 6);
+const map = L.map('map').setView([37.0956, -116.1028], 7);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 18,
@@ -442,18 +450,18 @@ document.querySelectorAll('input[name="weather_source"]').forEach(radio => {
         document.getElementById('era5-note').style.display = isARL ? 'none' : 'block';
         document.getElementById('arl-section').classList.toggle('active', isARL);
 
-        // Reset to ERA5 defaults when switching back
+        // Reset to ERA5 defaults for the active dataset when switching back
         if (!isARL) {
-            document.getElementById('inp-date').min = '1953-03-24';
-            document.getElementById('inp-date').max = '1953-03-27';
-            document.getElementById('inp-date').value = '1953-03-24';
-            document.getElementById('inp-hour').value = 13;
-            document.getElementById('inp-lat').min = 35; document.getElementById('inp-lat').max = 42;
-            document.getElementById('inp-lat').value = 37.0956;
-            document.getElementById('inp-lon').min = -120; document.getElementById('inp-lon').max = -110;
-            document.getElementById('inp-lon').value = -116.1028;
-            marker.setLatLng([37.0956, -116.1028]);
-            map.setView([37.0956, -116.1028], 7);
+            const ds = document.getElementById('dataset-select').value;
+            const d = DATASET_DEFAULTS[ds] || DATASET_DEFAULTS.nancy;
+            document.getElementById('inp-date').min = d.date_min;
+            document.getElementById('inp-date').max = d.date_max;
+            document.getElementById('inp-date').value = d.date;
+            document.getElementById('inp-hour').value = d.hour;
+            document.getElementById('inp-lat').value = d.lat;
+            document.getElementById('inp-lon').value = d.lon;
+            marker.setLatLng([d.lat, d.lon]);
+            map.setView([d.lat, d.lon], d.zoom);
             // Restore ERA5 bounds rectangle
             if (window._era5Bounds) {
                 const b = window._era5Bounds;
@@ -466,6 +474,101 @@ document.querySelectorAll('input[name="weather_source"]').forEach(radio => {
         }
     });
 });
+
+// --- Dataset switching ---
+const DATASET_DEFAULTS = {
+    nancy: {
+        lat: 37.0956, lon: -116.1028, date: '1953-03-24', hour: 13,
+        date_min: '1953-03-24', date_max: '1953-03-27',
+        duration: 12, zoom: 7, mode: 'bomb', yield_kt: 24.0,
+    },
+    etex: {
+        lat: 48.058, lon: -2.008, date: '1994-10-23', hour: 16,
+        date_min: '1994-10-23', date_max: '1994-10-27',
+        duration: 72, zoom: 5, mode: 'npp',
+        activity_tbq: 1.0, stack_height_m: 10, isotope: 'Generic',
+    },
+};
+
+let datasetLoading = false;
+
+async function switchDataset(dataset) {
+    if (datasetLoading) return;
+    const sel = document.getElementById('dataset-select');
+    const btn = document.getElementById('btn-run');
+    datasetLoading = true;
+    sel.disabled = true;
+    btn.disabled = true;
+    btn.textContent = 'Loading dataset...';
+
+    // Reset any existing simulation state
+    resetSimulation();
+
+    try {
+        const resp = await fetch('/api/load-dataset', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({dataset}),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed to load dataset');
+
+        // Apply defaults for this dataset
+        const d = DATASET_DEFAULTS[dataset];
+        if (d) {
+            document.getElementById('inp-lat').value = d.lat;
+            document.getElementById('inp-lon').value = d.lon;
+            document.getElementById('inp-date').value = d.date;
+            document.getElementById('inp-date').min = d.date_min;
+            document.getElementById('inp-date').max = d.date_max;
+            document.getElementById('inp-hour').value = d.hour;
+            document.getElementById('inp-duration').value = d.duration;
+            marker.setLatLng([d.lat, d.lon]);
+
+            // Switch release mode
+            if (d.mode === 'npp') {
+                document.getElementById('mode-npp').checked = true;
+                document.getElementById('mode-npp').dispatchEvent(new Event('change'));
+                if (d.activity_tbq) document.getElementById('inp-activity').value = d.activity_tbq;
+                if (d.stack_height_m) document.getElementById('inp-stack-height').value = d.stack_height_m;
+                if (d.isotope) document.getElementById('inp-isotope').value = d.isotope;
+            } else {
+                document.getElementById('mode-bomb').checked = true;
+                document.getElementById('mode-bomb').dispatchEvent(new Event('change'));
+                if (d.yield_kt) document.getElementById('inp-yield').value = d.yield_kt;
+            }
+        }
+
+        // Switch back to ERA5 weather source
+        document.getElementById('ws-era5').checked = true;
+        document.getElementById('ws-era5').dispatchEvent(new Event('change'));
+
+        // Update bounding box and map view
+        window._era5Bounds = data;
+        showWeatherBounds(data.lat_min, data.lat_max, data.lon_min, data.lon_max, false);
+
+        // Update ERA5 note
+        if (dataset === 'etex') {
+            document.getElementById('era5-note').textContent =
+                'ERA5 data covers Europe (lat ' + data.lat_min.toFixed(0) + '–' + data.lat_max.toFixed(0) +
+                ', lon ' + data.lon_min.toFixed(0) + '–' + data.lon_max.toFixed(0) +
+                '), 23–27 October 1994. Click the map to place the release.';
+        } else {
+            document.getElementById('era5-note').textContent =
+                'ERA5 data covers Nevada Test Site region (lat 35–42, lon -120 to -110), ' +
+                '24–27 March 1953. Click the map to place the release.';
+        }
+    } catch (e) {
+        showError('Dataset switch failed: ' + e.message);
+        // Revert selector
+        sel.value = Object.keys(DATASET_DEFAULTS).find(k => k !== dataset) || 'nancy';
+    } finally {
+        datasetLoading = false;
+        sel.disabled = false;
+        btn.disabled = false;
+        btn.textContent = 'Run Simulation';
+    }
+}
 
 function applyARLConstraints() {
     if (!arlMetadata) return;

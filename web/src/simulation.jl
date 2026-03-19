@@ -85,6 +85,7 @@ end
 # --- Pre-loaded ERA5 data (populated by preload_era5!) ---
 
 const ERA5_STATE = Ref{Any}(nothing)
+const ACTIVE_DATASET = Ref{String}("nancy")
 
 struct ERA5Data
     files::Vector{String}
@@ -116,9 +117,27 @@ struct ARLData
     tmpdir::String
 end
 
-function preload_era5!(; progress_callback=nothing)
-    isnothing(progress_callback) || progress_callback(0, "Downloading ERA5 data (first run only)...")
-    era5_files = nancy_era5_files()
+"""Return ETEX ERA5 snap files from the examples/etex/ERA5_data directory."""
+function etex_era5_files()
+    era5_dir = joinpath(dirname(dirname(@__DIR__)), "examples", "etex", "ERA5_data")
+    isdir(era5_dir) || error("ETEX ERA5 data not found at $era5_dir. " *
+        "Ensure examples/etex/ERA5_data/ exists (may be a symlink to external drive).")
+    sort(filter(f -> endswith(f, "_snap.nc"), readdir(era5_dir, join=true)))
+end
+
+# Dataset configuration: name → (file_loader, cache_range, label)
+const DATASET_CONFIGS = Dict{String,NamedTuple{(:files_fn, :cache_start, :cache_end, :label),
+                             Tuple{Function, Int, Int, String}}}(
+    "nancy" => (files_fn=nancy_era5_files, cache_start=5, cache_end=11, label="Nancy (NTS)"),
+    "etex"  => (files_fn=etex_era5_files,  cache_start=5, cache_end=24, label="ETEX (Europe)"),
+)
+
+function preload_era5!(; dataset::String="nancy", progress_callback=nothing)
+    cfg = get(DATASET_CONFIGS, dataset, nothing)
+    isnothing(cfg) && error("Unknown dataset: $dataset. Available: $(join(keys(DATASET_CONFIGS), ", "))")
+
+    isnothing(progress_callback) || progress_callback(0, "Loading $(cfg.label) ERA5 data...")
+    era5_files = cfg.files_fn()
 
     met_format = Transport.detect_met_format(era5_files[1])
     nx_met, ny_met, nk_met = NCDataset(era5_files[1]) do ds
@@ -131,7 +150,8 @@ function preload_era5!(; progress_callback=nothing)
 
     isnothing(progress_callback) || progress_callback(30, "Caching met fields...")
     met_cache = Dict{Tuple{Int,Int}, Transport.MeteoFields}()
-    for file_idx in 5:min(11, length(era5_files))
+    cache_end = min(cfg.cache_end, length(era5_files))
+    for file_idx in cfg.cache_start:cache_end
         NCDataset(era5_files[file_idx]) do ds
             times = Transport.get_time_variable(met_format, ds)
             for t_idx in 1:length(times)
@@ -143,9 +163,10 @@ function preload_era5!(; progress_callback=nothing)
         end
     end
 
-    isnothing(progress_callback) || progress_callback(100, "ERA5 data ready")
+    isnothing(progress_callback) || progress_callback(100, "$(cfg.label) ERA5 data ready")
     ERA5_STATE[] = ERA5Data(era5_files, met_format, met_cache,
                             nx_met, ny_met, nk_met, lat_range, lon_range)
+    ACTIVE_DATASET[] = dataset
     return ERA5_STATE[]
 end
 
@@ -284,7 +305,7 @@ function run_dispersion_simulation(;
             saveat=[Float64(h) * 3600.0 for h in 0:duration_hours],
             verbose=false, max_duration=Float64(duration_hours) * 3600.0,
             save_snapshots=true, dt_particle=300.0, use_reference_stepping=true,
-            max_files=7, output_config=out_cfg)
+            max_files=length(era5.files), output_config=out_cfg)
 
         snapshots = Transport.run_simulation!(state, era5.files,
             particle_size_config=psc, deposition_config=dep,
@@ -301,8 +322,9 @@ function run_dispersion_simulation(;
         update!(85, "Computing deposition...")
 
         # Build deposition field on fine grid (kBq/m²)
-        lon_grid = range(-117.5, -112.0, step=0.023)
-        lat_grid = range(36.5, 41.0, step=0.018)
+        display_lons = [l > 180.0 ? l - 360.0 : l for l in era5.lon_range]
+        lon_grid = range(minimum(display_lons), maximum(display_lons), step=0.023)
+        lat_grid = range(minimum(era5.lat_range), maximum(era5.lat_range), step=0.018)
         nx_out, ny_out = length(lon_grid), length(lat_grid)
 
         fine_dep = zeros(nx_out, ny_out)
@@ -441,7 +463,7 @@ function run_dispersion_simulation(;
         saveat=[Float64(h) * 3600.0 for h in 0:duration_hours],
         verbose=false, max_duration=Float64(duration_hours) * 3600.0,
         save_snapshots=true, dt_particle=300.0, use_reference_stepping=true,
-        max_files=7, omega_scale=p.omega_scale,
+        max_files=length(era5.files), omega_scale=p.omega_scale,
         output_config=out_cfg)
 
     # Run simulation
@@ -460,8 +482,9 @@ function run_dispersion_simulation(;
     update!(85, "Computing dose rates...")
 
     # Build dose rate field on fine grid
-    lon_grid = range(-117.5, -112.0, step=0.023)
-    lat_grid = range(36.5, 41.0, step=0.018)
+    display_lons = [l > 180.0 ? l - 360.0 : l for l in era5.lon_range]
+    lon_grid = range(minimum(display_lons), maximum(display_lons), step=0.023)
+    lat_grid = range(minimum(era5.lat_range), maximum(era5.lat_range), step=0.018)
     nx_out, ny_out = length(lon_grid), length(lat_grid)
 
     fine_dep = zeros(nx_out, ny_out)
