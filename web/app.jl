@@ -25,8 +25,11 @@ if Threads.nthreads() < 2
 end
 
 println("Loading packages...")
+include(joinpath(@__DIR__, "src", "arl_reader.jl"))
+include(joinpath(@__DIR__, "src", "arl_converter.jl"))
 include(joinpath(@__DIR__, "src", "simulation.jl"))
 include(joinpath(@__DIR__, "src", "contours.jl"))
+include(joinpath(@__DIR__, "src", "animation.jl"))
 include(joinpath(@__DIR__, "src", "server.jl"))
 
 println("Pre-loading ERA5 meteorological data...")
