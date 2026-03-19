@@ -23,3 +23,16 @@ lazy = true
     [[smoky_era5_data.download]]
     url = "https://zenodo.org/records/18681346/files/smoky_era5_data.tar.gz"
     sha256 = "1fd983b57943ea65209371235e40dabe6e3103ba63576fedb8aee79f41827c0e"
+
+# ERA5 reanalysis data for the ETEX-1 tracer experiment
+# 23-27 Oct 1994, subdomain lat [40,63] lon [-8,28], 137 hybrid levels
+#
+# DOI: 10.5281/zenodo.19112773
+
+[etex_era5_data]
+git-tree-sha1 = "fa903f05e5a74ce6b411de9e56147277f3c0c0c8"
+lazy = true
+
+    [[etex_era5_data.download]]
+    url = "https://zenodo.org/records/19112773/files/etex_era5_data.tar.gz"
+    sha256 = "46ac9995eb3a50ba3a24f01bec119b5e9b1393bc4267cb738ed389fcc29de3b4"

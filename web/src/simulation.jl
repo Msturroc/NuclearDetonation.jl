@@ -117,13 +117,7 @@ struct ARLData
     tmpdir::String
 end
 
-"""Return ETEX ERA5 snap files from the examples/etex/ERA5_data directory."""
-function etex_era5_files()
-    era5_dir = joinpath(dirname(dirname(@__DIR__)), "examples", "etex", "ERA5_data")
-    isdir(era5_dir) || error("ETEX ERA5 data not found at $era5_dir. " *
-        "Ensure examples/etex/ERA5_data/ exists (may be a symlink to external drive).")
-    sort(filter(f -> endswith(f, "_snap.nc"), readdir(era5_dir, join=true)))
-end
+# etex_era5_files() is now provided by NuclearDetonation.Transport (data_access.jl)
 
 # Dataset configuration: name → (file_loader, cache_range, label)
 const DATASET_CONFIGS = Dict{String,NamedTuple{(:files_fn, :cache_start, :cache_end, :label),
