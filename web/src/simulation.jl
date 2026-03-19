@@ -127,6 +127,12 @@ const DATASET_CONFIGS = Dict{String,NamedTuple{(:files_fn, :cache_start, :cache_
 )
 
 function preload_era5!(; dataset::String="nancy", progress_callback=nothing)
+    # Skip if already loaded
+    if ACTIVE_DATASET[] == dataset && !isnothing(ERA5_STATE[])
+        isnothing(progress_callback) || progress_callback(100, "$(DATASET_CONFIGS[dataset].label) already loaded")
+        return ERA5_STATE[]
+    end
+
     cfg = get(DATASET_CONFIGS, dataset, nothing)
     isnothing(cfg) && error("Unknown dataset: $dataset. Available: $(join(keys(DATASET_CONFIGS), ", "))")
 
@@ -198,6 +204,7 @@ function run_dispersion_simulation(;
     activity_tbq::Float64 = 1.0,
     stack_height_m::Float64 = 100.0,
     isotope::String = "Cs-137",
+    release_duration_hours::Float64 = 1.0,
 )
     era5 = ERA5_STATE[]
     isnothing(era5) && error("ERA5 data not loaded. Call preload_era5!() first.")
@@ -232,6 +239,7 @@ function run_dispersion_simulation(;
         geometry = ColumnRelease(stack_height_m - half_h, stack_height_m + half_h)
         total_activity = activity_tbq * 1e12  # TBq → Bq
 
+        # Use a dummy source for initialization (actual particles are pre-generated below)
         source = ReleaseSource(
             (release_x, release_y), geometry,
             ConstantRelease(), [total_activity], n_particles,
@@ -250,9 +258,14 @@ function run_dispersion_simulation(;
         state = Transport.initialize_simulation(domain, [source], [isotope], decay_params;
                                                  log_depositions=true)
 
-        update!(15, "Generating particles...")
+        # Pre-generate particles with staggered ages to simulate continuous release.
+        # Each particle gets a random "birth time" within [0, release_duration].
+        # Particles with age > 0 won't have been advected during the delay, but this
+        # is the standard Lagrangian approximation for pre-seeded releases.
+        rel_dur_s = max(release_duration_hours, 1.0/12.0) * 3600.0
 
-        # Single 5 μm particle bin
+        update!(15, "Generating particles ($(release_duration_hours)h release)...")
+
         particle_prop = ParticleProperties(diameter_μm=5.0, density_gcm3=2.0)
         npp_radii = Float64[]
         npp_densities = Float64[]
@@ -265,13 +278,15 @@ function run_dispersion_simulation(;
             domain.dx, domain.dy, domain.hlevel,
         )
         if released_s && !isempty(pos_s)
-            for (pos, activity) in zip(pos_s, act_s)
+            for (k, (pos, activity)) in enumerate(zip(pos_s, act_s))
                 sigma_z = Transport.height_to_sigma_hybrid(
                     release_x, release_y, pos[3], init_met, 0.0)
+                # Stagger birth: particle k is "born" at a random time in the release window
+                age = rand(rng) * rel_dur_s
                 Transport.add_particle!(state.ensemble,
                     SVector{3,Float64}(pos[1], pos[2], sigma_z),
                     SVector{3,Float64}(0.0, 0.0, 0.0),
-                    [activity], 0.0, icomp=1)
+                    [activity], age, icomp=1)
                 push!(npp_radii, 5.0 * 0.5e-6)
                 push!(npp_densities, 2000.0)
                 push!(npp_size_indices, 1)
@@ -609,18 +624,19 @@ function run_simulation_with_source(;
     activity_tbq::Float64 = 1.0,
     stack_height_m::Float64 = 100.0,
     isotope::String = "Cs-137",
+    release_duration_hours::Float64 = 1.0,
     progress_callback = nothing,
 )
     if weather_source == "arl"
         return run_arl_dispersion_simulation(;
             arl_dir, lat, lon, yield_kt, start_date, start_hour,
             duration_hours, n_particles, release_mode, activity_tbq,
-            stack_height_m, isotope, progress_callback)
+            stack_height_m, isotope, release_duration_hours, progress_callback)
     else
         return run_dispersion_simulation(;
             lat, lon, yield_kt, start_date, start_hour,
             duration_hours, n_particles, release_mode, activity_tbq,
-            stack_height_m, isotope, progress_callback)
+            stack_height_m, isotope, release_duration_hours, progress_callback)
     end
 end
 
@@ -636,6 +652,7 @@ function run_arl_dispersion_simulation(;
     activity_tbq::Float64 = 1.0,
     stack_height_m::Float64 = 100.0,
     isotope::String = "Cs-137",
+    release_duration_hours::Float64 = 1.0,
     progress_callback = nothing,
 )
     update!(pct, msg) = isnothing(progress_callback) || progress_callback(pct, msg)
@@ -867,9 +884,9 @@ function run_arl_dispersion_simulation(;
         state = Transport.initialize_simulation(domain, [source], [isotope], decay_params;
                                                  log_depositions=true)
 
-        update!(18, "Generating particles...")
+        rel_dur_s = max(release_duration_hours, 1.0/12.0) * 3600.0
+        update!(18, "Generating particles ($(release_duration_hours)h release)...")
 
-        # Single 5 μm particle bin
         particle_prop = ParticleProperties(diameter_μm=5.0, density_gcm3=2.0)
         npp_radii = Float64[]
         npp_densities = Float64[]
@@ -885,10 +902,11 @@ function run_arl_dispersion_simulation(;
             for (pos, activity) in zip(pos_s, act_s)
                 sigma_z = Transport.height_to_sigma_hybrid(
                     release_x, release_y, pos[3], init_met, 0.0)
+                age = rand(rng) * rel_dur_s
                 Transport.add_particle!(state.ensemble,
                     SVector{3,Float64}(pos[1], pos[2], sigma_z),
                     SVector{3,Float64}(0.0, 0.0, 0.0),
-                    [activity], 0.0, icomp=1)
+                    [activity], age, icomp=1)
                 push!(npp_radii, 5.0 * 0.5e-6)
                 push!(npp_densities, 2000.0)
                 push!(npp_size_indices, 1)

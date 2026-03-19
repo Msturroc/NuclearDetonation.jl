@@ -148,6 +148,7 @@ function api_simulate(req::HTTP.Request)
     isotope        = String(get(params, :isotope, "Cs-137"))
     weather_source = String(get(params, :weather_source, "era5"))
     arl_dir        = String(get(params, :arl_dir, ""))
+    release_duration_hours = Float64(get(params, :release_duration_hours, 1.0))
 
     # Reset state
     APP[] = AppStatus(true, 0, "Starting...", "", "", 0.0, 0, "", "mSv/h")
@@ -159,7 +160,7 @@ function api_simulate(req::HTTP.Request)
                 weather_source, arl_dir,
                 lat, lon, yield_kt, start_date, start_hour,
                 duration_hours, n_particles,
-                release_mode, activity_tbq, stack_height_m, isotope,
+                release_mode, activity_tbq, stack_height_m, isotope, release_duration_hours,
                 progress_callback = (pct, msg) -> begin
                     APP[].progress_pct = pct
                     APP[].progress_msg = msg

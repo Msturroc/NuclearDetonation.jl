@@ -12,7 +12,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 
 /* Left panel */
 #panel {
-    width: 340px; min-width: 340px; padding: 20px; overflow-y: auto;
+    width: 360px; min-width: 360px; padding: 20px; overflow-y: auto;
     background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; gap: 16px;
 }
 #panel h1 { font-size: 18px; color: #333; line-height: 1.3; }
@@ -21,7 +21,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .form-group { display: flex; flex-direction: column; gap: 4px; }
 .form-group label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
 .form-group input, .form-group select {
-    padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px;
+    padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; min-width: 0;
 }
 .form-group input:focus, .form-group select:focus { outline: none; border-color: #4A90D9; box-shadow: 0 0 0 2px rgba(74,144,217,0.2); }
 .form-row { display: flex; gap: 10px; }
@@ -213,11 +213,17 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     </div>
 
     <div id="npp-fields" class="mode-fields">
-        <div class="form-group">
-            <label>Activity (TBq)</label>
-            <input type="number" id="inp-activity" value="1.0" step="0.1" min="0.001" max="100000">
-        </div>
         <div class="form-row">
+            <div class="form-group">
+                <label>Activity (TBq)</label>
+                <input type="number" id="inp-activity" value="1.0" step="0.1" min="0.001" max="100000">
+            </div>
+            <div class="form-group">
+                <label>Release Dur. (h)</label>
+                <input type="number" id="inp-release-duration" value="1.0" step="0.5" min="0.1" max="48">
+            </div>
+        </div>
+        <div class="form-row" style="margin-top:4px;">
             <div class="form-group">
                 <label>Stack Height (m)</label>
                 <input type="number" id="inp-stack-height" value="100" step="10" min="10" max="500">
@@ -487,6 +493,7 @@ const DATASET_DEFAULTS = {
         date_min: '1994-10-23', date_max: '1994-10-27',
         duration: 72, zoom: 5, mode: 'npp',
         activity_tbq: 1.0, stack_height_m: 10, isotope: 'Generic',
+        release_duration: 12,
     },
 };
 
@@ -532,6 +539,7 @@ async function switchDataset(dataset) {
                 if (d.activity_tbq) document.getElementById('inp-activity').value = d.activity_tbq;
                 if (d.stack_height_m) document.getElementById('inp-stack-height').value = d.stack_height_m;
                 if (d.isotope) document.getElementById('inp-isotope').value = d.isotope;
+                if (d.release_duration) document.getElementById('inp-release-duration').value = d.release_duration;
             } else {
                 document.getElementById('mode-bomb').checked = true;
                 document.getElementById('mode-bomb').dispatchEvent(new Event('change'));
@@ -831,6 +839,7 @@ async function runSimulation() {
         params.activity_tbq = parseFloat(document.getElementById('inp-activity').value);
         params.stack_height_m = parseFloat(document.getElementById('inp-stack-height').value);
         params.isotope = document.getElementById('inp-isotope').value;
+        params.release_duration_hours = parseFloat(document.getElementById('inp-release-duration').value);
     }
 
     try {
