@@ -2,6 +2,8 @@
 
 using HTTP
 using JSON3
+using Dates
+using Base64
 
 # --- Application state ---
 
@@ -11,13 +13,13 @@ mutable struct AppStatus
     progress_msg::String
     error_msg::String
     geojson::String
-    max_dose_mRh::Float64
+    max_dose::Float64
     n_events::Int
     csv_data::String
     units::String
 end
 
-const APP = Ref(AppStatus(false, 0, "", "", "", 0.0, 0, "", "mR/h"))
+const APP = Ref(AppStatus(false, 0, "", "", "", 0.0, 0, "", "mSv/h"))
 
 const WEB_DIR = dirname(@__DIR__)  # web/
 
@@ -29,6 +31,8 @@ function mime_type(path::String)
     endswith(path, ".png")  && return "image/png"
     endswith(path, ".svg")  && return "image/svg+xml"
     endswith(path, ".csv")  && return "text/csv"
+    endswith(path, ".gif")  && return "image/gif"
+    endswith(path, ".mp4")  && return "video/mp4"
     return "application/octet-stream"
 end
 
@@ -64,6 +68,22 @@ function handle_request(req::HTTP.Request)
             return api_results_csv()
         elseif path == "/api/era5-bounds" && method == "GET"
             return api_era5_bounds()
+        elseif path == "/api/upload-arl" && method == "POST"
+            return api_upload_arl(req)
+        elseif path == "/api/load-arl" && method == "POST"
+            return api_load_arl(req)
+        elseif path == "/api/arl-bounds" && method == "GET"
+            return api_arl_bounds()
+        elseif path == "/api/animation-levels" && method == "GET"
+            return api_animation_levels()
+        elseif path == "/api/animation-frames" && method == "POST"
+            return api_animation_frames(req)
+        elseif path == "/api/animation.gif" && method == "POST"
+            return api_animation_export(req, "gif")
+        elseif path == "/api/animation.mp4" && method == "POST"
+            return api_animation_export(req, "mp4")
+        elseif path == "/api/stitch-frames" && method == "POST"
+            return api_stitch_frames(req)
         end
 
         return HTTP.Response(404, cors_headers(), "Not found: $path")
@@ -92,7 +112,7 @@ function api_status()
         "progress_msg" => s.progress_msg,
         "error_msg"    => s.error_msg,
         "geojson"      => s.geojson,
-        "max_dose_mRh" => s.max_dose_mRh,
+        "max_dose"     => s.max_dose,
         "n_events"     => s.n_events,
         "complete"     => !s.running && !isempty(s.geojson),
         "units"        => s.units,
@@ -122,14 +142,17 @@ function api_simulate(req::HTTP.Request)
     activity_tbq   = Float64(get(params, :activity_tbq, 1.0))
     stack_height_m = Float64(get(params, :stack_height_m, 100.0))
     isotope        = String(get(params, :isotope, "Cs-137"))
+    weather_source = String(get(params, :weather_source, "era5"))
+    arl_dir        = String(get(params, :arl_dir, ""))
 
     # Reset state
-    APP[] = AppStatus(true, 0, "Starting...", "", "", 0.0, 0, "", "mR/h")
+    APP[] = AppStatus(true, 0, "Starting...", "", "", 0.0, 0, "", "mSv/h")
 
     # Run simulation asynchronously
     Threads.@spawn begin
         try
-            result = run_dispersion_simulation(;
+            result = run_simulation_with_source(;
+                weather_source, arl_dir,
                 lat, lon, yield_kt, start_date, start_hour,
                 duration_hours, n_particles,
                 release_mode, activity_tbq, stack_height_m, isotope,
@@ -144,16 +167,28 @@ function api_simulate(req::HTTP.Request)
 
             APP[].geojson = geojson
             APP[].csv_data = csv
-            APP[].max_dose_mRh = result.max_dose_mRh
+            APP[].max_dose = result.max_dose
             APP[].n_events = length(result.deposition_log)
             APP[].units = result.units
             APP[].progress_pct = 100
             APP[].progress_msg = "Complete"
             APP[].running = false
         catch e
+            bt = catch_backtrace()
+            # Full error with stacktrace
+            err_full = sprint() do io
+                showerror(io, e, bt)
+            end
             APP[].error_msg = sprint(showerror, e)
             APP[].running = false
-            @error "Simulation failed" exception=(e, catch_backtrace())
+            # Write to log file for debugging
+            logpath = joinpath(WEB_DIR, "error.log")
+            open(logpath, "a") do f
+                println(f, "\n", "="^60)
+                println(f, Dates.now(), " — Simulation error:")
+                println(f, err_full)
+            end
+            @error "Simulation failed — see web/error.log" exception=(e, bt)
         end
     end
 
@@ -190,6 +225,240 @@ function api_era5_bounds()
     ))
     headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
     return HTTP.Response(200, headers, body)
+end
+
+# --- ARL endpoints ---
+
+# Mutable state for ARL metadata (set by load-arl, used by UI)
+const ARL_METADATA = Ref{Any}(nothing)
+
+function api_upload_arl(req::HTTP.Request)
+    try
+        # Extract boundary from Content-Type header
+        content_type = HTTP.header(req, "Content-Type", "")
+        if !contains(content_type, "multipart/form-data")
+            return HTTP.Response(400, cors_headers(), "Expected multipart/form-data")
+        end
+        bm = match(r"boundary=(.+)", content_type)
+        isnothing(bm) && return HTTP.Response(400, cors_headers(), "No boundary in Content-Type")
+        boundary = String(bm.captures[1])
+
+        upload_dir = mktempdir()
+        n_files = 0
+        raw = req.body
+        delim = Vector{UInt8}("--" * boundary)
+
+        # Split body on boundary markers and extract file parts
+        parts = _split_multipart(raw, delim)
+        for part_bytes in parts
+            part_str = String(copy(part_bytes))
+            # Find header/body separator (double CRLF)
+            sep_idx = findfirst("\r\n\r\n", part_str)
+            isnothing(sep_idx) && continue
+            headers_str = part_str[1:sep_idx.start-1]
+            body_start = sep_idx.stop + 1
+            # Extract filename from Content-Disposition
+            fm = match(r"filename=\"([^\"]+)\"", headers_str)
+            isnothing(fm) && continue
+            fname = basename(fm.captures[1])
+            isempty(fname) && continue
+            # Body is after \r\n\r\n, strip trailing \r\n before next boundary
+            file_data = part_bytes[body_start:end]
+            if length(file_data) >= 2 && file_data[end-1:end] == UInt8[0x0d, 0x0a]
+                file_data = file_data[1:end-2]
+            end
+            write(joinpath(upload_dir, fname), file_data)
+            n_files += 1
+        end
+
+        if n_files == 0
+            rm(upload_dir, force=true, recursive=true)
+            return HTTP.Response(400, cors_headers(), "No files uploaded")
+        end
+        body = JSON3.write(Dict("upload_dir" => upload_dir, "n_files" => n_files))
+        hdrs = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, hdrs, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        hdrs = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, hdrs, body)
+    end
+end
+
+"""Split multipart body on boundary delimiter, returning content between boundaries."""
+function _split_multipart(data::Vector{UInt8}, delim::Vector{UInt8})
+    parts = Vector{UInt8}[]
+    dlen = length(delim)
+    n = length(data)
+    # Find all positions of delimiter
+    positions = Int[]
+    for i in 1:(n - dlen + 1)
+        if data[i:i+dlen-1] == delim
+            push!(positions, i)
+        end
+    end
+    # Content is between consecutive delimiters
+    for k in 1:(length(positions) - 1)
+        # Skip delimiter + potential \r\n after it
+        start = positions[k] + dlen
+        if start <= n && data[start] == 0x0d; start += 1; end
+        if start <= n && data[start] == 0x0a; start += 1; end
+        stop = positions[k+1] - 1
+        start <= stop || continue
+        push!(parts, data[start:stop])
+    end
+    return parts
+end
+
+function api_load_arl(req::HTTP.Request)
+    params = JSON3.read(String(req.body))
+    dir_path = String(get(params, :path, ""))
+    isempty(dir_path) && return HTTP.Response(400, cors_headers(), "Missing 'path' parameter")
+
+    try
+        bounds = load_arl_metadata!(dir_path)
+        ARL_METADATA[] = merge(bounds, (dir_path = dir_path,))
+        body = JSON3.write(Dict(
+            "lat_min" => bounds.lat_min,
+            "lat_max" => bounds.lat_max,
+            "lon_min" => bounds.lon_min,
+            "lon_max" => bounds.lon_max,
+            "date_min" => bounds.date_min,
+            "date_max" => bounds.date_max,
+            "n_files" => bounds.n_files,
+            "resolution" => bounds.resolution,
+            "pressure_levels" => bounds.pressure_levels,
+            "hours_per_file" => bounds.hours_per_file,
+        ))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
+end
+
+function api_arl_bounds()
+    meta = ARL_METADATA[]
+    if isnothing(meta)
+        return HTTP.Response(404, cors_headers(), "No ARL data loaded")
+    end
+    body = JSON3.write(Dict(
+        "lat_min" => meta.lat_min,
+        "lat_max" => meta.lat_max,
+        "lon_min" => meta.lon_min,
+        "lon_max" => meta.lon_max,
+        "date_min" => meta.date_min,
+        "date_max" => meta.date_max,
+        "dir_path" => meta.dir_path,
+    ))
+    headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+    return HTTP.Response(200, headers, body)
+end
+
+# --- Animation endpoints ---
+
+function api_animation_levels()
+    try
+        data = get_available_levels()
+        body = JSON3.write(data)
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(isnothing(ANIMATION_STATE[]) ? 404 : 500, headers, body)
+    end
+end
+
+function api_animation_frames(req::HTTP.Request)
+    try
+        params = JSON3.read(String(req.body))
+        level = Int(get(params, :level, 1))
+        data = get_animation_frames(level)
+        body = JSON3.write(data)
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
+end
+
+function api_animation_export(req::HTTP.Request, format::String)
+    try
+        params = JSON3.read(String(req.body))
+        level = Int(get(params, :level, 1))
+        fps = Int(get(params, :fps, 2))
+        target_px = Int(get(params, :target_px, 1200))
+
+        bytes = if format == "gif"
+            generate_gif(level; fps, target_px)
+        else
+            generate_mp4(level; fps, target_px)
+        end
+
+        content_type = format == "gif" ? "image/gif" : "video/mp4"
+        headers = vcat(cors_headers(), [
+            "Content-Type" => content_type,
+            "Content-Disposition" => "attachment; filename=\"dispersion_animation.$format\"",
+        ])
+        return HTTP.Response(200, headers, bytes)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
+end
+
+function api_stitch_frames(req::HTTP.Request)
+    try
+        params = JSON3.read(String(req.body))
+        frames_b64 = collect(params[:frames])
+        fps = Int(get(params, :fps, 2))
+        format = String(get(params, :format, "gif"))
+
+        isempty(frames_b64) && error("No frames provided")
+
+        # Write PNG frames to a temp directory
+        tmpdir = mktempdir()
+        for (i, b64) in enumerate(frames_b64)
+            png_data = base64decode(String(b64))
+            write(joinpath(tmpdir, "frame_$(lpad(i, 4, '0')).png"), png_data)
+        end
+
+        outpath = tempname() * "." * format
+
+        if format == "gif"
+            run(pipeline(`ffmpeg -y -loglevel error
+                -framerate $fps -i $(joinpath(tmpdir, "frame_%04d.png"))
+                -vf "split[s0][s1];[s0]palettegen=max_colors=256:stats_mode=full[p];[s1][p]paletteuse=dither=sierra2_4a"
+                $outpath`))
+        else
+            run(pipeline(`ffmpeg -y -loglevel error
+                -framerate $fps -i $(joinpath(tmpdir, "frame_%04d.png"))
+                -vf "pad=ceil(iw/2)*2:ceil(ih/2)*2"
+                -c:v libx264 -pix_fmt yuv420p -crf 20
+                $outpath`))
+        end
+
+        bytes = read(outpath)
+        rm(tmpdir, recursive=true, force=true)
+        rm(outpath, force=true)
+
+        content_type = format == "gif" ? "image/gif" : "video/mp4"
+        headers = vcat(cors_headers(), [
+            "Content-Type" => content_type,
+            "Content-Disposition" => "attachment; filename=\"dispersion_animation.$format\"",
+        ])
+        return HTTP.Response(200, headers, bytes)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
 end
 
 # --- Server start ---

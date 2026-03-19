@@ -983,7 +983,7 @@ Integrate one simulation timestep: advection, deposition, decay.
                     if state.log_depositions
                         push!(state.deposition_log, DepositionEvent(
                             Float64(x_domain_final), Float64(y_domain_final), Float64(mass),
-                            Float64(t), comp))
+                            Float64(current_time_global), comp))
                     end
                 end
                 set_rad!(particle, comp, -1.0f0)

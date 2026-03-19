@@ -76,6 +76,56 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 .mode-fields { display: none; }
 .mode-fields.active { display: block; }
 
+/* ARL section */
+#arl-section { display: none; }
+#arl-section.active { display: flex; flex-direction: column; gap: 8px; }
+#arl-path-row { display: flex; gap: 6px; }
+#arl-path-row input { flex: 1; font-size: 12px; padding: 6px 8px; }
+#btn-load-arl {
+    padding: 6px 12px; font-size: 12px; font-weight: 600; border: 1px solid #4A90D9;
+    background: #fff; color: #4A90D9; border-radius: 4px; cursor: pointer; white-space: nowrap;
+}
+#btn-load-arl:hover { background: #f0f6ff; }
+#btn-load-arl:disabled { border-color: #aaa; color: #aaa; cursor: not-allowed; }
+#arl-status {
+    font-size: 11px; color: #666; padding: 6px 8px; background: #f0f8ff;
+    border-radius: 4px; border-left: 3px solid #4A90D9; display: none;
+}
+#arl-status.active { display: block; }
+#arl-status.error { background: #fff0f0; border-left-color: #c00; color: #900; }
+
+/* NPP markers */
+.npp-marker {
+    background: none; border: none;
+    font-size: 18px; line-height: 1; text-align: center;
+    cursor: pointer; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+.npp-marker:hover { transform: scale(1.3); }
+
+/* Animation panel */
+#animation-panel { display: none; border-top: 1px solid #eee; padding-top: 10px; }
+#animation-panel.active { display: block; }
+#animation-panel h3 { font-size: 12px; color: #555; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+#anim-controls { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+#anim-controls button {
+    padding: 4px 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;
+    background: #fff; cursor: pointer; min-width: 32px;
+}
+#anim-controls button:hover { background: #f0f6ff; }
+#anim-controls button.active { background: #4A90D9; color: #fff; border-color: #4A90D9; }
+#anim-time { font-size: 12px; color: #555; flex: 1; text-align: right; }
+#anim-slider { width: 100%; margin: 4px 0; }
+#anim-row-export { display: flex; gap: 6px; margin-top: 6px; }
+#anim-row-export select, #anim-row-export button {
+    padding: 4px 8px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;
+}
+#anim-row-export button {
+    background: #fff; color: #4A90D9; border-color: #4A90D9; cursor: pointer; font-weight: 600;
+}
+#anim-row-export button:hover { background: #f0f6ff; }
+#anim-row-export button:disabled { border-color: #aaa; color: #aaa; cursor: not-allowed; }
+#anim-status { font-size: 11px; color: #666; margin-top: 4px; }
+
 /* Legend */
 #legend { margin-top: auto; padding-top: 12px; border-top: 1px solid #eee; }
 #legend h3 { font-size: 12px; color: #555; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
@@ -107,9 +157,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         <label for="mode-npp">Point Release (NPP)</label>
     </div>
 
-    <div class="note">
+    <button id="btn-new-sim" onclick="resetSimulation()" style="display:none; width:100%; padding:8px 12px; font-size:13px; font-weight:600; border:1px solid #888; background:#fff; color:#555; border-radius:4px; cursor:pointer; margin-bottom:4px;">New Simulation</button>
+
+    <div class="mode-toggle" style="margin-top: 4px;">
+        <input type="radio" name="weather_source" id="ws-era5" value="era5" checked>
+        <label for="ws-era5">Built-in ERA5</label>
+        <input type="radio" name="weather_source" id="ws-arl" value="arl">
+        <label for="ws-arl">Local ARL Files</label>
+    </div>
+
+    <div class="note" id="era5-note">
         ERA5 data covers Nevada Test Site region (lat 35-42, lon -120 to -110),
         24-27 March 1953. Click the map to place the release.
+    </div>
+
+    <div id="arl-section">
+        <div class="form-group">
+            <label>ARL File or Directory</label>
+            <div id="arl-path-row">
+                <input type="text" id="inp-arl-path" placeholder="/path/to/Weather_data/ or /path/to/file.ARL">
+                <button id="btn-load-arl" onclick="loadARL()">Load</button>
+            </div>
+        </div>
+        <div class="form-group" style="margin-top:4px">
+            <label>Or Upload ARL Files</label>
+            <input type="file" id="inp-arl-upload" multiple accept=".ARL,.arl" style="font-size:12px;" onchange="uploadARLFiles(this.files)">
+        </div>
+        <div id="arl-status"></div>
     </div>
 
     <div class="form-row">
@@ -170,7 +244,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
         </div>
         <div class="form-group">
             <label>Particles</label>
-            <input type="number" id="inp-particles" value="5000" step="1000" min="100" max="50000">
+            <input type="number" id="inp-particles" value="2500" step="500" min="100" max="50000">
         </div>
     </div>
 
@@ -186,33 +260,73 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
     <div id="results">
         <div class="stat">Peak dose: <strong id="res-max-dose"></strong></div>
         <div class="stat">Deposition events: <span id="res-n-events"></span></div>
-        <button id="btn-export" onclick="exportCSV()">Export CSV</button>
+        <div style="display:flex; gap:6px; margin-top:8px; flex-wrap:wrap;">
+            <button id="btn-contours" onclick="showContours()" style="padding:8px 12px; font-size:13px; border:1px solid #4A90D9; background:#fff; color:#4A90D9; border-radius:4px; cursor:pointer;">Show Dose Contours</button>
+            <button id="btn-export" onclick="exportCSV()" style="padding:8px 12px; font-size:13px; border:1px solid #4A90D9; background:#fff; color:#4A90D9; border-radius:4px; cursor:pointer;">Export CSV</button>
+        </div>
     </div>
 
-    <div id="legend">
-        <h3 id="legend-title">Dose Rate at H+12 (mR/h)</h3>
+    <div id="animation-panel">
+        <h3>Animation</h3>
+        <div class="form-group" style="margin-bottom:6px">
+            <label>Height Level</label>
+            <select id="anim-level" onchange="loadAnimationFrames()"></select>
+        </div>
+        <div id="anim-controls">
+            <button onclick="animStepBack()" title="Step back">&#9664;&#9664;</button>
+            <button id="anim-play-btn" onclick="animTogglePlay()" title="Play/Pause">&#9654;</button>
+            <button onclick="animStepForward()" title="Step forward">&#9654;&#9654;</button>
+            <span id="anim-time">--</span>
+        </div>
+        <input type="range" id="anim-slider" min="0" max="0" value="0" oninput="animSeek(this.value)">
+        <div id="anim-row-export">
+            <select id="anim-format">
+                <option value="gif">GIF</option>
+                <option value="mp4">MP4</option>
+            </select>
+            <select id="anim-fps">
+                <option value="1">1 fps</option>
+                <option value="2" selected>2 fps</option>
+                <option value="4">4 fps</option>
+                <option value="8">8 fps</option>
+            </select>
+            <button id="btn-anim-export" onclick="exportAnimation()">Download</button>
+        </div>
+        <div id="anim-status"></div>
+    </div>
+
+    <div id="legend" style="display:none;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:6px;">
+            <h3 id="legend-title" style="margin:0; flex:1;">Dose Rate (mSv/h)</h3>
+            <select id="unit-select" onchange="changeUnit(this.value)" style="font-size:11px; padding:2px 4px; border:1px solid #ccc; border-radius:3px;">
+                <option value="mSv/h">mSv/h</option>
+                <option value="μSv/h">&mu;Sv/h</option>
+                <option value="mR/h">mR/h</option>
+            </select>
+        </div>
         <div id="legend-items">
-            <div class="legend-item"><span class="legend-swatch" style="background:#CC0000"></span> 100</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:#FF8800"></span> 40</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:#CCCC00"></span> 10</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:#33AA33"></span> 4</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:#00CCCC"></span> 1</div>
-            <div class="legend-item"><span class="legend-swatch" style="background:#3366FF"></span> 0.4</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#CC0000"></span> 1.0</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#FF8800"></span> 0.4</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#CCCC00"></span> 0.1</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#33AA33"></span> 0.04</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#00CCCC"></span> 0.01</div>
+            <div class="legend-item"><span class="legend-swatch" style="background:#3366FF"></span> 0.004</div>
         </div>
     </div>
 </div>
 
 <div id="map-container">
-    <div id="map-hint">Click the map to place detonation</div>
+    <div id="map-hint">Click the map to place release location</div>
     <div id="map"></div>
 </div>
 
 <script>
 // --- Map setup ---
-const map = L.map('map').setView([37.0956, -116.1028], 7);
+const map = L.map('map').setView([53.5, -7.5], 6);
 L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
     attribution: '&copy; OpenStreetMap contributors',
     maxZoom: 18,
+    crossOrigin: true,
 }).addTo(map);
 
 // Detonation marker
@@ -224,11 +338,64 @@ const starIcon = L.divIcon({
 });
 let marker = L.marker([37.0956, -116.1028], {icon: starIcon}).addTo(map);
 let contourLayer = null;
+let weatherBoundsLayer = null;
 
-// Click to place detonation
+// --- NPP plant markers ---
+const NPP_PLANTS = [
+    {name: "Hinkley Point C", lat: 51.2086, lon: -3.1304},
+    {name: "Wylfa", lat: 53.4167, lon: -4.4822},
+    {name: "Paluel", lat: 49.8584, lon: 0.6354},
+    {name: "Flamanville", lat: 49.5381, lon: -1.8802},
+    {name: "Sizewell B", lat: 52.2145, lon: 1.6206},
+    {name: "Heysham", lat: 54.0285, lon: -2.9161},
+];
+
+const nppIcon = L.divIcon({
+    html: '\u2622',
+    className: 'npp-marker',
+    iconSize: [22, 22],
+    iconAnchor: [11, 11],
+});
+
+const nppMarkerLayers = [];
+NPP_PLANTS.forEach(plant => {
+    const m = L.marker([plant.lat, plant.lon], {icon: nppIcon, zIndexOffset: 500})
+        .bindTooltip(plant.name, {direction: 'top', offset: [0, -8]})
+        .on('click', function() {
+            document.getElementById('inp-lat').value = plant.lat;
+            document.getElementById('inp-lon').value = plant.lon;
+            marker.setLatLng([plant.lat, plant.lon]);
+            // Switch to NPP mode
+            document.getElementById('mode-npp').checked = true;
+            document.getElementById('mode-npp').dispatchEvent(new Event('change'));
+            document.getElementById('map-hint').classList.add('hidden');
+        });
+    nppMarkerLayers.push(m);
+});
+
+function updateNPPMarkers() {
+    const show = getSelectedMode() === 'npp';
+    nppMarkerLayers.forEach(m => show ? m.addTo(map) : map.removeLayer(m));
+}
+
+// Click to place release location
 map.on('click', function(e) {
     const lat = Math.round(e.latlng.lat * 10000) / 10000;
     const lon = Math.round(e.latlng.lng * 10000) / 10000;
+
+    // Bounds-check when ARL mode is active
+    if (activeWeatherSource === 'arl' && arlMetadata) {
+        const m = arlMetadata;
+        if (lat < m.lat_min || lat > m.lat_max || lon < m.lon_min || lon > m.lon_max) {
+            setARLStatus(
+                `Click outside weather data bounds (lat ${m.lat_min.toFixed(1)}\u2013${m.lat_max.toFixed(1)}, ` +
+                `lon ${m.lon_min.toFixed(1)}\u2013${m.lon_max.toFixed(1)}). Click inside the blue rectangle.`,
+                true
+            );
+            return;
+        }
+    }
+
     document.getElementById('inp-lat').value = lat;
     document.getElementById('inp-lon').value = lon;
     marker.setLatLng([lat, lon]);
@@ -244,7 +411,7 @@ map.on('click', function(e) {
     });
 });
 
-// --- Mode toggle ---
+// --- Release mode toggle ---
 function getSelectedMode() {
     return document.querySelector('input[name="release_mode"]:checked').value;
 }
@@ -254,28 +421,259 @@ document.querySelectorAll('input[name="release_mode"]').forEach(radio => {
         const mode = getSelectedMode();
         document.getElementById('bomb-fields').classList.toggle('active', mode === 'bomb');
         document.getElementById('npp-fields').classList.toggle('active', mode === 'npp');
+        updateNPPMarkers();
+    });
+});
+// Initial state: show/hide NPP markers based on default mode (bomb → hidden)
+updateNPPMarkers();
+
+// --- Weather source toggle ---
+let activeWeatherSource = 'era5';
+let arlMetadata = null;
+
+function getWeatherSource() {
+    return document.querySelector('input[name="weather_source"]:checked').value;
+}
+
+document.querySelectorAll('input[name="weather_source"]').forEach(radio => {
+    radio.addEventListener('change', function() {
+        activeWeatherSource = getWeatherSource();
+        const isARL = activeWeatherSource === 'arl';
+        document.getElementById('era5-note').style.display = isARL ? 'none' : 'block';
+        document.getElementById('arl-section').classList.toggle('active', isARL);
+
+        // Reset to ERA5 defaults when switching back
+        if (!isARL) {
+            document.getElementById('inp-date').min = '1953-03-24';
+            document.getElementById('inp-date').max = '1953-03-27';
+            document.getElementById('inp-date').value = '1953-03-24';
+            document.getElementById('inp-hour').value = 13;
+            document.getElementById('inp-lat').min = 35; document.getElementById('inp-lat').max = 42;
+            document.getElementById('inp-lat').value = 37.0956;
+            document.getElementById('inp-lon').min = -120; document.getElementById('inp-lon').max = -110;
+            document.getElementById('inp-lon').value = -116.1028;
+            marker.setLatLng([37.0956, -116.1028]);
+            map.setView([37.0956, -116.1028], 7);
+            // Restore ERA5 bounds rectangle
+            if (window._era5Bounds) {
+                const b = window._era5Bounds;
+                showWeatherBounds(b.lat_min, b.lat_max, b.lon_min, b.lon_max, true);
+            } else if (weatherBoundsLayer) {
+                map.removeLayer(weatherBoundsLayer); weatherBoundsLayer = null;
+            }
+        } else if (arlMetadata) {
+            applyARLConstraints();
+        }
     });
 });
 
-// Legend definitions
-const BOMB_LEGEND = {
-    title: 'Dose Rate (mR/h)',
-    levels: [100, 40, 10, 4, 1, 0.4],
-    colors: ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'],
-};
-const NPP_LEGEND = {
-    title: 'Deposition (kBq/m²)',
-    levels: [1480, 555, 185, 37, 10, 1],
-    colors: ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'],
+function applyARLConstraints() {
+    if (!arlMetadata) return;
+    const m = arlMetadata;
+    // Date constraints
+    document.getElementById('inp-date').min = m.date_min;
+    document.getElementById('inp-date').max = m.date_max;
+    document.getElementById('inp-date').value = m.date_min;
+    document.getElementById('inp-hour').value = 0;
+    // Lat/lon constraints and values — center on ARL data
+    const centerLat = ((m.lat_min + m.lat_max) / 2).toFixed(4);
+    const centerLon = ((m.lon_min + m.lon_max) / 2).toFixed(4);
+    document.getElementById('inp-lat').min = m.lat_min;
+    document.getElementById('inp-lat').max = m.lat_max;
+    document.getElementById('inp-lat').value = centerLat;
+    document.getElementById('inp-lon').min = m.lon_min;
+    document.getElementById('inp-lon').max = m.lon_max;
+    document.getElementById('inp-lon').value = centerLon;
+    marker.setLatLng([parseFloat(centerLat), parseFloat(centerLon)]);
+}
+
+// --- ARL loading ---
+
+async function loadARL() {
+    const pathInput = document.getElementById('inp-arl-path');
+    const btn = document.getElementById('btn-load-arl');
+    const status = document.getElementById('arl-status');
+    const dirPath = pathInput.value.trim();
+
+    if (!dirPath) { setARLStatus('Please enter a file or directory path', true); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Loading...';
+    setARLStatus('Scanning ARL files...', false);
+
+    try {
+        const resp = await fetch('/api/load-arl', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({path: dirPath}),
+        });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Failed to load ARL data');
+
+        arlMetadata = data;
+        arlMetadata.dir_path = dirPath;
+        applyARLConstraints();
+
+        // Show weather data boundary on map
+        showWeatherBounds(data.lat_min, data.lat_max, data.lon_min, data.lon_max);
+
+        setARLStatus(
+            `Loaded ${data.n_files} ARL files (${data.resolution}&deg; resolution, ` +
+            `${data.pressure_levels.length} levels). ` +
+            `Dates: ${data.date_min} to ${data.date_max}. ` +
+            `Click within the blue rectangle on the map.`,
+            false
+        );
+    } catch (e) {
+        setARLStatus(e.message, true);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Load';
+    }
+}
+
+function setARLStatus(msg, isError) {
+    const el = document.getElementById('arl-status');
+    el.textContent = msg;
+    el.classList.add('active');
+    el.classList.toggle('error', isError);
+}
+
+async function uploadARLFiles(files) {
+    if (!files || files.length === 0) return;
+    const btn = document.getElementById('btn-load-arl');
+    btn.disabled = true;
+    setARLStatus(`Uploading ${files.length} file(s)...`, false);
+
+    try {
+        const formData = new FormData();
+        for (const file of files) {
+            formData.append('files', file, file.name);
+        }
+        const resp = await fetch('/api/upload-arl', { method: 'POST', body: formData });
+        const data = await resp.json();
+        if (!resp.ok) throw new Error(data.error || 'Upload failed');
+
+        setARLStatus(`Uploaded ${data.n_files} file(s). Loading metadata...`, false);
+        // Set the path input to the upload dir and trigger load
+        document.getElementById('inp-arl-path').value = data.upload_dir;
+        await loadARL();
+    } catch (e) {
+        setARLStatus('Upload error: ' + e.message, true);
+    } finally {
+        btn.disabled = false;
+        document.getElementById('inp-arl-upload').value = '';
+    }
+}
+
+function showWeatherBounds(latMin, latMax, lonMin, lonMax, skipFitBounds) {
+    if (weatherBoundsLayer) { map.removeLayer(weatherBoundsLayer); }
+
+    const isGlobal = (latMax - latMin > 160) && (lonMax - lonMin > 340);
+
+    weatherBoundsLayer = L.rectangle(
+        [[latMin, lonMin], [latMax, lonMax]],
+        {color: '#4A90D9', weight: 2, fill: true, fillOpacity: 0.05, dashArray: '5,5'}
+    ).addTo(map);
+
+    if (!skipFitBounds) {
+        if (isGlobal) {
+            map.setView([0, 0], 2);
+        } else {
+            map.fitBounds(weatherBoundsLayer.getBounds().pad(0.1));
+        }
+    }
+}
+
+// Store ERA5 bounds globally for mode switching
+window._era5Bounds = null;
+
+// Fetch ERA5 bounds on page load and show them
+fetch('/api/era5-bounds').then(r => r.ok ? r.json() : null).then(b => {
+    if (!b) return;
+    window._era5Bounds = b;
+    if (activeWeatherSource === 'era5') {
+        showWeatherBounds(b.lat_min, b.lat_max, b.lon_min, b.lon_max, true);
+    }
+}).catch(() => {});
+
+// --- Unit conversion system ---
+// Server always returns dose in mSv/h, deposition in kBq/m²
+// Client converts for display based on selected unit
+
+// Base contour levels in mSv/h (matching server-side CONTOUR_LEVELS)
+const BOMB_BASE_LEVELS = [1.0, 0.4, 0.1, 0.04, 0.01, 0.004];
+const BOMB_COLORS = ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'];
+
+// Dose rate unit conversions (from mSv/h)
+const DOSE_UNITS = {
+    'mSv/h':  { factor: 1,    label: 'mSv/h',  title: 'Dose Rate (mSv/h)' },
+    'μSv/h':  { factor: 1000, label: 'μSv/h',  title: 'Dose Rate (μSv/h)' },
+    'mR/h':   { factor: 100,  label: 'mR/h',   title: 'Dose Rate (mR/h)' },
 };
 
+// Deposition unit conversions (from kBq/m²)
+const DEP_UNITS = {
+    'kBq/m²':  { factor: 1,       label: 'kBq/m²',  title: 'Deposition (kBq/m²)' },
+    'Ci/km²':  { factor: 0.02703, label: 'Ci/km²',  title: 'Deposition (Ci/km²)' },
+};
+
+const NPP_BASE_LEVELS = [1480, 555, 185, 37, 10, 1];
+const NPP_COLORS = ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'];
+
+let currentBaseUnits = 'mSv/h';    // base units from server
+let currentDisplayUnit = 'mSv/h';  // what user has selected
+let lastMaxDose = 0;               // stored in base units
+
+function getUnitInfo() {
+    if (currentBaseUnits === 'kBq/m²') return DEP_UNITS[currentDisplayUnit] || DEP_UNITS['kBq/m²'];
+    return DOSE_UNITS[currentDisplayUnit] || DOSE_UNITS['mSv/h'];
+}
+
+function formatValue(val, unit) {
+    const info = currentBaseUnits === 'kBq/m²' ? DEP_UNITS[unit] : DOSE_UNITS[unit];
+    if (!info) return val.toFixed(2);
+    const converted = val * info.factor;
+    if (converted >= 100) return converted.toFixed(0);
+    if (converted >= 1) return converted.toFixed(1);
+    if (converted >= 0.01) return converted.toFixed(3);
+    return converted.toExponential(2);
+}
+
+function changeUnit(unit) {
+    currentDisplayUnit = unit;
+    updateLegend(currentBaseUnits);
+    // Update peak dose display if results are showing
+    if (document.getElementById('results').classList.contains('active')) {
+        const info = getUnitInfo();
+        document.getElementById('res-max-dose').textContent = formatValue(lastMaxDose, currentDisplayUnit) + ' ' + info.label;
+    }
+}
+
 function updateLegend(units) {
-    const legend = units === 'kBq/m²' ? NPP_LEGEND : BOMB_LEGEND;
-    document.getElementById('legend-title').textContent = legend.title;
-    const container = document.getElementById('legend-items');
-    container.innerHTML = legend.levels.map((lv, i) =>
-        `<div class="legend-item"><span class="legend-swatch" style="background:${legend.colors[i]}"></span> ${lv}</div>`
-    ).join('');
+    currentBaseUnits = units;
+    const unitSel = document.getElementById('unit-select');
+    if (units === 'kBq/m²') {
+        unitSel.style.display = 'none';
+        document.getElementById('legend-title').textContent = 'Deposition (kBq/m²)';
+        const container = document.getElementById('legend-items');
+        container.innerHTML = NPP_BASE_LEVELS.map((lv, i) => {
+            const label = lv >= 1 ? lv.toFixed(lv >= 100 ? 0 : 1) : lv.toFixed(3);
+            return `<div class="legend-item"><span class="legend-swatch" style="background:${NPP_COLORS[i]}"></span> ${label}</div>`;
+        }).join('');
+    } else {
+        unitSel.style.display = '';
+        unitSel.innerHTML = '<option value="mSv/h">mSv/h</option><option value="μSv/h">&mu;Sv/h</option><option value="mR/h">mR/h</option>';
+        unitSel.value = currentDisplayUnit;
+        const info = DOSE_UNITS[currentDisplayUnit] || DOSE_UNITS['mSv/h'];
+        document.getElementById('legend-title').textContent = info.title;
+        const container = document.getElementById('legend-items');
+        container.innerHTML = BOMB_BASE_LEVELS.map((lv, i) => {
+            const converted = lv * info.factor;
+            const label = converted >= 1 ? converted.toFixed(converted >= 100 ? 0 : 1) : converted.toFixed(3);
+            return `<div class="legend-item"><span class="legend-swatch" style="background:${BOMB_COLORS[i]}"></span> ${label}</div>`;
+        }).join('');
+    }
 }
 
 // --- Simulation ---
@@ -292,10 +690,17 @@ async function runSimulation() {
     document.getElementById('progress-bar').style.width = '0%';
     document.getElementById('progress-msg').textContent = 'Starting...';
 
-    // Clear previous contours
+    // Clear previous contours and animation
     if (contourLayer) { map.removeLayer(contourLayer); contourLayer = null; }
+    if (animOverlay) { map.removeLayer(animOverlay); animOverlay = null; }
+    lastGeoJSON = null;
+    animStop();
+    animFrames = [];
+    document.getElementById('animation-panel').classList.remove('active');
+    document.getElementById('btn-contours').textContent = 'Show Dose Contours';
 
     const mode = getSelectedMode();
+    const wsource = getWeatherSource();
     const params = {
         lat: parseFloat(document.getElementById('inp-lat').value),
         lon: parseFloat(document.getElementById('inp-lon').value),
@@ -304,7 +709,19 @@ async function runSimulation() {
         duration_hours: parseInt(document.getElementById('inp-duration').value),
         n_particles: parseInt(document.getElementById('inp-particles').value),
         release_mode: mode,
+        weather_source: wsource,
     };
+
+    // Add weather-source-specific params
+    if (wsource === 'arl') {
+        if (!arlMetadata) {
+            showError('Please load ARL data first');
+            resetButton();
+            return;
+        }
+        params.arl_dir = arlMetadata.dir_path;
+    }
+
     if (mode === 'bomb') {
         params.yield_kt = parseFloat(document.getElementById('inp-yield').value);
     } else {
@@ -357,35 +774,62 @@ async function pollStatus() {
     }
 }
 
+let lastGeoJSON = null;  // stored for on-demand contour rendering
+
 function showResults(s) {
     document.getElementById('results').classList.add('active');
+    document.getElementById('btn-new-sim').style.display = 'block';
     document.getElementById('progress-box').classList.remove('active');
-    const units = s.units || 'mR/h';
-    document.getElementById('res-max-dose').textContent = s.max_dose_mRh.toFixed(1) + ' ' + units;
+    const units = s.units || 'mSv/h';
+    currentBaseUnits = units;
+    lastMaxDose = s.max_dose;
+    const info = getUnitInfo();
+    document.getElementById('res-max-dose').textContent = formatValue(s.max_dose, currentDisplayUnit) + ' ' + info.label;
     document.getElementById('res-n-events').textContent = s.n_events.toLocaleString();
     updateLegend(units);
+    document.getElementById('legend').style.display = '';
 
-    // Parse and render contours
-    if (s.geojson) {
-        const geojson = JSON.parse(s.geojson);
-        contourLayer = L.geoJSON(geojson, {
-            style: function(feature) {
-                return {
-                    color: feature.properties.color,
-                    weight: 2.5,
-                    opacity: 0.9,
-                };
-            },
-            onEachFeature: function(feature, layer) {
-                layer.bindTooltip(feature.properties.label, {sticky: true});
-            },
-        }).addTo(map);
+    // Store GeoJSON for on-demand rendering (not auto-rendered)
+    lastGeoJSON = s.geojson ? JSON.parse(s.geojson) : null;
+    document.getElementById('btn-contours').style.display = lastGeoJSON ? '' : 'none';
 
-        // Zoom to contour bounds
-        if (contourLayer.getBounds().isValid()) {
-            map.fitBounds(contourLayer.getBounds().pad(0.1));
-        }
+    // Load animation levels
+    loadAnimationLevels();
+}
+
+function showContours() {
+    if (!lastGeoJSON) return;
+
+    // Toggle off if already showing
+    if (contourLayer) {
+        map.removeLayer(contourLayer);
+        contourLayer = null;
+        document.getElementById('btn-contours').textContent = 'Show Dose Contours';
+        return;
     }
+
+    contourLayer = L.geoJSON(lastGeoJSON, {
+        style: function(feature) {
+            return {
+                color: feature.properties.color,
+                weight: 2.5,
+                opacity: 0.9,
+            };
+        },
+        onEachFeature: function(feature, layer) {
+            // Dynamic tooltip using current display unit
+            const baseVal = feature.properties.level;
+            const info = getUnitInfo();
+            const converted = baseVal * info.factor;
+            const label = (converted >= 1 ? converted.toFixed(converted >= 100 ? 0 : 1) : converted.toFixed(3)) + ' ' + info.label;
+            layer.bindTooltip(label, {sticky: true});
+        },
+    }).addTo(map);
+
+    if (contourLayer.getBounds().isValid()) {
+        map.fitBounds(contourLayer.getBounds().pad(0.1));
+    }
+    document.getElementById('btn-contours').textContent = 'Hide Contours';
 }
 
 function showError(msg) {
@@ -401,8 +845,426 @@ function resetButton() {
     btn.textContent = 'Run Simulation';
 }
 
+function resetSimulation() {
+    // Clear results and animation
+    document.getElementById('btn-new-sim').style.display = 'none';
+    document.getElementById('results').classList.remove('active');
+    document.getElementById('animation-panel').classList.remove('active');
+    document.getElementById('error-box').classList.remove('active');
+    document.getElementById('progress-box').classList.remove('active');
+    document.getElementById('legend').style.display = 'none';
+    if (contourLayer) { map.removeLayer(contourLayer); contourLayer = null; }
+    if (animOverlay) { map.removeLayer(animOverlay); animOverlay = null; }
+    lastGeoJSON = null;
+    animStop();
+    animFrames = [];
+    document.getElementById('btn-contours').textContent = 'Show Dose Contours';
+    // Scroll panel back to top
+    document.getElementById('panel').scrollTop = 0;
+}
+
 function exportCSV() {
     window.open('/api/results.csv', '_blank');
+}
+
+// --- Animation ---
+let animFrames = [];      // base64-encoded RGBA data per frame
+let animBounds = null;     // {lat_min, lat_max, lon_min, lon_max}
+let animWidth = 0;
+let animHeight = 0;
+let animTimes = [];
+let animIndex = 0;
+let animMaxValue = 0;
+let animUnits = '';
+let animPlaying = false;
+let animTimer = null;
+let animOverlay = null;
+let animCanvas = null;
+
+async function loadAnimationLevels() {
+    try {
+        const resp = await fetch('/api/animation-levels');
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const sel = document.getElementById('anim-level');
+        sel.innerHTML = '';
+
+        // Column Total (index 0) comes first, then individual levels from surface to top
+        const levels = data.levels.slice();
+        // Separate column total from individual levels
+        const colTotal = levels.filter(lv => lv.index === 0);
+        const individual = levels.filter(lv => lv.index > 0).reverse();
+        const ordered = [...colTotal, ...individual];
+        ordered.forEach((lv, i) => {
+            const opt = document.createElement('option');
+            opt.value = lv.index;
+            opt.textContent = lv.label;
+            if (i === 0) opt.selected = true;  // Column Total is default
+            sel.appendChild(opt);
+        });
+
+        document.getElementById('animation-panel').classList.add('active');
+        loadAnimationFrames();
+    } catch (e) {
+        console.error('Failed to load animation levels:', e);
+    }
+}
+
+async function loadAnimationFrames() {
+    const level = parseInt(document.getElementById('anim-level').value);
+    if (isNaN(level)) return;
+
+    document.getElementById('anim-status').textContent = 'Loading frames...';
+    animStop();
+
+    try {
+        const resp = await fetch('/api/animation-frames', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({level}),
+        });
+        const data = await resp.json();
+        if (data.error) { document.getElementById('anim-status').textContent = data.error; return; }
+        if (!data.n_frames || data.n_frames === 0) {
+            document.getElementById('anim-status').textContent = data.message || 'No data at this level';
+            return;
+        }
+
+        animFrames = data.frames;
+        animBounds = data.bounds;
+        animWidth = data.width;
+        animHeight = data.height;
+        animTimes = data.times_hours;
+        animMaxValue = data.max_value;
+        animUnits = data.units || '';
+        animIndex = 0;
+
+        const slider = document.getElementById('anim-slider');
+        slider.max = animFrames.length - 1;
+        slider.value = 0;
+
+        document.getElementById('anim-status').textContent =
+            `${animFrames.length} frames, ${data.level_label || 'Column Total'}, max=${data.max_value.toExponential(1)} Bq`;
+
+        // Clear any existing overlay — don't render until user presses play/step
+        if (animOverlay) { map.removeLayer(animOverlay); animOverlay = null; }
+        document.getElementById('anim-time').textContent = `H+${(animTimes[0] || 0).toFixed(0)}`;
+    } catch (e) {
+        document.getElementById('anim-status').textContent = 'Error: ' + e.message;
+    }
+}
+
+function renderAnimFrame(idx) {
+    if (idx < 0 || idx >= animFrames.length) return;
+    animIndex = idx;
+
+    // Decode base64 RGBA
+    const raw = atob(animFrames[idx]);
+    const rgba = new Uint8ClampedArray(raw.length);
+    for (let i = 0; i < raw.length; i++) rgba[i] = raw.charCodeAt(i);
+
+    // Draw raw data onto a tiny temp canvas
+    const tmpCanvas = document.createElement('canvas');
+    tmpCanvas.width = animWidth;
+    tmpCanvas.height = animHeight;
+    const tmpCtx = tmpCanvas.getContext('2d');
+    tmpCtx.putImageData(new ImageData(rgba, animWidth, animHeight), 0, 0);
+
+    // Upscale with smooth interpolation to eliminate blocky grid artifacts
+    const scale = Math.max(4, Math.ceil(800 / Math.max(animWidth, animHeight)));
+    if (!animCanvas) animCanvas = document.createElement('canvas');
+    animCanvas.width = animWidth * scale;
+    animCanvas.height = animHeight * scale;
+    const ctx = animCanvas.getContext('2d');
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.clearRect(0, 0, animCanvas.width, animCanvas.height);
+    ctx.drawImage(tmpCanvas, 0, 0, animCanvas.width, animCanvas.height);
+
+    // Create or update Leaflet overlay
+    const bounds = [[animBounds.lat_min, animBounds.lon_min], [animBounds.lat_max, animBounds.lon_max]];
+    const dataUrl = animCanvas.toDataURL();
+
+    if (animOverlay) {
+        animOverlay.setUrl(dataUrl);
+        animOverlay.setBounds(bounds);
+    } else {
+        animOverlay = L.imageOverlay(dataUrl, bounds, {opacity: 0.8, interactive: false}).addTo(map);
+    }
+
+    // Update UI
+    document.getElementById('anim-slider').value = idx;
+    const t = animTimes[idx];
+    document.getElementById('anim-time').textContent = t !== undefined ? `H+${t.toFixed(0)}` : `${idx+1}/${animFrames.length}`;
+}
+
+function animTogglePlay() {
+    if (animPlaying) { animStop(); } else { animPlay(); }
+}
+
+function animPlay() {
+    if (animFrames.length === 0) return;
+    animPlaying = true;
+    document.getElementById('anim-play-btn').innerHTML = '&#9646;&#9646;';
+    document.getElementById('anim-play-btn').classList.add('active');
+    animTimer = setInterval(() => {
+        animIndex = (animIndex + 1) % animFrames.length;
+        renderAnimFrame(animIndex);
+    }, 500);
+}
+
+function animStop() {
+    animPlaying = false;
+    if (animTimer) { clearInterval(animTimer); animTimer = null; }
+    document.getElementById('anim-play-btn').innerHTML = '&#9654;';
+    document.getElementById('anim-play-btn').classList.remove('active');
+}
+
+function animStepForward() {
+    animStop();
+    if (animFrames.length === 0) return;
+    renderAnimFrame((animIndex + 1) % animFrames.length);
+}
+
+function animStepBack() {
+    animStop();
+    if (animFrames.length === 0) return;
+    renderAnimFrame((animIndex - 1 + animFrames.length) % animFrames.length);
+}
+
+function animSeek(val) {
+    renderAnimFrame(parseInt(val));
+}
+
+/**
+ * Colormap matching the server-side conc_to_rgba: blue → cyan → green → yellow → red.
+ * t in [0,1], returns [r, g, b] in 0–255.
+ */
+function concColormap(t) {
+    let r, g, b;
+    if (t < 0.25)      { r = 0;              g = t / 0.25;              b = 1; }
+    else if (t < 0.5)  { r = 0;              g = 1;                     b = 1 - (t - 0.25) / 0.25; }
+    else if (t < 0.75) { r = (t - 0.5)/0.25; g = 1;                     b = 0; }
+    else               { r = 1;              g = 1 - (t - 0.75) / 0.25; b = 0; }
+    return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)];
+}
+
+/** Format a value in compact scientific notation for legend labels. */
+function sciLabel(val) {
+    if (val >= 1) return val.toPrecision(2);
+    const e = Math.floor(Math.log10(val));
+    const m = val / Math.pow(10, e);
+    return m.toFixed(1) + 'e' + e;
+}
+
+/**
+ * Capture the current map view (tiles + overlay) as a canvas,
+ * with a colorbar legend appended on the right.
+ */
+function captureMapCanvas() {
+    const container = document.getElementById('map');
+    const rect = container.getBoundingClientRect();
+    const mapW = Math.round(rect.width);
+    const mapH = Math.round(rect.height);
+
+    // Legend dimensions
+    const cbW = Math.max(20, Math.round(mapH * 0.025));
+    const gap = Math.max(6, Math.round(mapH * 0.008));
+    const labelMargin = Math.max(80, Math.round(mapH * 0.1));
+    const totalW = mapW + gap + cbW + gap + labelMargin;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = totalW;
+    canvas.height = mapH;
+    const ctx = canvas.getContext('2d');
+
+    // White background for legend area
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(0, 0, totalW, mapH);
+
+    // Draw tile images
+    const tiles = container.querySelectorAll('.leaflet-tile-loaded');
+    tiles.forEach(tile => {
+        try {
+            const tileRect = tile.getBoundingClientRect();
+            ctx.drawImage(tile,
+                tileRect.left - rect.left, tileRect.top - rect.top,
+                tileRect.width, tileRect.height);
+        } catch (e) { /* CORS tile — skip */ }
+    });
+
+    // Draw concentration overlay
+    if (animOverlay && animOverlay._image) {
+        const img = animOverlay._image;
+        const imgRect = img.getBoundingClientRect();
+        ctx.globalAlpha = 0.8;
+        ctx.drawImage(img,
+            imgRect.left - rect.left, imgRect.top - rect.top,
+            imgRect.width, imgRect.height);
+        ctx.globalAlpha = 1.0;
+    }
+
+    // Draw release marker (same red star as the map marker)
+    const markerLatLng = marker.getLatLng();
+    const pt = map.latLngToContainerPoint(markerLatLng);
+    if (pt.x >= -12 && pt.x <= mapW + 12 && pt.y >= -12 && pt.y <= mapH + 12) {
+        const s = Math.max(1, Math.round(mapH * 0.02)) / 12; // scale factor (star is 24x24, centered at 12,12)
+        const starPts = [[12,2],[15,9],[22,9],[16,14],[18,22],[12,17],[6,22],[8,14],[2,9],[9,9]];
+        ctx.beginPath();
+        starPts.forEach(([sx, sy], i) => {
+            const x = pt.x + (sx - 12) * s;
+            const y = pt.y + (sy - 12) * s;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        });
+        ctx.closePath();
+        ctx.fillStyle = '#c00';
+        ctx.strokeStyle = '#800';
+        ctx.lineWidth = s;
+        ctx.fill();
+        ctx.stroke();
+    }
+
+    // Draw timestamp + level label (top-left, outlined)
+    const t = animTimes[animIndex];
+    const timeStr = t !== undefined ? `H+${t.toFixed(0)}h` : '';
+    const levelSel = document.getElementById('anim-level');
+    const levelStr = levelSel.options[levelSel.selectedIndex].textContent;
+    const fs = Math.max(16, Math.round(mapH * 0.025));
+    ctx.font = `bold ${fs}px sans-serif`;
+    ctx.lineWidth = Math.max(2, fs * 0.15);
+    ctx.strokeStyle = 'black';
+    ctx.fillStyle = 'white';
+    const pad = Math.max(8, Math.round(mapH * 0.01));
+    if (timeStr) {
+        ctx.strokeText(timeStr, pad, pad + fs);
+        ctx.fillText(timeStr, pad, pad + fs);
+    }
+    const fs2 = Math.max(12, Math.round(mapH * 0.018));
+    ctx.font = `bold ${fs2}px sans-serif`;
+    ctx.lineWidth = Math.max(1, fs2 * 0.12);
+    ctx.strokeText(levelStr, pad, pad + fs + fs2 + 4);
+    ctx.fillText(levelStr, pad, pad + fs + fs2 + 4);
+
+    // --- Colorbar legend (right side) ---
+    const cbX = mapW + gap;
+    const cbTop = Math.round(mapH * 0.08);
+    const cbBot = Math.round(mapH * 0.92);
+    const cbH = cbBot - cbTop;
+
+    // Draw gradient bar
+    for (let row = 0; row < cbH; row++) {
+        const t = 1.0 - row / (cbH - 1);  // top = high
+        const [r, g, b] = concColormap(t);
+        ctx.fillStyle = `rgb(${r},${g},${b})`;
+        ctx.fillRect(cbX, cbTop + row, cbW, 1);
+    }
+    // Border
+    ctx.strokeStyle = '#333';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(cbX, cbTop, cbW, cbH);
+
+    // Labels
+    const logMax = Math.log10(animMaxValue);
+    const logMin = logMax - 5;
+    const fsLbl = Math.max(11, Math.round(mapH * 0.016));
+    ctx.font = `${fsLbl}px sans-serif`;
+    ctx.fillStyle = '#222';
+    ctx.textBaseline = 'middle';
+    const lblX = cbX + cbW + gap;
+
+    // 5 tick labels (top to bottom: max, 10^-1, 10^-2, 10^-3, 10^-4, min)
+    const nTicks = 6;
+    for (let i = 0; i < nTicks; i++) {
+        const frac = i / (nTicks - 1);
+        const logVal = logMax - frac * 5;
+        const y = cbTop + frac * cbH;
+        ctx.fillText(sciLabel(Math.pow(10, logVal)), lblX, y);
+        // Tick mark
+        ctx.beginPath();
+        ctx.moveTo(cbX + cbW, y);
+        ctx.lineTo(cbX + cbW + 3, y);
+        ctx.strokeStyle = '#333';
+        ctx.stroke();
+    }
+
+    // Units label (centered on colorbar)
+    const fsUnit = Math.max(12, Math.round(mapH * 0.018));
+    ctx.font = `bold ${fsUnit}px sans-serif`;
+    ctx.fillStyle = '#222';
+    ctx.textBaseline = 'top';
+    ctx.fillText(animUnits, lblX, cbBot + 8);
+
+    return canvas;
+}
+
+/** Convert a canvas to a PNG base64 string (without the data:image/png;base64, prefix). */
+function canvasToBase64(canvas) {
+    return canvas.toDataURL('image/png').split(',')[1];
+}
+
+async function exportAnimation() {
+    const format = document.getElementById('anim-format').value;
+    const fps = parseInt(document.getElementById('anim-fps').value);
+    const btn = document.getElementById('btn-anim-export');
+
+    if (animFrames.length === 0) {
+        document.getElementById('anim-status').textContent = 'No animation frames loaded';
+        return;
+    }
+
+    btn.disabled = true;
+    const wasPlaying = animPlaying;
+    animStop();
+    const savedIndex = animIndex;
+
+    try {
+        // Capture each frame from the browser's own rendering
+        const framePngs = [];
+        for (let i = 0; i < animFrames.length; i++) {
+            btn.textContent = `Capturing ${i+1}/${animFrames.length}...`;
+            document.getElementById('anim-status').textContent =
+                `Capturing frame ${i+1} of ${animFrames.length}...`;
+            renderAnimFrame(i);
+            // Wait for overlay image to update
+            await new Promise(r => setTimeout(r, 80));
+            framePngs.push(canvasToBase64(captureMapCanvas()));
+        }
+
+        // Restore the frame the user was viewing
+        renderAnimFrame(savedIndex);
+
+        btn.textContent = `Stitching ${format.toUpperCase()}...`;
+        document.getElementById('anim-status').textContent =
+            `Sending ${framePngs.length} frames to server for ${format.toUpperCase()} encoding...`;
+
+        const resp = await fetch('/api/stitch-frames', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({frames: framePngs, fps, format}),
+        });
+        if (!resp.ok) {
+            const err = await resp.json();
+            throw new Error(err.error || 'Export failed');
+        }
+        const blob = await resp.blob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const mode = getSelectedMode();
+        const date = document.getElementById('inp-date').value.replace(/-/g, '');
+        const dur = document.getElementById('inp-duration').value;
+        a.download = `${mode}_${date}_${dur}h.${format}`;
+        a.click();
+        URL.revokeObjectURL(url);
+        document.getElementById('anim-status').textContent = `${format.toUpperCase()} downloaded`;
+    } catch (e) {
+        document.getElementById('anim-status').textContent = 'Export error: ' + e.message;
+        renderAnimFrame(savedIndex);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Download';
+        if (wasPlaying) animPlay();
+    }
 }
 </script>
 </body>
