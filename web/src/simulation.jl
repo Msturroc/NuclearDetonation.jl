@@ -123,7 +123,7 @@ end
 const DATASET_CONFIGS = Dict{String,NamedTuple{(:files_fn, :cache_start, :cache_end, :label),
                              Tuple{Function, Int, Int, String}}}(
     "nancy" => (files_fn=nancy_era5_files, cache_start=5, cache_end=11, label="Nancy (NTS)"),
-    "etex"  => (files_fn=etex_era5_files,  cache_start=5, cache_end=24, label="ETEX (Europe)"),
+    "etex"  => (files_fn=etex_era5_files,  cache_start=5, cache_end=19, label="ETEX (Europe)"),
 )
 
 function preload_era5!(; dataset::String="nancy", progress_callback=nothing)
@@ -298,10 +298,17 @@ function run_dispersion_simulation(;
         psc = ParticleSizeConfig(size_bins=[particle_prop],
             particle_radii=npp_radii, particle_densities=npp_densities,
             particle_size_indices=npp_size_indices)
-        hanna = HannaTurbulenceConfig{Float64}(use_cbl=true)
+        # Use ETEX-calibrated transport parameters for point source releases
+        etex = etex_optimised_config()
+        ep = etex.physics_scales
+        hanna = HannaTurbulenceConfig{Float64}(
+            sigma_scale=ep.sigma_h_scale, sigma_scale_vertical=ep.sigma_w_scale,
+            tl_scale=ep.tl_scale, use_cbl=true)
         dep = Transport.DepositionConfig{Float64}(
             apply_dry_deposition=true, apply_wet_deposition=false,
-            use_simple_deposition=true, simple_deposition_velocity=0.002)
+            use_simple_deposition=true, simple_deposition_velocity=0.002,
+            mixing_height=1000.0 * ep.mixing_height_scale,
+            surface_roughness=0.1 * ep.roughness_scale)
 
         num_cfg = ERA5NumericalConfig{Float64}(
             interpolation_order=Transport.LinearInterp, ode_solver_type=:Euler,
@@ -314,7 +321,8 @@ function run_dispersion_simulation(;
             saveat=[Float64(h) * 3600.0 for h in 0:duration_hours],
             verbose=false, max_duration=Float64(duration_hours) * 3600.0,
             save_snapshots=true, dt_particle=300.0, use_reference_stepping=true,
-            max_files=length(era5.files), output_config=out_cfg)
+            max_files=length(era5.files), omega_scale=ep.omega_scale,
+            output_config=out_cfg)
 
         snapshots = Transport.run_simulation!(state, era5.files,
             particle_size_config=psc, deposition_config=dep,

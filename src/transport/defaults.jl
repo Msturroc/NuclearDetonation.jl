@@ -2,7 +2,7 @@
 # Best-fit parameters from BIPOP-CMA-ES optimisation against Nancy observations
 # Current best OU score: 76.8% combined (FMS=0.370, Shape=0.860, Extent=1.0, TOA=1.0)
 
-export nancy_optimised_config
+export nancy_optimised_config, etex_optimised_config
 
 """
     nancy_optimised_config()
@@ -81,5 +81,72 @@ function nancy_optimised_config()
         layer_fractions = layer_fractions,
         physics_scales = physics_scales,
         activity_Bq = 48.418e15,
+    )
+end
+
+"""
+    etex_optimised_config()
+
+Return optimised transport/turbulence parameters calibrated against the ETEX-1
+European Tracer Experiment (340 kg PMCH gas release, Monterfil France, Oct 1994,
+168 stations across Europe).
+
+These parameters are appropriate for point source / continuous releases in
+European-scale dispersion modelling. ETEX is an inert gas tracer, so no particle
+size distribution or gravitational settling parameters are included.
+
+Parameters were obtained via CMA-ES optimisation (FMS = 0.572, 400 evaluations)
+using gridded Figure of Merit in Space scoring against observed PMCH concentrations.
+
+# Returns
+- `NamedTuple` with fields:
+  - `hanna_config::HannaTurbulenceConfig` — turbulence configuration
+  - `physics_scales` — NamedTuple of scaling factors for transport parameters
+
+# Example
+```julia
+params = etex_optimised_config()
+p = params.physics_scales
+hanna = HannaTurbulenceConfig(
+    sigma_scale = p.sigma_h_scale,
+    sigma_scale_vertical = p.sigma_w_scale,
+    tl_scale = p.tl_scale,
+    use_cbl = true,
+)
+dep = DepositionConfig(
+    simple_deposition_velocity = 0.002,
+    mixing_height = 1000.0 * p.mixing_height_scale,
+    surface_roughness = 0.1 * p.roughness_scale,
+)
+sim_cfg = SimulationConfig(omega_scale = p.omega_scale)
+```
+"""
+function etex_optimised_config()
+    hanna_config = HannaTurbulenceConfig(
+        apply_turbulence = true,
+        use_cbl = true,
+        use_simple_convection = false,
+        use_dynamic_L = false,
+    )
+
+    # Transport scaling factors from CMA-ES optimisation against ETEX-1 (FMS = 0.572)
+    # Key differences from Nancy/NTS bomb calibration:
+    #   - Much lower vertical diffusivity (gas tracer, no mushroom cloud)
+    #   - Lower omega_scale (less vertical velocity amplification)
+    #   - Much higher horizontal BL diffusion and Lagrangian timescale
+    physics_scales = (
+        sigma_w_scale = 0.2021,             # Vertical diffusivity (Nancy: 4.028)
+        sigma_h_scale = 7.6081,             # Horizontal diffusivity (Nancy: 2.220)
+        h_diff_scale = 36.909,              # Horizontal diffusion in BL (Nancy: 0.2055)
+        tl_scale = 42.369,                  # Lagrangian timescale (Nancy: 4.458)
+        omega_scale = 0.8155,               # Vertical velocity (Nancy: 2.557)
+        mixing_height_scale = 8.0,          # BL mixing height (Nancy: 4.105)
+        tmix_scale = 6.0215,               # Mixing timescale (Nancy: 1.290)
+        roughness_scale = 4.4314,           # Surface roughness (Nancy: 1.174)
+    )
+
+    return (
+        hanna_config = hanna_config,
+        physics_scales = physics_scales,
     )
 end

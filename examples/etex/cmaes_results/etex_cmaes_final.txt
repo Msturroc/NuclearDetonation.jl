@@ -1,0 +1,15 @@
+# ETEX-1 CMA-ES final results
+# Score: 0.4782
+# Evals: 400, Generations: 40
+# Parameters: sigma_w_scale, sigma_h_scale, h_diff_scale, tl_scale, omega_scale, mixing_height_scale, tmix_scale, roughness_scale
+0.1, 9.919112, 25.659258, 34.439577, 1.999294, 0.1, 1.234457, 6.103562
+
+# Comparison with Nancy/Smoky mean:
+#   sigma_w_scale             ETEX=0.100  Nancy/Smoky=4.420  ratio=0.02
+#   sigma_h_scale             ETEX=9.919  Nancy/Smoky=2.600  ratio=3.82
+#   h_diff_scale              ETEX=25.659  Nancy/Smoky=0.720  ratio=35.64
+#   tl_scale                  ETEX=34.440  Nancy/Smoky=3.260  ratio=10.56
+#   omega_scale               ETEX=1.999  Nancy/Smoky=2.490  ratio=0.80
+#   mixing_height_scale       ETEX=0.100  Nancy/Smoky=4.260  ratio=0.02
+#   tmix_scale                ETEX=1.234  Nancy/Smoky=1.020  ratio=1.21
+#   roughness_scale           ETEX=6.104  Nancy/Smoky=2.380  ratio=2.56

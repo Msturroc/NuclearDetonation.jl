@@ -88,6 +88,8 @@ function handle_request(req::HTTP.Request)
             return api_animation_export(req, "mp4")
         elseif path == "/api/stitch-frames" && method == "POST"
             return api_stitch_frames(req)
+        elseif path == "/api/observations" && method == "GET"
+            return api_observations()
         end
 
         return HTTP.Response(404, cors_headers(), "Not found: $path")
@@ -506,6 +508,138 @@ function api_stitch_frames(req::HTTP.Request)
         headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
         return HTTP.Response(500, headers, body)
     end
+end
+
+# --- Observation data overlays ---
+
+function api_observations()
+    dataset = ACTIVE_DATASET[]
+    try
+        if dataset == "etex"
+            data = _load_etex_observations()
+        elseif dataset == "nancy"
+            data = _load_nancy_observations_geojson()
+        else
+            return HTTP.Response(404, cors_headers(), "No observations for dataset: $dataset")
+        end
+        body = JSON3.write(data)
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
+end
+
+function _load_etex_observations()
+    meas_file = joinpath(pkgdir(NuclearDetonation), "data", "etex", "meas-t1.txt")
+    # Parse station data: compute TIC per station
+    stations = Dict{Int, @NamedTuple{lat::Float64, lon::Float64, tic::Float64}}()
+    for line in readlines(meas_file)[3:end]
+        parts = split(strip(line))
+        length(parts) >= 9 || continue
+        lat = parse(Float64, parts[6])
+        lon = parse(Float64, parts[7])
+        conc = parse(Float64, parts[8])
+        stn = parse(Int, parts[9])
+        dur_min = parse(Int, parts[5])
+        dur_hours = dur_min / 100  # format HHMM
+        conc >= 0.0 || continue
+        if haskey(stations, stn)
+            s = stations[stn]
+            stations[stn] = (lat=lat, lon=lon, tic=s.tic + conc * dur_hours)
+        else
+            stations[stn] = (lat=lat, lon=lon, tic=conc * dur_hours)
+        end
+    end
+
+    # Grid TIC onto a coarse lat/lon grid and generate contours
+    grid_res = 1.5  # degrees
+    lon_range = range(-10.0, 30.0, step=grid_res)
+    lat_range = range(40.0, 62.0, step=grid_res)
+    nx, ny = length(lon_range), length(lat_range)
+    tic_grid = zeros(nx, ny)
+    counts = zeros(Int, nx, ny)
+    for (_, s) in stations
+        s.tic > 0 || continue
+        i = round(Int, (s.lon - first(lon_range)) / grid_res) + 1
+        j = round(Int, (s.lat - first(lat_range)) / grid_res) + 1
+        if 1 <= i <= nx && 1 <= j <= ny
+            tic_grid[i, j] += s.tic
+            counts[i, j] += 1
+        end
+    end
+    for k in eachindex(tic_grid)
+        counts[k] > 0 && (tic_grid[k] /= counts[k])
+    end
+
+    # Smooth with simple 3×3 averaging for nicer contours
+    smoothed = copy(tic_grid)
+    for j in 2:ny-1, i in 2:nx-1
+        smoothed[i,j] = (tic_grid[i-1,j-1] + tic_grid[i,j-1] + tic_grid[i+1,j-1] +
+                          tic_grid[i-1,j]   + tic_grid[i,j]   + tic_grid[i+1,j] +
+                          tic_grid[i-1,j+1] + tic_grid[i,j+1] + tic_grid[i+1,j+1]) / 9.0
+    end
+
+    # Upsample for smoother contours
+    up_grid = _upsample_grid(smoothed, 4)
+    up_lon = range(first(lon_range), last(lon_range), length=size(up_grid, 1))
+    up_lat = range(first(lat_range), last(lat_range), length=size(up_grid, 2))
+
+    # Contour levels spanning observed TIC range
+    levels = [100.0, 500.0, 2000.0, 5000.0, 10000.0]
+    colors = ["#3288bd", "#66c2a5", "#fee08b", "#f46d43", "#d53e4f"]
+    labels = ["100 ng·h/m³", "500 ng·h/m³", "2000 ng·h/m³", "5000 ng·h/m³", "10000 ng·h/m³"]
+
+    cl = Contour.contours(collect(up_lon), collect(up_lat), up_grid, levels)
+    features = Dict{String,Any}[]
+    for level_obj in Contour.levels(cl)
+        level_val = Contour.level(level_obj)
+        ci = findfirst(l -> abs(l - level_val) / max(l, 1e-10) < 0.01, levels)
+        isnothing(ci) && continue
+        for line in Contour.lines(level_obj)
+            xs, ys = Contour.coordinates(line)
+            coords = [[round(x, digits=4), round(y, digits=4)] for (x, y) in zip(xs, ys)]
+            length(coords) < 2 && continue
+            coords = _chaikin_smooth(coords, 2)
+            push!(features, Dict{String,Any}(
+                "type" => "Feature",
+                "geometry" => Dict{String,Any}("type" => "LineString", "coordinates" => coords),
+                "properties" => Dict{String,Any}(
+                    "level" => level_val, "label" => labels[ci], "color" => colors[ci]),
+            ))
+        end
+    end
+
+    geojson = Dict{String,Any}("type" => "FeatureCollection", "features" => features)
+    return Dict("type" => "etex", "geojson" => geojson)
+end
+
+function _load_nancy_observations_geojson()
+    obs = Transport.load_nancy_observations()
+    # Convert dose rate contours to GeoJSON features
+    features = []
+    # Dose rate colors (matching typical fallout contour palette)
+    colors = Dict(0.4 => "#3288bd", 1.0 => "#66c2a5", 4.0 => "#abdda4",
+                  10.0 => "#fee08b", 40.0 => "#f46d43", 100.0 => "#d53e4f")
+    for c in obs.dose_rate_contours
+        for poly_coords in c.polygons
+            coords = [[pt[2], pt[1]] for pt in poly_coords]  # (lat,lon) → [lon,lat] for GeoJSON
+            feature = Dict(
+                "type" => "Feature",
+                "geometry" => Dict("type" => "Polygon", "coordinates" => [coords]),
+                "properties" => Dict("dose_rate" => c.dose_rate_mR_hr,
+                    "label" => "$(c.dose_rate_mR_hr) mR/h",
+                    "color" => get(colors, c.dose_rate_mR_hr, "#999")),
+            )
+            push!(features, feature)
+        end
+    end
+    geojson = Dict("type" => "FeatureCollection", "features" => features)
+    return Dict("type" => "nancy", "geojson" => geojson,
+                "detonation_lat" => obs.detonation_lat,
+                "detonation_lon" => obs.detonation_lon)
 end
 
 # --- Server start ---

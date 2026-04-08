@@ -1,0 +1,3 @@
+# ETEX CMA-ES best parameters (gen 40, score 0.4782)
+# sigma_w_scale, sigma_h_scale, h_diff_scale, tl_scale, omega_scale, mixing_height_scale, tmix_scale, roughness_scale
+0.1, 9.919112, 25.659258, 34.439577, 1.999294, 0.1, 1.234457, 6.103562
