@@ -17,6 +17,14 @@ NuclearDetonation.jl is a Julia package for modelling nuclear weapon effects and
   <img src="examples/nancy_bomb_release.png" width="50%" alt="Model-predicted dose rate contours at H+12 for the Nancy nuclear test"/>
 </p>
 
+### Web GUI
+
+An interactive web interface built with React and Leaflet lets you configure and run simulations in the browser. Start it with `julia --threads=2 --project=web web/app.jl`.
+
+<p align="center">
+  <img src="docs/web_gui_screenshot.png" width="100%" alt="Web GUI showing Nancy test fallout dispersion with dose rate contours"/>
+</p>
+
 ## Features
 
 ### Atmospheric transport
