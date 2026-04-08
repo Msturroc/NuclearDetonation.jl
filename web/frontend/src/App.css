@@ -1,0 +1,141 @@
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; height: 100vh; }
+#root { height: 100vh; }
+
+.app { display: flex; height: 100%; background: #f5f5f5; }
+
+/* Left panel */
+.panel {
+  width: 360px; min-width: 360px; padding: 20px; overflow-y: auto;
+  background: #fff; border-right: 1px solid #ddd; display: flex; flex-direction: column; gap: 16px;
+}
+.panel h1 { font-size: 18px; color: #333; line-height: 1.3; }
+.panel h1 small { display: block; font-weight: normal; font-size: 12px; color: #888; margin-top: 2px; }
+
+.form-group { display: flex; flex-direction: column; gap: 4px; }
+.form-group label { font-size: 12px; font-weight: 600; color: #555; text-transform: uppercase; letter-spacing: 0.5px; }
+.form-group input, .form-group select {
+  padding: 8px 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 14px; min-width: 0; width: 100%; box-sizing: border-box;
+}
+.form-group input:focus, .form-group select:focus { outline: none; border-color: #4A90D9; box-shadow: 0 0 0 2px rgba(74,144,217,0.2); }
+.form-row { display: flex; gap: 10px; }
+.form-row .form-group { flex: 1; min-width: 0; }
+
+.note {
+  font-size: 11px; color: #888; background: #f9f9f9; padding: 8px; border-radius: 4px;
+  border-left: 3px solid #ddd; line-height: 1.4;
+}
+
+.btn-run {
+  padding: 12px; font-size: 15px; font-weight: 600; border: none; border-radius: 6px;
+  cursor: pointer; transition: all 0.2s;
+  background: #4A90D9; color: #fff; width: 100%;
+}
+.btn-run:hover { background: #357ABD; }
+.btn-run:disabled { background: #aaa; cursor: not-allowed; }
+
+/* Mode toggle */
+.mode-toggle { display: flex; gap: 0; border: 1px solid #ccc; border-radius: 6px; overflow: hidden; }
+.mode-toggle input[type="radio"] { display: none; }
+.mode-toggle label {
+  flex: 1; padding: 8px 12px; text-align: center; font-size: 13px; font-weight: 600;
+  cursor: pointer; background: #f5f5f5; color: #555; transition: all 0.2s;
+}
+.mode-toggle input[type="radio"]:checked + label { background: #4A90D9; color: #fff; }
+
+/* Progress */
+.progress-bar-track {
+  height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 4px;
+}
+.progress-bar {
+  height: 100%; background: #4A90D9; border-radius: 4px; transition: width 0.3s;
+}
+.progress-msg { font-size: 12px; color: #666; margin-top: 4px; }
+
+/* Results */
+.stat { font-size: 14px; color: #333; margin-bottom: 4px; }
+.stat strong { color: #c00; }
+
+.btn-secondary {
+  padding: 8px 12px; font-size: 13px; border: 1px solid #4A90D9;
+  background: #fff; color: #4A90D9; border-radius: 4px; cursor: pointer;
+}
+.btn-secondary:hover { background: #f0f6ff; }
+.btn-secondary.active { background: #4A90D9; color: #fff; }
+
+.btn-obs {
+  padding: 8px 12px; font-size: 13px; border: 1px solid #e67e22;
+  background: #fff; color: #e67e22; border-radius: 4px; cursor: pointer;
+}
+.btn-obs:hover { background: #fef5ec; }
+.btn-obs.active { background: #e67e22; color: #fff; }
+
+.btn-new-sim {
+  width: 100%; padding: 8px 12px; font-size: 13px; font-weight: 600;
+  border: 1px solid #888; background: #fff; color: #555; border-radius: 4px; cursor: pointer;
+  margin-bottom: 4px;
+}
+
+.error-box {
+  padding: 10px; background: #ffeaea; border: 1px solid #c00; border-radius: 4px; color: #900; font-size: 13px;
+}
+
+/* ARL section */
+.arl-path-row { display: flex; gap: 6px; }
+.arl-path-row input { flex: 1; font-size: 12px; padding: 6px 8px; }
+.btn-load-arl {
+  padding: 6px 12px; font-size: 12px; font-weight: 600; border: 1px solid #4A90D9;
+  background: #fff; color: #4A90D9; border-radius: 4px; cursor: pointer; white-space: nowrap;
+}
+.btn-load-arl:hover { background: #f0f6ff; }
+.btn-load-arl:disabled { border-color: #aaa; color: #aaa; cursor: not-allowed; }
+.arl-status {
+  font-size: 11px; color: #666; padding: 6px 8px; background: #f0f8ff;
+  border-radius: 4px; border-left: 3px solid #4A90D9;
+}
+.arl-status.error { background: #fff0f0; border-left-color: #c00; color: #900; }
+
+/* Animation panel */
+.animation-panel h3 { font-size: 12px; color: #555; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+.anim-controls { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }
+.anim-controls button {
+  padding: 4px 8px; font-size: 14px; border: 1px solid #ccc; border-radius: 4px;
+  background: #fff; cursor: pointer; min-width: 32px;
+}
+.anim-controls button:hover { background: #f0f6ff; }
+.anim-controls button.active { background: #4A90D9; color: #fff; border-color: #4A90D9; }
+.anim-time { font-size: 12px; color: #555; flex: 1; text-align: right; }
+.anim-slider { width: 100%; margin: 4px 0; }
+.anim-row-export { display: flex; gap: 6px; margin-top: 6px; }
+.anim-row-export select, .anim-row-export button {
+  padding: 4px 8px; font-size: 12px; border: 1px solid #ccc; border-radius: 4px;
+}
+.anim-row-export button {
+  background: #fff; color: #4A90D9; border-color: #4A90D9; cursor: pointer; font-weight: 600;
+}
+.anim-row-export button:hover { background: #f0f6ff; }
+.anim-row-export button:disabled { border-color: #aaa; color: #aaa; cursor: not-allowed; }
+.anim-status { font-size: 11px; color: #666; margin-top: 4px; }
+
+/* Legend */
+.legend { margin-top: auto; padding-top: 12px; border-top: 1px solid #eee; }
+.legend h3 { font-size: 12px; color: #555; margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+.legend-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: #444; margin-bottom: 3px; }
+.legend-swatch { width: 24px; height: 4px; border-radius: 2px; }
+
+/* Map */
+.map-container { flex: 1; position: relative; }
+.map-hint {
+  position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 1000;
+  background: rgba(0,0,0,0.7); color: #fff; padding: 8px 16px; border-radius: 20px;
+  font-size: 13px; pointer-events: none; transition: opacity 0.5s;
+}
+.map-hint.hidden { opacity: 0; }
+
+/* NPP markers */
+.npp-marker {
+  background: none; border: none;
+  font-size: 18px; line-height: 1; text-align: center;
+  cursor: pointer; filter: drop-shadow(0 1px 2px rgba(0,0,0,0.5));
+}
+.npp-marker:hover { transform: scale(1.3); }

@@ -52,11 +52,25 @@ function handle_request(req::HTTP.Request)
     method == "OPTIONS" && return HTTP.Response(204, cors_headers())
 
     try
-        # Static files
+        # Static files — serve from React build (public_react/) if it exists,
+        # otherwise fall back to vanilla public/
+        react_dir = joinpath(WEB_DIR, "public_react")
+        use_react = isdir(react_dir)
+        static_dir = use_react ? "public_react" : "public"
+
         if path == "/" || path == ""
-            return serve_file("public/index.html")
+            return serve_file("$(static_dir)/index.html")
         elseif startswith(path, "/public/")
             return serve_file(path[2:end])  # strip leading /
+        elseif use_react && startswith(path, "/assets/")
+            return serve_file("public_react" * path)
+        elseif use_react
+            # SPA fallback: try the file, then serve index.html
+            trypath = "public_react" * path
+            fullpath = joinpath(WEB_DIR, trypath)
+            if isfile(fullpath)
+                return serve_file(trypath)
+            end
         end
 
         # API endpoints
