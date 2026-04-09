@@ -2,6 +2,7 @@ import { useState, useCallback } from 'react';
 import { formatValue, getUnitInfo, BOMB_BASE_LEVELS, BOMB_COLORS, NPP_BASE_LEVELS, NPP_COLORS, DOSE_UNITS } from '../constants';
 import { loadARLFromPath, uploadARLFiles } from '../api';
 import AnimationPanel from './AnimationPanel';
+import HistoryPanel from './HistoryPanel';
 
 export default function ControlPanel({
   dataset, onDatasetChange, datasetLoading,
@@ -28,6 +29,7 @@ export default function ControlPanel({
   era5Bounds,
   onDateMinChange, onDateMaxChange, onMapZoomChange,
   animData, onAnimDataChange,
+  onLoadHistoryRun,
 }) {
   const [arlPath, setArlPath] = useState('');
   const [arlStatus, setArlStatus] = useState(null);
@@ -318,8 +320,8 @@ export default function ControlPanel({
         </div>
       )}
 
-      {/* Animation panel */}
-      {results && (
+      {/* Animation panel - only for fresh runs, not cached/history loads */}
+      {results && !results.fromCache && (
         <AnimationPanel
           animData={animData}
           onAnimDataChange={onAnimDataChange}
@@ -366,6 +368,9 @@ export default function ControlPanel({
           </div>
         </div>
       )}
+
+      {/* Simulation history */}
+      <HistoryPanel onLoadRun={onLoadHistoryRun} />
     </div>
   );
 }

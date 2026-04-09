@@ -157,7 +157,27 @@ export default function App() {
     }
 
     try {
-      await startSimulation(params);
+      const simResponse = await startSimulation(params);
+
+      // If server returned cached results, load them immediately
+      if (simResponse.status === 'cached') {
+        const s = await fetchStatus();
+        setSimRunning(false);
+        setProgressPct(100);
+        setProgressMsg(s.progress_msg || 'Loaded from cache');
+        const units = s.units || 'mSv/h';
+        setBaseUnits(units);
+        setResults({
+          maxDose: s.max_dose,
+          nEvents: s.n_events,
+          fromCache: true,
+        });
+        if (s.geojson) {
+          setGeojson(JSON.parse(s.geojson));
+        }
+        return;
+      }
+
       pollTimerRef.current = setInterval(async () => {
         try {
           const s = await fetchStatus();
@@ -198,6 +218,41 @@ export default function App() {
   }, [lat, lon, startDate, startHour, duration, particles, releaseMode,
       weatherSource, yieldKt, activityTbq, stackHeight, isotope,
       releaseDuration, arlMetadata]);
+
+  // Load a past run from history
+  const handleLoadHistoryRun = useCallback(async (data) => {
+    // Update form to match the loaded run's parameters
+    if (data.latitude != null) setLat(data.latitude);
+    if (data.longitude != null) setLon(data.longitude);
+    if (data.release_mode) setReleaseMode(data.release_mode);
+    if (data.yield_kt != null) setYieldKt(data.yield_kt);
+    if (data.start_date) setStartDate(data.start_date);
+    if (data.start_hour != null) setStartHour(data.start_hour);
+    if (data.duration_hours != null) setDuration(data.duration_hours);
+    if (data.n_particles != null) setParticles(data.n_particles);
+
+    // Fetch the status (which now has the loaded results)
+    try {
+      const s = await fetchStatus();
+      setSimRunning(false);
+      setError(null);
+      setAnimData(null);
+      setShowContours(false);
+      setShowObs(false);
+      const units = s.units || 'mSv/h';
+      setBaseUnits(units);
+      setResults({
+        maxDose: s.max_dose,
+        nEvents: s.n_events,
+        fromCache: true,
+      });
+      if (s.geojson) {
+        setGeojson(JSON.parse(s.geojson));
+      }
+    } catch (e) {
+      setError('Failed to load run: ' + e.message);
+    }
+  }, []);
 
   // Map click handler
   const handleMapClick = useCallback((clickLat, clickLon) => {
@@ -270,6 +325,7 @@ export default function App() {
         onMapZoomChange={setMapZoom}
         animData={animData}
         onAnimDataChange={setAnimData}
+        onLoadHistoryRun={handleLoadHistoryRun}
       />
       <MapView
         lat={lat}

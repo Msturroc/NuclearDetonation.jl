@@ -30,7 +30,15 @@ include(joinpath(@__DIR__, "src", "arl_converter.jl"))
 include(joinpath(@__DIR__, "src", "simulation.jl"))
 include(joinpath(@__DIR__, "src", "contours.jl"))
 include(joinpath(@__DIR__, "src", "animation.jl"))
+include(joinpath(@__DIR__, "src", "database.jl"))
 include(joinpath(@__DIR__, "src", "server.jl"))
+
+println("Connecting to PostgreSQL...")
+try
+    db_init()
+catch e
+    @warn "PostgreSQL unavailable — simulation history will not be recorded" exception=e
+end
 
 println("Pre-loading ERA5 meteorological data...")
 preload_era5!(progress_callback = (pct, msg) -> println("  [$pct%] $msg"))

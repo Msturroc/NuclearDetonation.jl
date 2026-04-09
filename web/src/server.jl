@@ -17,9 +17,10 @@ mutable struct AppStatus
     n_events::Int
     csv_data::String
     units::String
+    db_run_id::Union{Int, Nothing}  # current run's database ID
 end
 
-const APP = Ref(AppStatus(false, 0, "", "", "", 0.0, 0, "", "mSv/h"))
+const APP = Ref(AppStatus(false, 0, "", "", "", 0.0, 0, "", "mSv/h", nothing))
 
 const WEB_DIR = dirname(@__DIR__)  # web/
 
@@ -104,6 +105,14 @@ function handle_request(req::HTTP.Request)
             return api_stitch_frames(req)
         elseif path == "/api/observations" && method == "GET"
             return api_observations()
+        elseif path == "/api/runs" && method == "GET"
+            return api_list_runs(req)
+        elseif startswith(path, "/api/runs/") && endswith(path, "/load") && method == "POST"
+            id_str = replace(replace(path, "/api/runs/" => ""), "/load" => "")
+            return api_load_run(parse(Int, id_str))
+        elseif startswith(path, "/api/runs/") && method == "GET"
+            id_str = replace(path, "/api/runs/" => "")
+            return api_get_run(parse(Int, id_str))
         end
 
         return HTTP.Response(404, cors_headers(), "Not found: $path")
@@ -166,8 +175,55 @@ function api_simulate(req::HTTP.Request)
     arl_dir        = String(get(params, :arl_dir, ""))
     release_duration_hours = Float64(get(params, :release_duration_hours, 1.0))
 
+    # Build parameter dict for database operations
+    run_params = Dict(
+        "dataset" => get(params, :dataset, nothing),
+        "release_mode" => release_mode,
+        "weather_source" => weather_source,
+        "lat" => lat, "lon" => lon,
+        "start_date" => start_date,
+        "start_hour" => start_hour,
+        "duration_hours" => duration_hours,
+        "n_particles" => n_particles,
+        "yield_kt" => release_mode == "bomb" ? yield_kt : nothing,
+        "activity_tbq" => release_mode == "npp" ? activity_tbq : nothing,
+        "stack_height_m" => release_mode == "npp" ? stack_height_m : nothing,
+        "isotope" => release_mode == "npp" ? isotope : nothing,
+        "release_duration_hours" => release_mode == "npp" ? release_duration_hours : nothing,
+        "arl_dir" => weather_source == "arl" ? arl_dir : nothing,
+    )
+
+    # Check for cached result with identical parameters
+    cached = try
+        db_find_cached_run(run_params)
+    catch e
+        @warn "Cache lookup failed" exception=e
+        nothing
+    end
+
+    if cached !== nothing
+        # Return cached results immediately
+        APP[] = AppStatus(false, 100, "Loaded from cache (run #$(cached["id"]))",
+                          "", cached["geojson_result"],
+                          cached["peak_dose"], cached["n_events"],
+                          cached["csv_result"], cached["dose_units"], nothing)
+        @info "Cache hit: returning results from run #$(cached["id"])"
+        body = JSON3.write(Dict("status" => "cached", "run_id" => cached["id"]))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    end
+
+    # No cache hit — log new run and compute
+    db_id = try
+        db_insert_run(run_params)
+    catch e
+        @warn "Failed to log run to database" exception=e
+        nothing
+    end
+
     # Reset state
-    APP[] = AppStatus(true, 0, "Starting...", "", "", 0.0, 0, "", "mSv/h")
+    APP[] = AppStatus(true, 0, "Starting...", "", "", 0.0, 0, "", "mSv/h", db_id)
+    t_start = time()
 
     # Run simulation asynchronously
     Threads.@spawn begin
@@ -194,6 +250,21 @@ function api_simulate(req::HTTP.Request)
             APP[].progress_pct = 100
             APP[].progress_msg = "Complete"
             APP[].running = false
+
+            # Store results in database for future cache hits
+            if db_id !== nothing
+                try
+                    db_complete_run(db_id;
+                        peak_dose = result.max_dose,
+                        dose_units = result.units,
+                        n_events = length(result.deposition_log),
+                        elapsed_seconds = time() - t_start,
+                        geojson = geojson,
+                        csv = csv)
+                catch e
+                    @warn "Failed to update run in database" exception=e
+                end
+            end
         catch e
             bt = catch_backtrace()
             # Full error with stacktrace
@@ -202,6 +273,12 @@ function api_simulate(req::HTTP.Request)
             end
             APP[].error_msg = sprint(showerror, e)
             APP[].running = false
+
+            # Update database record with failure
+            if db_id !== nothing
+                try db_fail_run(db_id, sprint(showerror, e)) catch end
+            end
+
             # Write to log file for debugging
             logpath = joinpath(WEB_DIR, "error.log")
             open(logpath, "a") do f
@@ -654,6 +731,117 @@ function _load_nancy_observations_geojson()
     return Dict("type" => "nancy", "geojson" => geojson,
                 "detonation_lat" => obs.detonation_lat,
                 "detonation_lon" => obs.detonation_lon)
+end
+
+# --- Simulation history (PostgreSQL) ---
+
+function api_list_runs(req::HTTP.Request)
+    uri = HTTP.URI(req.target)
+    query = HTTP.queryparams(uri)
+    limit = parse(Int, get(query, "limit", "50"))
+    offset = parse(Int, get(query, "offset", "0"))
+    limit = clamp(limit, 1, 200)
+
+    try
+        runs = db_list_runs(; limit, offset)
+        total = db_run_count()
+
+        # Convert columntable to array of dicts
+        n = length(runs.id)
+        rows = [Dict(
+            "id" => runs.id[i],
+            "created_at" => string(runs.created_at[i]),
+            "dataset" => runs.dataset[i],
+            "release_mode" => runs.release_mode[i],
+            "weather_source" => runs.weather_source[i],
+            "latitude" => runs.latitude[i],
+            "longitude" => runs.longitude[i],
+            "start_date" => runs.start_date[i],
+            "start_hour" => runs.start_hour[i],
+            "duration_hours" => runs.duration_hours[i],
+            "n_particles" => runs.n_particles[i],
+            "yield_kt" => runs.yield_kt[i],
+            "activity_tbq" => runs.activity_tbq[i],
+            "isotope" => runs.isotope[i],
+            "status" => runs.status[i],
+            "peak_dose" => runs.peak_dose[i],
+            "dose_units" => runs.dose_units[i],
+            "n_events" => runs.n_events[i],
+            "elapsed_seconds" => runs.elapsed_seconds[i],
+        ) for i in 1:n]
+
+        body = JSON3.write(Dict("runs" => rows, "total" => total,
+                                "limit" => limit, "offset" => offset))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
+end
+
+function api_get_run(id::Int)
+    try
+        run = db_get_run(id)
+        if run === nothing
+            body = JSON3.write(Dict("error" => "Run not found"))
+            headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+            return HTTP.Response(404, headers, body)
+        end
+        body = JSON3.write(run)
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
+end
+
+function api_load_run(id::Int)
+    try
+        run = db_get_run(id)
+        if run === nothing
+            body = JSON3.write(Dict("error" => "Run not found"))
+            headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+            return HTTP.Response(404, headers, body)
+        end
+        if run["status"] != "completed" || run["geojson_result"] === missing || run["geojson_result"] === nothing
+            body = JSON3.write(Dict("error" => "Run has no stored results"))
+            headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+            return HTTP.Response(400, headers, body)
+        end
+
+        # Load results into APP[] as if the simulation just completed
+        APP[] = AppStatus(false, 100, "Loaded from history (run #$id)",
+                          "", run["geojson_result"],
+                          run["peak_dose"], run["n_events"],
+                          something(run["csv_result"], ""),
+                          something(run["dose_units"], "mSv/h"), nothing)
+
+        body = JSON3.write(Dict(
+            "status" => "loaded",
+            "run_id" => id,
+            "peak_dose" => run["peak_dose"],
+            "dose_units" => run["dose_units"],
+            "n_events" => run["n_events"],
+            "release_mode" => run["release_mode"],
+            "latitude" => run["latitude"],
+            "longitude" => run["longitude"],
+            "yield_kt" => run["yield_kt"],
+            "start_date" => run["start_date"],
+            "start_hour" => run["start_hour"],
+            "duration_hours" => run["duration_hours"],
+            "n_particles" => run["n_particles"],
+        ))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
 end
 
 # --- Server start ---
