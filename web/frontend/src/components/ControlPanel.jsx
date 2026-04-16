@@ -30,6 +30,9 @@ export default function ControlPanel({
   onDateMinChange, onDateMaxChange, onMapZoomChange,
   animData, onAnimDataChange,
   onLoadHistoryRun,
+  selectedNpp,
+  prediction,
+  predictionLoading,
 }) {
   const [arlPath, setArlPath] = useState('');
   const [arlStatus, setArlStatus] = useState(null);
@@ -272,6 +275,26 @@ export default function ControlPanel({
         </div>
       </div>
 
+      {/* Impact prediction banner */}
+      {predictionLoading && (
+        <div className="prediction-banner loading">
+          Running impact prediction...
+        </div>
+      )}
+      {prediction && !predictionLoading && (
+        <div className={`prediction-banner ${prediction.impact ? 'impact' : 'no-impact'}`}>
+          <div className="prediction-title">
+            XGBoost Prediction: {selectedNpp?.name || prediction.site}
+          </div>
+          <div className="prediction-result">
+            {prediction.impact ? 'Ireland WILL be impacted' : 'Ireland will NOT be impacted'}
+          </div>
+          <div className="prediction-prob">
+            Probability: {(prediction.probability * 100).toFixed(1)}%
+          </div>
+        </div>
+      )}
+
       {/* Run button */}
       <button className="btn-run"
         disabled={simRunning || datasetLoading}
@@ -320,8 +343,8 @@ export default function ControlPanel({
         </div>
       )}
 
-      {/* Animation panel - only for fresh runs, not cached/history loads */}
-      {results && !results.fromCache && (
+      {/* Animation panel */}
+      {results && (
         <AnimationPanel
           animData={animData}
           onAnimDataChange={onAnimDataChange}

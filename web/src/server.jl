@@ -87,6 +87,8 @@ function handle_request(req::HTTP.Request)
             return api_load_dataset(req)
         elseif path == "/api/active-dataset" && method == "GET"
             return api_active_dataset()
+        elseif path == "/api/predict" && method == "POST"
+            return api_predict(req)
         elseif path == "/api/upload-arl" && method == "POST"
             return api_upload_arl(req)
         elseif path == "/api/load-arl" && method == "POST"
@@ -194,11 +196,17 @@ function api_simulate(req::HTTP.Request)
     )
 
     # Check for cached result with identical parameters
-    cached = try
-        db_find_cached_run(run_params)
-    catch e
-        @warn "Cache lookup failed" exception=e
+    # Skip cache when client requests it (e.g. to generate animation data)
+    skip_cache = Bool(get(params, :skip_cache, false))
+    cached = if skip_cache
         nothing
+    else
+        try
+            db_find_cached_run(run_params)
+        catch e
+            @warn "Cache lookup failed" exception=e
+            nothing
+        end
     end
 
     if cached !== nothing
@@ -495,6 +503,45 @@ function api_arl_bounds()
     ))
     headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
     return HTTP.Response(200, headers, body)
+end
+
+# --- Prediction endpoint ---
+
+function api_predict(req::HTTP.Request)
+    try
+        params = JSON3.read(String(req.body))
+        site = lowercase(String(get(params, :site, "")))
+        date_str = String(get(params, :date, ""))
+        hour = Int(get(params, :hour, 0))
+        release_duration = Float64(get(params, :release_duration, 48.0))
+        release_height = Float64(get(params, :release_height, 100.0))
+
+        isempty(site) && return HTTP.Response(400, cors_headers(), "Missing 'site' parameter")
+        isempty(date_str) && return HTTP.Response(400, cors_headers(), "Missing 'date' parameter")
+
+        meta = ARL_METADATA[]
+        isnothing(meta) && return HTTP.Response(400, cors_headers(), "No ARL data loaded")
+
+        date = Date(date_str)
+        result = Prediction.predict_from_arl(
+            site, meta.dir_path, date, hour;
+            release_duration=release_duration,
+            release_height=release_height
+        )
+
+        body = JSON3.write(Dict(
+            "impact" => result.impact,
+            "probability" => result.probability,
+            "site" => result.site,
+        ))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(200, headers, body)
+    catch e
+        @error "Prediction error" exception=(e, catch_backtrace())
+        body = JSON3.write(Dict("error" => sprint(showerror, e)))
+        headers = vcat(cors_headers(), ["Content-Type" => "application/json"])
+        return HTTP.Response(500, headers, body)
+    end
 end
 
 # --- Animation endpoints ---

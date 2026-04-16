@@ -57,6 +57,17 @@ export async function uploadARLFiles(files) {
   return data;
 }
 
+export async function fetchPrediction({ site, date, hour, release_duration, release_height }) {
+  const resp = await fetch('/api/predict', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ site, date, hour, release_duration, release_height }),
+  });
+  const data = await resp.json();
+  if (!resp.ok) throw new Error(data.error || 'Prediction failed');
+  return data;
+}
+
 export async function fetchObservations() {
   const resp = await fetch('/api/observations');
   if (!resp.ok) throw new Error('No observations');

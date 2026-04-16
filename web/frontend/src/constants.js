@@ -14,14 +14,14 @@ export const DATASET_DEFAULTS = {
   },
 };
 
-// NPP plant markers
+// NPP plant markers (site key matches prediction model filenames)
 export const NPP_PLANTS = [
-  { name: 'Hinkley Point C', lat: 51.2086, lon: -3.1304 },
-  { name: 'Wylfa', lat: 53.4167, lon: -4.4822 },
-  { name: 'Paluel', lat: 49.8584, lon: 0.6354 },
-  { name: 'Flamanville', lat: 49.5381, lon: -1.8802 },
-  { name: 'Sizewell B', lat: 52.2145, lon: 1.6206 },
-  { name: 'Heysham', lat: 54.0285, lon: -2.9161 },
+  { name: 'Hinkley Point C', site: 'hinkley',     lat: 51.2086, lon: -3.1304 },
+  { name: 'Wylfa',           site: 'wylfa',        lat: 53.4167, lon: -4.4822 },
+  { name: 'Paluel',          site: 'paluel',        lat: 49.8584, lon: 0.6354 },
+  { name: 'Flamanville',     site: 'flamanville',   lat: 49.5381, lon: -1.8802 },
+  { name: 'Sizewell B',      site: 'sizewell',      lat: 52.2145, lon: 1.6206 },
+  { name: 'Heysham',         site: 'heysham',        lat: 54.0285, lon: -2.9161 },
 ];
 
 // Contour levels and colours

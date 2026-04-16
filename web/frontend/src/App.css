@@ -95,6 +95,33 @@ body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-
 }
 .arl-status.error { background: #fff0f0; border-left-color: #c00; color: #900; }
 
+/* Prediction banner */
+.prediction-banner {
+  padding: 12px; border-radius: 6px; font-size: 13px; line-height: 1.5;
+}
+.prediction-banner.loading {
+  background: #f0f6ff; border: 1px solid #4A90D9; color: #4A90D9; text-align: center;
+}
+.prediction-banner.impact {
+  background: #fef2f2; border: 1px solid #dc2626;
+}
+.prediction-banner.no-impact {
+  background: #f0fdf4; border: 1px solid #16a34a;
+}
+.prediction-title {
+  font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;
+  color: #666; margin-bottom: 4px;
+}
+.prediction-banner.impact .prediction-result {
+  font-size: 16px; font-weight: 700; color: #dc2626;
+}
+.prediction-banner.no-impact .prediction-result {
+  font-size: 16px; font-weight: 700; color: #16a34a;
+}
+.prediction-prob {
+  font-size: 12px; color: #666; margin-top: 2px;
+}
+
 /* Animation panel */
 .animation-panel h3 { font-size: 12px; color: #555; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
 .anim-controls { display: flex; gap: 4px; align-items: center; margin-bottom: 6px; }

@@ -2,7 +2,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import ControlPanel from './components/ControlPanel';
 import MapView from './components/MapView';
 import { DATASET_DEFAULTS } from './constants';
-import { fetchStatus, startSimulation, loadDataset, fetchERA5Bounds } from './api';
+import { fetchStatus, startSimulation, loadDataset, fetchERA5Bounds, fetchPrediction } from './api';
 import './App.css';
 
 export default function App() {
@@ -26,6 +26,11 @@ export default function App() {
 
   // --- ARL state ---
   const [arlMetadata, setArlMetadata] = useState(null);
+
+  // --- Prediction state ---
+  const [selectedNpp, setSelectedNpp] = useState(null);
+  const [prediction, setPrediction] = useState(null);
+  const [predictionLoading, setPredictionLoading] = useState(false);
 
   // --- Simulation state ---
   const [simRunning, setSimRunning] = useState(false);
@@ -136,6 +141,7 @@ export default function App() {
       n_particles: particles,
       release_mode: releaseMode,
       weather_source: weatherSource,
+      skip_cache: true,  // always run fresh so animation data is generated
     };
 
     if (weatherSource === 'arl') {
@@ -272,7 +278,28 @@ export default function App() {
     setLat(plant.lat);
     setLon(plant.lon);
     setReleaseMode('npp');
-  }, []);
+    setSelectedNpp(plant);
+    setPrediction(null);
+
+    // Auto-trigger prediction if ARL data is loaded
+    if (weatherSource === 'arl' && arlMetadata && plant.site) {
+      setPredictionLoading(true);
+      fetchPrediction({
+        site: plant.site,
+        date: startDate,
+        hour: startHour,
+        release_duration: releaseDuration,
+        release_height: stackHeight,
+      }).then(result => {
+        setPrediction(result);
+      }).catch(err => {
+        console.error('Prediction error:', err);
+        setPrediction(null);
+      }).finally(() => {
+        setPredictionLoading(false);
+      });
+    }
+  }, [weatherSource, arlMetadata, startDate, startHour, releaseDuration, stackHeight]);
 
   // Weather bounds to display
   const weatherBounds = weatherSource === 'arl' && arlMetadata
@@ -326,6 +353,9 @@ export default function App() {
         animData={animData}
         onAnimDataChange={setAnimData}
         onLoadHistoryRun={handleLoadHistoryRun}
+        selectedNpp={selectedNpp}
+        prediction={prediction}
+        predictionLoading={predictionLoading}
       />
       <MapView
         lat={lat}
