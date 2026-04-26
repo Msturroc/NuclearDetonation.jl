@@ -75,6 +75,8 @@ import NuclearDetonation.Transport:
         include("transport/test_milib.jl")
         include("transport/test_posint.jl")
         include("transport/test_compheight.jl")
+        include("transport/test_boundary_layer.jl")
+        include("transport/test_om2edot.jl")
     end
 
     # Phase 3 Tests: Particle Physics
@@ -82,6 +84,7 @@ import NuclearDetonation.Transport:
         include("transport/test_vgravtables.jl")
         include("transport/test_decay.jl")
         include("transport/test_particle_dynamics.jl")
+        include("transport/test_particle_dynamics_extra.jl")
     end
 
     # Phase 4 Tests: Source Term Modelling
@@ -113,6 +116,7 @@ import NuclearDetonation.Transport:
     # Phase 8 Tests: Orchestration / Configuration
     @testset "Transport Phase 8: Orchestration" begin
         include("transport/test_orchestration.jl")
+        include("transport/test_integrate_timestep.jl")
         include("transport/test_numerical_config.jl")
         include("transport/test_defaults.jl")
     end
