@@ -47,21 +47,28 @@ end
         data2 = fill(7.5f0, nx, ny, nk)
         itp = _Tx_pde.ReferenceTrilinearInterpolant(data1, data2, 0.0f0, 3600.0f0, nx, ny, nk)
 
-        # Interior point of constant field at t=t1: rt1=1, rt2=0 → returns val_t1 = 7.5.
-        # NOTE: line 227 of particle_dynamics.jl uses muladd(rt2, val_t2 - val_t1,
-        # rt1 * val_t1) instead of muladd(rt2, val_t2 - val_t1, val_t1), so the time blend
-        # is only correct at t == t1. Tests below pin current behaviour, not the fix.
-        @test itp(3.0, 3.0, 2.0, 0.0) ≈ 7.5 atol=1e-4
-        # Boundary clamping: out-of-domain queries remain finite.
-        @test isfinite(itp(-50.0, 3.0, 2.0, 0.0))
-        @test isfinite(itp(3.0, 1000.0, 2.0, 0.0))
-        @test isfinite(itp(3.0, 3.0, 2.0, -1.0e9))
-        @test isfinite(itp(3.0, 3.0, 2.0, 1.0e9))
+        # Constant field → constant output at any (x, y, z, t).
+        @test itp(3.0, 3.0, 2.0, 0.0)    ≈ 7.5 atol=1e-4
+        @test itp(3.0, 3.0, 2.0, 1800.0) ≈ 7.5 atol=1e-4
+        @test itp(3.0, 3.0, 2.0, 3600.0) ≈ 7.5 atol=1e-4
+        # Boundary clamping: out-of-domain queries also return the constant.
+        @test itp(-50.0, 3.0, 2.0, 1800.0)   ≈ 7.5 atol=1e-4
+        @test itp(3.0, 1000.0, 2.0, 1800.0)  ≈ 7.5 atol=1e-4
+        @test itp(3.0, 3.0, 2.0, -1.0e9)     ≈ 7.5 atol=1e-4
+        @test itp(3.0, 3.0, 2.0,  1.0e9)     ≈ 7.5 atol=1e-4
 
         # Equal-time degenerate case (t1 == t2) hits the dt<=0 branch (rt1=rt2=0.5).
         itp_eq = _Tx_pde.ReferenceTrilinearInterpolant(data1, data2, 1000.0f0, 1000.0f0,
                                                        nx, ny, nk)
-        @test isfinite(itp_eq(3.0, 3.0, 2.0, 1000.0))
+        @test itp_eq(3.0, 3.0, 2.0, 1000.0) ≈ 7.5 atol=1e-4
+
+        # Linear time blend: differing data1/data2 should interpolate to the midpoint at t = (t1+t2)/2.
+        d1 = fill(2.0f0, nx, ny, nk)
+        d2 = fill(8.0f0, nx, ny, nk)
+        itp_lt = _Tx_pde.ReferenceTrilinearInterpolant(d1, d2, 0.0f0, 1000.0f0, nx, ny, nk)
+        @test itp_lt(3.0, 3.0, 2.0, 0.0)     ≈ 2.0 atol=1e-4
+        @test itp_lt(3.0, 3.0, 2.0, 500.0)   ≈ 5.0 atol=1e-4
+        @test itp_lt(3.0, 3.0, 2.0, 1000.0)  ≈ 8.0 atol=1e-4
 
         # The ReferenceInterp config branch is documented as broken by type constraint
         # (u/v/w become ReferenceTrilinearInterpolant while p/t/h remain
