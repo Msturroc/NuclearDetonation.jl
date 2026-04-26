@@ -280,8 +280,8 @@ Get the current radioactive content and set a new value atomically.
 - `Float32` - The previous radioactive content
 """
 function get_set_rad!(p::Particle, rad::Real)::Float32
-    previous = p.rad
-    p.rad = Float32(rad)
+    previous = p.rad[1]
+    p.rad[1] = Float32(rad)
     return previous
 end
 

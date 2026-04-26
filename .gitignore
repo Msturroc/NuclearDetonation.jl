@@ -6,3 +6,5 @@ Manifest.toml
 *.dylib
 build/compiled_app/
 .DS_Store
+*.cov
+lcov.info

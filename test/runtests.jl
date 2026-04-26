@@ -64,19 +64,24 @@ import NuclearDetonation.Transport:
     # Phase 1 Tests: Core Data Structures
     @testset "Transport Phase 1: Core Data Structures" begin
         include("transport/test_datetime.jl")
+        include("transport/test_datetime_extra.jl")
         include("transport/test_particles.jl")
+        include("transport/test_particles_extra.jl")
         include("transport/test_dimensions.jl")
     end
 
     # Phase 2 Tests: Meteorological Interface
     @testset "Transport Phase 2: Meteorological Interface" begin
         include("transport/test_milib.jl")
+        include("transport/test_posint.jl")
+        include("transport/test_compheight.jl")
     end
 
     # Phase 3 Tests: Particle Physics
     @testset "Transport Phase 3: Particle Physics" begin
         include("transport/test_vgravtables.jl")
         include("transport/test_decay.jl")
+        include("transport/test_particle_dynamics.jl")
     end
 
     # Phase 4 Tests: Source Term Modelling
@@ -92,6 +97,24 @@ import NuclearDetonation.Transport:
     # Phase 6 Tests: Main Simulation Loop
     @testset "Transport Phase 6: Main Simulation Loop" begin
         include("transport/test_simulation.jl")
+        include("transport/test_simulation_helpers.jl")
+    end
+
+    # Utilities (root src/utilities.jl)
+    @testset "Utilities" begin
+        include("test_utilities.jl")
+    end
+
+    # Phase 7 Tests: Output and Reporting
+    @testset "Transport Phase 7: Output and Reporting" begin
+        include("transport/test_output.jl")
+    end
+
+    # Phase 8 Tests: Orchestration / Configuration
+    @testset "Transport Phase 8: Orchestration" begin
+        include("transport/test_orchestration.jl")
+        include("transport/test_numerical_config.jl")
+        include("transport/test_defaults.jl")
     end
 
     println("\n" * "="^70)

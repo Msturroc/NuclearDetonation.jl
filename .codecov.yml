@@ -1,0 +1,32 @@
+coverage:
+  precision: 1
+  round: nearest
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 2%
+        informational: true
+    patch:
+      default:
+        informational: true
+
+# Files excluded from the coverage denominator.
+# These are not tested by the unit-test suite by design:
+#  - validation.jl: regression-comparison utilities, run ad-hoc against reference outputs
+#  - data_access.jl: Zenodo download wrappers; need network
+#  - weapon-effects family: separate concern from atmospheric transport, no unit tests yet
+ignore:
+  - "src/transport/validation.jl"
+  - "src/transport/data_access.jl"
+  - "src/fallout.jl"
+  - "src/overpressure.jl"
+  - "src/radiation.jl"
+  - "src/soviet_overpressure_data.jl"
+  - "src/soviet_overpressure_funcs.jl"
+  - "src/thermal.jl"
+
+comment:
+  layout: "reach, diff, flags, files"
+  behavior: default
+  require_changes: false

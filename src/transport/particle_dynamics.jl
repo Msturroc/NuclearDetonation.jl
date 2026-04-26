@@ -755,14 +755,6 @@ function particle_velocity!(du, u, p::ParticleODEParams, t)
     v_wind = p.winds.v_interp(x, y, z, t)
     w_wind = p.winds.w_interp(x, y, z, t)
 
-    # DEBUG: Print w_wind for particle 1 (first few evaluations only)
-    global debug_call_count = get(task_local_storage(), :debug_w_count, 0)
-    if p.particle_idx == 1 && debug_call_count < 5
-        println("JULIA W_WIND DIAGNOSTIC #$(debug_call_count+1) - Particle 1 at t=$t s: w_wind=$w_wind sigma/s, z=$z")
-        flush(stdout)
-        task_local_storage(:debug_w_count, debug_call_count + 1)
-    end
-
     # Gravitational settling (if enabled)
     w_grav = 0.0
     if p.params.grav_type > 0
