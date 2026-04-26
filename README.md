@@ -2,7 +2,8 @@
 
 Nuclear detonation effects and atmospheric dispersion modelling in Julia.
 
-<!-- [![CI](https://github.com/Msturroc/NuclearDetonation.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Msturroc/NuclearDetonation.jl/actions/workflows/CI.yml) -->
+[![CI](https://github.com/Msturroc/NuclearDetonation.jl/actions/workflows/CI.yml/badge.svg)](https://github.com/Msturroc/NuclearDetonation.jl/actions/workflows/CI.yml)
+[![Coverage](https://codecov.io/gh/Msturroc/NuclearDetonation.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/Msturroc/NuclearDetonation.jl)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 ## Overview

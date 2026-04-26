@@ -158,7 +158,7 @@ NetCDF file with:
 """
 function export_dose_fields(filename::String, domain::SimulationDomain,
                              dose_rate::Matrix{T}, deposition::Matrix{T},
-                             reference_time::DateTime) where T
+                             reference_time::Dates.DateTime) where T
 
     @info "Exporting dose fields to $filename"
 
@@ -189,34 +189,36 @@ function export_dose_fields(filename::String, domain::SimulationDomain,
         lat_var.attrib["standard_name"] = "latitude"
 
         # Define data variables
+        # NetCDF requires _FillValue to be set before any data is written, so
+        # define attributes first, then assign the data.
         # 1. Dose rate (mSv/hr)
         dose_var = defVar(ds, "dose_rate_mSv_hr", Float32, ("longitude", "latitude"))
-        dose_var[:, :] = Float32.(dose_rate)
+        dose_var.attrib["_FillValue"] = Float32(NaN)
         dose_var.attrib["units"] = "mSv/hr"
         dose_var.attrib["long_name"] = "Radiation dose rate"
         dose_var.attrib["standard_name"] = "dose_rate"
         dose_var.attrib["reference_time"] = format(reference_time, "yyyy-mm-dd HH:MM:SS UTC")
-        dose_var.attrib["_FillValue"] = Float32(NaN)
         dose_var.attrib["valid_min"] = Float32(0.0)
+        dose_var[:, :] = Float32.(dose_rate)
 
         # 2. Dose rate (mR/hr) - for legacy compatibility
         dose_mR_var = defVar(ds, "dose_rate_mR_hr", Float32, ("longitude", "latitude"))
-        dose_mR_var[:, :] = Float32.(dose_rate_mR)
+        dose_mR_var.attrib["_FillValue"] = Float32(NaN)
         dose_mR_var.attrib["units"] = "mR/hr"
         dose_mR_var.attrib["long_name"] = "Radiation dose rate (roentgen per hour)"
         dose_mR_var.attrib["reference_time"] = format(reference_time, "yyyy-mm-dd HH:MM:SS UTC")
-        dose_mR_var.attrib["_FillValue"] = Float32(NaN)
         dose_mR_var.attrib["valid_min"] = Float32(0.0)
         dose_mR_var.attrib["note"] = "1 mSv/hr ≈ 100 mR/hr (conversion factor 100.7)"
+        dose_mR_var[:, :] = Float32.(dose_rate_mR)
 
         # 3. Surface deposition (Bq/m²)
         dep_var = defVar(ds, "deposition_Bq_m2", Float32, ("longitude", "latitude"))
-        dep_var[:, :] = Float32.(deposition)
+        dep_var.attrib["_FillValue"] = Float32(NaN)
         dep_var.attrib["units"] = "Bq/m2"
         dep_var.attrib["long_name"] = "Total surface deposition"
         dep_var.attrib["standard_name"] = "surface_deposition"
-        dep_var.attrib["_FillValue"] = Float32(NaN)
         dep_var.attrib["valid_min"] = Float32(0.0)
+        dep_var[:, :] = Float32.(deposition)
 
         # Global attributes
         ds.attrib["title"] = "Nuclear fallout simulation results"
@@ -259,7 +261,7 @@ Export 3D concentration field to NetCDF.
 - `varname`: Variable name in NetCDF (default: "concentration")
 """
 function export_concentration_field(filename::String, domain::SimulationDomain,
-                                    concentration::Array{T,3}, valid_time::DateTime,
+                                    concentration::Array{T,3}, valid_time::Dates.DateTime,
                                     varname::String="concentration") where T
 
     @info "Exporting 3D concentration field to $filename"
@@ -295,14 +297,14 @@ function export_concentration_field(filename::String, domain::SimulationDomain,
             "positive" => "up"
         ))
 
-        # Concentration variable
+        # Concentration variable. _FillValue must be set before data is written.
         conc_var = defVar(ds, varname, Float32, ("longitude", "latitude", "height"))
-        conc_var[:, :, :] = Float32.(concentration)
+        conc_var.attrib["_FillValue"] = Float32(NaN)
         conc_var.attrib["units"] = "Bq/m3"
         conc_var.attrib["long_name"] = "Atmospheric concentration"
         conc_var.attrib["standard_name"] = "atmosphere_mole_content_of_radionuclide"
         conc_var.attrib["valid_time"] = format(valid_time, "yyyy-mm-dd HH:MM:SS UTC")
-        conc_var.attrib["_FillValue"] = Float32(NaN)
+        conc_var[:, :, :] = Float32.(concentration)
 
         # Global attributes
         ds.attrib["title"] = "3D atmospheric concentration field"
