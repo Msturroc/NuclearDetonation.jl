@@ -223,8 +223,9 @@ function (interp::ReferenceTrilinearInterpolant{T})(x::Real, y::Real, z::Real, t
         # Linear interpolation in z at t2
         val_t2 = muladd(dz, val_k1_t2 - val_k_t2, val_k_t2)
 
-        # Linear time interpolation
-        return muladd(rt2, val_t2 - val_t1, rt1 * val_t1)
+        # Linear time interpolation: val_t1 + rt2 * (val_t2 - val_t1)
+        # (rt2 = (t - t1) / (t2 - t1), so this is the standard convex blend.)
+        return muladd(rt2, val_t2 - val_t1, val_t1)
     end
 end
 
