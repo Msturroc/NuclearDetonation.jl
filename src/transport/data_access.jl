@@ -5,7 +5,19 @@ using Pkg.Artifacts
 
 export nancy_era5_files, smoky_era5_files, etex_era5_files
 
-const _ARTIFACTS_TOML = joinpath(@__DIR__, "..", "..", "Artifacts.toml")
+"""
+Locate Artifacts.toml at runtime. `@__DIR__` gets baked at precompile time to
+the build-machine path, which doesn't exist on a deploy target — so try the
+source-tree layout first (works in dev), then fall back to the compiled-app
+layout where build_app.jl copies Artifacts.toml to share/julia/.
+"""
+function _artifacts_toml()
+    src_path = joinpath(@__DIR__, "..", "..", "Artifacts.toml")
+    isfile(src_path) && return src_path
+    bundled = joinpath(dirname(Sys.BINDIR), "share", "julia", "Artifacts.toml")
+    isfile(bundled) && return bundled
+    error("Artifacts.toml not found. Looked at:\n  $src_path\n  $bundled")
+end
 
 """
     nancy_era5_files()
@@ -25,13 +37,13 @@ results = run_simulation!(state, met_files, ...)
 ```
 """
 function nancy_era5_files()
-    hash = artifact_hash("nancy_era5_data", _ARTIFACTS_TOML)
+    hash = artifact_hash("nancy_era5_data", _artifacts_toml())
     if hash === nothing
         error("Artifact 'nancy_era5_data' not found in Artifacts.toml. " *
               "ERA5 data must be uploaded to Zenodo and the artifact registered first.")
     end
     if !artifact_exists(hash)
-        ensure_artifact_installed("nancy_era5_data", _ARTIFACTS_TOML)
+        ensure_artifact_installed("nancy_era5_data", _artifacts_toml())
     end
     rootpath = artifact_path(hash)
     # Tarball extracts with a nancy_era5_data/ subdirectory
@@ -66,14 +78,14 @@ function smoky_era5_files(; local_dir::Union{String,Nothing}=nothing)
             return files
         end
     end
-    hash = artifact_hash("smoky_era5_data", _ARTIFACTS_TOML)
+    hash = artifact_hash("smoky_era5_data", _artifacts_toml())
     if hash === nothing
         error("Artifact 'smoky_era5_data' not found in Artifacts.toml. " *
               "ERA5 data must be downloaded, merged, and uploaded to Zenodo first.\n" *
               "See examples/smoky_example/ for download and merge scripts.")
     end
     if !artifact_exists(hash)
-        ensure_artifact_installed("smoky_era5_data", _ARTIFACTS_TOML)
+        ensure_artifact_installed("smoky_era5_data", _artifacts_toml())
     end
     rootpath = artifact_path(hash)
     datadir = joinpath(rootpath, "smoky_era5_data")
@@ -101,13 +113,13 @@ results = run_simulation!(state, met_files, ...)
 ```
 """
 function etex_era5_files()
-    hash = artifact_hash("etex_era5_data", _ARTIFACTS_TOML)
+    hash = artifact_hash("etex_era5_data", _artifacts_toml())
     if hash === nothing
         error("Artifact 'etex_era5_data' not found in Artifacts.toml. " *
               "ERA5 data must be uploaded to Zenodo and the artifact registered first.")
     end
     if !artifact_exists(hash)
-        ensure_artifact_installed("etex_era5_data", _ARTIFACTS_TOML)
+        ensure_artifact_installed("etex_era5_data", _artifacts_toml())
     end
     rootpath = artifact_path(hash)
     datadir = joinpath(rootpath, "etex_era5_data")
