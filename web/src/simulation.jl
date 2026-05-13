@@ -239,10 +239,12 @@ function run_dispersion_simulation(;
         geometry = ColumnRelease(stack_height_m - half_h, stack_height_m + half_h)
         total_activity = activity_tbq * 1e12  # TBq → Bq
 
-        # Use a dummy source for initialization (actual particles are pre-generated below)
+        # BombRelease, not ConstantRelease: the latter interprets activity as Bq/s and
+        # multiplies by a 3600 s timestep, over-releasing by that factor. Staggered birth
+        # ages below give the continuous-release behaviour without that scaling.
         source = ReleaseSource(
             (release_x, release_y), geometry,
-            ConstantRelease(), [total_activity], n_particles,
+            BombRelease(0.0), [total_activity], n_particles,
         )
 
         # Decay setup
@@ -874,9 +876,11 @@ function run_arl_dispersion_simulation(;
         geometry = ColumnRelease(stack_height_m - half_h, stack_height_m + half_h)
         total_activity = activity_tbq * 1e12  # TBq → Bq
 
+        # See note in run_dispersion_simulation: BombRelease avoids the 3600s/step
+        # Bq/s misinterpretation; staggered birth ages handle continuous release.
         source = ReleaseSource(
             (release_x, release_y), geometry,
-            ConstantRelease(), [total_activity], n_particles,
+            BombRelease(0.0), [total_activity], n_particles,
         )
 
         # Decay setup

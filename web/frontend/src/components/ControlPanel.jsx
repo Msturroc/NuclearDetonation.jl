@@ -364,6 +364,7 @@ export default function ControlPanel({
                 style={{ fontSize: 11, padding: '2px 4px', border: '1px solid #ccc', borderRadius: 3 }}>
                 <option value="mSv/h">mSv/h</option>
                 <option value="\u03BCSv/h">{'\u03BC'}Sv/h</option>
+                <option value="Sv/h">Sv/h</option>
                 <option value="mR/h">mR/h</option>
               </select>
             )}

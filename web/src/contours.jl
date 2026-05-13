@@ -7,10 +7,18 @@ const CONTOUR_LEVELS = [0.004, 0.01, 0.04, 0.1, 0.4, 1.0]
 const CONTOUR_COLORS = ["#3366FF", "#00CCCC", "#33AA33", "#CCCC00", "#FF8800", "#CC0000"]
 const CONTOUR_LABELS = ["0.004 mSv/h", "0.01 mSv/h", "0.04 mSv/h", "0.1 mSv/h", "0.4 mSv/h", "1.0 mSv/h"]
 
-# NPP deposition contours (Chernobyl zoning thresholds, kBq/m²)
-const NPP_LEVELS = [1.0, 10.0, 37.0, 185.0, 555.0, 1480.0]
-const NPP_COLORS = ["#3366FF", "#00CCCC", "#33AA33", "#CCCC00", "#FF8800", "#CC0000"]
-const NPP_LABELS = ["1 kBq/m²", "10 kBq/m²", "37 kBq/m²", "185 kBq/m²", "555 kBq/m²", "1480 kBq/m²"]
+# NPP deposition contours.
+# Lower three levels are for visualisation of small releases; upper four match
+# the IAEA/Chernobyl Cs-137 zoning thresholds and are labelled with the
+# corresponding protective action.
+const NPP_LEVELS = [0.001, 0.01, 0.1, 1.0, 10.0, 37.0, 185.0, 555.0, 1480.0]
+const NPP_COLORS = ["#C8DCFF", "#8FB7E8", "#5A8DD0", "#3366FF", "#00CCCC",
+                    "#33AA33", "#CCCC00", "#FF8800", "#CC0000"]
+const NPP_LABELS = [
+    "0.001 kBq/m²", "0.01 kBq/m²", "0.1 kBq/m²", "1 kBq/m²", "10 kBq/m²",
+    "37 kBq/m² (monitoring)", "185 kBq/m² (resettlement)",
+    "555 kBq/m² (relocation)", "1480 kBq/m² (exclusion)",
+]
 
 """Chaikin corner-cutting: smooth a polyline by iteratively cutting corners."""
 function _chaikin_smooth(coords::Vector{Vector{Float64}}, iterations::Int=3)

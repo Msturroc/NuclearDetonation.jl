@@ -4,9 +4,47 @@
 # past runs survive server restarts and can be queried/compared.
 # Completed runs are cached: re-running identical parameters
 # returns stored results instantly without recomputing.
+#
+# Set NUCDET_DISABLE_DB=1 to skip all DB work (used by the standalone
+# Windows installer build, which ships without a Postgres server).
+
+using Dates
+
+const DB_DISABLED = get(ENV, "NUCDET_DISABLE_DB", "0") == "1"
+
+if DB_DISABLED
+    # No-op stubs so server.jl call sites work unchanged.
+    db_init() = nothing
+    db_insert_run(_params) = nothing
+    db_complete_run(_id; kwargs...) = nothing
+    db_fail_run(_id, _msg) = nothing
+    db_find_cached_run(_params) = nothing
+    db_get_run(_id) = nothing
+    db_run_count() = 0
+    db_list_runs(; limit::Int=0, offset::Int=0) = (;
+        id = Int[],
+        created_at = String[],
+        dataset = Union{String,Missing}[],
+        release_mode = String[],
+        weather_source = String[],
+        latitude = Float64[],
+        longitude = Float64[],
+        start_date = String[],
+        start_hour = Int[],
+        duration_hours = Int[],
+        n_particles = Int[],
+        yield_kt = Union{Float64,Missing}[],
+        activity_tbq = Union{Float64,Missing}[],
+        isotope = Union{String,Missing}[],
+        status = String[],
+        peak_dose = Union{Float64,Missing}[],
+        dose_units = Union{String,Missing}[],
+        n_events = Union{Int,Missing}[],
+        elapsed_seconds = Union{Float64,Missing}[],
+    )
+else
 
 using LibPQ
-using Dates
 
 const DB_CONNECTION_STRING = get(ENV, "NUCDET_DB_URL",
     "host=localhost dbname=nucleardetonation user=marc password=nuclear_dev")
@@ -230,3 +268,5 @@ function db_run_count()
     result = execute(conn, "SELECT COUNT(*) AS n FROM simulation_runs")
     return LibPQ.columntable(result).n[1]
 end
+
+end  # if DB_DISABLED / else

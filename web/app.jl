@@ -34,11 +34,15 @@ include(joinpath(@__DIR__, "src", "prediction.jl"))
 include(joinpath(@__DIR__, "src", "database.jl"))
 include(joinpath(@__DIR__, "src", "server.jl"))
 
-println("Connecting to PostgreSQL...")
-try
-    db_init()
-catch e
-    @warn "PostgreSQL unavailable — simulation history will not be recorded" exception=e
+if get(ENV, "NUCDET_DISABLE_DB", "0") == "1"
+    println("Simulation history disabled (NUCDET_DISABLE_DB=1)")
+else
+    println("Connecting to PostgreSQL...")
+    try
+        db_init()
+    catch e
+        @warn "PostgreSQL unavailable — simulation history will not be recorded" exception=e
+    end
 end
 
 println("Loading impact prediction models...")

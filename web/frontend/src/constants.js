@@ -27,14 +27,19 @@ export const NPP_PLANTS = [
 // Contour levels and colours
 export const BOMB_BASE_LEVELS = [1.0, 0.4, 0.1, 0.04, 0.01, 0.004];
 export const BOMB_COLORS = ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'];
-export const NPP_BASE_LEVELS = [1480, 555, 185, 37, 10, 1];
-export const NPP_COLORS = ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC', '#3366FF'];
+// Reversed for top-down legend display. Must mirror NPP_LEVELS/NPP_COLORS in
+// web/src/contours.jl. Lower three levels are visualisation-only; upper four
+// match IAEA/Chernobyl Cs-137 zoning thresholds.
+export const NPP_BASE_LEVELS = [1480, 555, 185, 37, 10, 1, 0.1, 0.01, 0.001];
+export const NPP_COLORS = ['#CC0000', '#FF8800', '#CCCC00', '#33AA33', '#00CCCC',
+                            '#3366FF', '#5A8DD0', '#8FB7E8', '#C8DCFF'];
 
 // Dose rate unit conversions (from mSv/h)
 export const DOSE_UNITS = {
-  'mSv/h':  { factor: 1,    label: 'mSv/h',  title: 'Dose Rate (mSv/h)' },
-  'μSv/h':  { factor: 1000, label: 'μSv/h',  title: 'Dose Rate (μSv/h)' },
-  'mR/h':   { factor: 100,  label: 'mR/h',   title: 'Dose Rate (mR/h)' },
+  'mSv/h':  { factor: 1,     label: 'mSv/h',  title: 'Dose Rate (mSv/h)' },
+  'μSv/h':  { factor: 1000,  label: 'μSv/h',  title: 'Dose Rate (μSv/h)' },
+  'Sv/h':   { factor: 0.001, label: 'Sv/h',   title: 'Dose Rate (Sv/h)'  },
+  'mR/h':   { factor: 100,   label: 'mR/h',   title: 'Dose Rate (mR/h)'  },
 };
 
 // Deposition unit conversions (from kBq/m2)
