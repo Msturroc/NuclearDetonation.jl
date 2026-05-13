@@ -179,9 +179,10 @@ export default function MapView({
         style={{ width: '100%', height: '100%' }}
       >
         <TileLayer
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-          attribution='&copy; OpenStreetMap contributors'
-          maxZoom={18}
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+          attribution='&copy; OpenStreetMap contributors &copy; CARTO'
+          subdomains="abcd"
+          maxZoom={20}
         />
         <MapClickHandler onClick={handleClick} />
         <MapSync lat={lat} lon={lon} zoom={zoom} />
