@@ -35,6 +35,13 @@ create_app(
     precompile_execution_file = joinpath(src_dir, "precompile_script.jl"),
     include_lazy_artifacts = true,  # bundle ERA5 data
     cpu_target = "generic",         # single target to reduce memory usage
+    # Don't bake transitive deps into the sysimage. CairoMakie/PlotlyJS are deps
+    # of NuclearDetonation (for examples) but unused by the GUI; pulling them in
+    # crashes Julia 1.12 during sysimage compile (Colors.jl conversions.jl:616).
+    # Only our direct [deps] (HTTP, JSON3, NuclearDetonation, NCDatasets, etc.)
+    # land in the sysimage; the rest stays in the bundled depot, available but
+    # lazy-loaded if anything reaches for it (nothing in julia_main does).
+    include_transitive_dependencies = false,
     force = true,
 )
 
