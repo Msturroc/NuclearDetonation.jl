@@ -11,6 +11,38 @@
 # Output: ../build/NuclearDetonationGUI/ containing the .exe
 
 using Pkg
+
+# --- Relocatable JLL paths (Windows) ---
+# JLLs bake their artifact path at precompile time. If we let Julia use the
+# build user's home (C:\Users\<builder>\.julia), the resulting exe only works
+# for that exact user. Instead, route Julia's depot through a junction at
+# C:\Users\Public\NuclearDetonationDepot — a path writable by any standard
+# user on any Windows machine. The launcher .bat creates the same-named
+# junction → the bundle's share\julia at runtime, so baked paths resolve.
+const FIXED_DEPOT = raw"C:\Users\Public\NuclearDetonationDepot"
+
+if Sys.iswindows()
+    real_depot = first(DEPOT_PATH)
+    if lowercase(real_depot) != lowercase(FIXED_DEPOT)
+        # Remove any stale junction/dir at FIXED_DEPOT and re-create pointing
+        # at the build user's real depot so artifacts/packages are reused
+        # without re-downloading.
+        if ispath(FIXED_DEPOT)
+            try
+                run(`cmd /c rmdir "$FIXED_DEPOT"`)
+            catch e
+                error("Could not remove existing $FIXED_DEPOT. Delete it manually and re-run. ($e)")
+            end
+        end
+        run(`cmd /c mklink /J "$FIXED_DEPOT" "$real_depot"`)
+        println("Created build-time depot junction: $FIXED_DEPOT -> $real_depot")
+        empty!(DEPOT_PATH)
+        push!(DEPOT_PATH, FIXED_DEPOT)
+        ENV["JULIA_DEPOT_PATH"] = FIXED_DEPOT
+        println("DEPOT_PATH rewritten to: $(DEPOT_PATH)")
+    end
+end
+
 println("Installing dependencies (first time may take a while)...")
 Pkg.instantiate()
 
@@ -122,13 +154,28 @@ else
     println("Install it: winget install ffmpeg")
 end
 
-# Write launcher .bat that sets DEPOT_PATH and disables Postgres.
-# Users double-click this rather than the .exe directly.
+# Write launcher .bat. Creates a junction at the same FIXED_DEPOT path used at
+# build time so the JLL-baked artifact paths resolve to the bundled depot.
+# C:\Users\Public\ is writable by standard users on all Windows installs, so
+# the junction step doesn't need admin.
 bat_path = joinpath(out_dir, "NuclearDetonation.bat")
 open(bat_path, "w") do io
     println(io, "@echo off")
     println(io, "set APP_DIR=%~dp0")
-    println(io, "set JULIA_DEPOT_PATH=%APP_DIR%share\\julia")
+    println(io, "set FIXED_DEPOT=$FIXED_DEPOT")
+    println(io)
+    println(io, "rem Re-point the build-time depot junction at this install.")
+    println(io, "if exist \"%FIXED_DEPOT%\" rmdir \"%FIXED_DEPOT%\" >nul 2>&1")
+    println(io, "mklink /J \"%FIXED_DEPOT%\" \"%APP_DIR%share\\julia\" >nul")
+    println(io, "if errorlevel 1 (")
+    println(io, "  echo Failed to create depot junction at %FIXED_DEPOT%.")
+    println(io, "  echo This usually means another user already has it pointed elsewhere,")
+    println(io, "  echo or C:\\Users\\Public is not writable on this machine.")
+    println(io, "  pause")
+    println(io, "  exit /b 1")
+    println(io, ")")
+    println(io)
+    println(io, "set JULIA_DEPOT_PATH=%FIXED_DEPOT%")
     println(io, "set NUCDET_DISABLE_DB=1")
     println(io, "\"%APP_DIR%bin\\NuclearDetonation.exe\"")
 end
