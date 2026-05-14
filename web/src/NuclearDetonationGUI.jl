@@ -45,6 +45,11 @@ function julia_main()::Cint
             pushfirst!(DEPOT_PATH, app_depot)
         end
 
+        # prediction.jl references Main.ARLReader.* (legacy of the dev path
+        # where everything lives at Main scope). In the compiled bundle this
+        # module is the parent, so alias it into Main for back-compat.
+        @eval Main const ARLReader = $(@__MODULE__).ARLReader
+
         web_dir = _web_dir()
         ENV["NUCLEAR_DETONATION_WEB_DIR"] = web_dir
 

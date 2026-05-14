@@ -43,6 +43,11 @@ if Sys.iswindows()
     end
 end
 
+# Bake the Postgres-disabled stubs into the sysimage. database.jl reads this
+# at module-load time, which is precompile time in a PackageCompiler build —
+# setting it at runtime via the .bat is too late to skip the LibPQ path.
+ENV["NUCDET_DISABLE_DB"] = "1"
+
 println("Installing dependencies (first time may take a while)...")
 Pkg.instantiate()
 
