@@ -22,7 +22,17 @@ end
 
 const APP = Ref(AppStatus(false, 0, "", "", "", 0.0, 0, "", "mSv/h", nothing))
 
-const WEB_DIR = dirname(@__DIR__)  # web/
+# Runtime lookup — `dirname(@__DIR__)` would bake the build-machine path into
+# the sysimage and fail on deploy targets. Source layout: this file is in
+# <repo>/web/src/. Compiled layout: bundle has <app>/web/ next to bin/.
+function _web_dir()
+    src_candidate = dirname(@__DIR__)
+    isdir(joinpath(src_candidate, "public_react")) && return src_candidate
+    bundled = joinpath(dirname(Sys.BINDIR), "web")
+    isdir(bundled) && return bundled
+    return src_candidate  # last resort — let downstream code surface the error
+end
+const WEB_DIR_BAKED = dirname(@__DIR__)  # kept for diagnostics
 
 function mime_type(path::String)
     endswith(path, ".html") && return "text/html"
@@ -55,7 +65,7 @@ function handle_request(req::HTTP.Request)
     try
         # Static files — serve from React build (public_react/) if it exists,
         # otherwise fall back to vanilla public/
-        react_dir = joinpath(WEB_DIR, "public_react")
+        react_dir = joinpath(_web_dir(), "public_react")
         use_react = isdir(react_dir)
         static_dir = use_react ? "public_react" : "public"
 
@@ -68,7 +78,7 @@ function handle_request(req::HTTP.Request)
         elseif use_react
             # SPA fallback: try the file, then serve index.html
             trypath = "public_react" * path
-            fullpath = joinpath(WEB_DIR, trypath)
+            fullpath = joinpath(_web_dir(), trypath)
             if isfile(fullpath)
                 return serve_file(trypath)
             end
@@ -125,7 +135,7 @@ function handle_request(req::HTTP.Request)
 end
 
 function serve_file(relpath::String)
-    fullpath = joinpath(WEB_DIR, relpath)
+    fullpath = joinpath(_web_dir(), relpath)
     if isfile(fullpath)
         content = read(fullpath)
         headers = vcat(cors_headers(), ["Content-Type" => mime_type(relpath)])
@@ -288,7 +298,7 @@ function api_simulate(req::HTTP.Request)
             end
 
             # Write to log file for debugging
-            logpath = joinpath(WEB_DIR, "error.log")
+            logpath = joinpath(_web_dir(), "error.log")
             open(logpath, "a") do f
                 println(f, "\n", "="^60)
                 println(f, Dates.now(), " — Simulation error:")
