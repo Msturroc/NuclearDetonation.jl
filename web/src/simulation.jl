@@ -191,6 +191,42 @@ const ISOTOPE_HALFLIVES = Dict{String,Float64}(
     "Generic" => 0.0,                       # NoDecay
 )
 
+"""Resolve isotope list + activities_tbq + halflives_hours, falling back to legacy scalars.
+
+Returns `(isotopes, activities_tbq, halflives_hours)` of equal length. A `NaN` in
+the half-lives vector means "use the ISOTOPE_HALFLIVES preset for this isotope name".
+"""
+function _resolve_isotopes(isotopes::Vector{String}, activities_tbq::Vector{Float64},
+                          halflives_hours::Vector{Float64},
+                          legacy_isotope::String, legacy_activity_tbq::Float64)
+    if isempty(isotopes) || isempty(activities_tbq)
+        return [legacy_isotope], [legacy_activity_tbq], [NaN]
+    end
+    length(isotopes) == length(activities_tbq) ||
+        error("isotopes and activities_tbq must have the same length " *
+              "(got $(length(isotopes)) vs $(length(activities_tbq)))")
+    hl_vec = isempty(halflives_hours) ? fill(NaN, length(isotopes)) : halflives_hours
+    length(hl_vec) == length(isotopes) ||
+        error("halflives_hours must match isotopes length (got $(length(hl_vec)) vs $(length(isotopes)))")
+    return isotopes, activities_tbq, hl_vec
+end
+
+"""Build DecayParams vector for a list of isotopes.
+
+`halflives_hours` is a per-isotope override (in hours). `NaN` (or omitted entries)
+falls back to ISOTOPE_HALFLIVES lookup. A finite half-life of 0 means no decay.
+"""
+function _build_decay_params(isotopes::Vector{String}, halflives_hours::Vector{Float64})
+    @assert length(isotopes) == length(halflives_hours)
+    [begin
+        hl_override = halflives_hours[i]
+        hl = isnan(hl_override) ? get(ISOTOPE_HALFLIVES, isotopes[i], 0.0) : hl_override
+        hl > 0.0 ?
+            Transport.DecayParams(kdecay=Transport.ExponentialDecay, halftime_hours=hl) :
+            Transport.DecayParams(kdecay=Transport.NoDecay, halftime_hours=0.0)
+    end for i in eachindex(isotopes)]
+end
+
 function run_dispersion_simulation(;
     lat::Float64 = 37.0956,
     lon::Float64 = -116.1028,
@@ -205,6 +241,9 @@ function run_dispersion_simulation(;
     stack_height_m::Float64 = 100.0,
     isotope::String = "Cs-137",
     release_duration_hours::Float64 = 1.0,
+    isotopes::Vector{String} = String[],
+    activities_tbq::Vector{Float64} = Float64[],
+    halflives_hours::Vector{Float64} = Float64[],
 )
     era5 = ERA5_STATE[]
     isnothing(era5) && error("ERA5 data not loaded. Call preload_era5!() first.")
@@ -237,58 +276,58 @@ function run_dispersion_simulation(;
         # --- NPP (Point Release) mode ---
         half_h = 5.0
         geometry = ColumnRelease(stack_height_m - half_h, stack_height_m + half_h)
-        total_activity = activity_tbq * 1e12  # TBq → Bq
 
+        # Resolve multi-isotope vectors, falling back to legacy scalars
+        iso_list, act_list, hl_list = _resolve_isotopes(
+            isotopes, activities_tbq, halflives_hours, isotope, activity_tbq)
+        ncomp = length(iso_list)
+
+        # Split particle budget across isotopes
+        n_per_iso = max(1, div(n_particles, ncomp))
+
+        # One ReleaseSource per isotope (each carrying that isotope's total activity in Bq).
         # BombRelease, not ConstantRelease: the latter interprets activity as Bq/s and
         # multiplies by a 3600 s timestep, over-releasing by that factor. Staggered birth
         # ages below give the continuous-release behaviour without that scaling.
-        source = ReleaseSource(
-            (release_x, release_y), geometry,
-            BombRelease(0.0), [total_activity], n_particles,
-        )
+        sources = [ReleaseSource(
+                       (release_x, release_y), geometry,
+                       BombRelease(0.0), [a * 1e12], n_per_iso,
+                   ) for a in act_list]
 
-        # Decay setup
-        hl = get(ISOTOPE_HALFLIVES, isotope, 0.0)
-        if hl > 0.0
-            decay_params = [Transport.DecayParams(
-                kdecay=Transport.ExponentialDecay, halftime_hours=hl)]
-        else
-            decay_params = [Transport.DecayParams(
-                kdecay=Transport.NoDecay, halftime_hours=0.0)]
-        end
+        decay_params = _build_decay_params(iso_list, hl_list)
 
-        state = Transport.initialize_simulation(domain, [source], [isotope], decay_params;
+        state = Transport.initialize_simulation(domain, sources, iso_list, decay_params;
                                                  log_depositions=true)
 
         # Pre-generate particles with staggered ages to simulate continuous release.
         # Each particle gets a random "birth time" within [0, release_duration].
-        # Particles with age > 0 won't have been advected during the delay, but this
-        # is the standard Lagrangian approximation for pre-seeded releases.
         rel_dur_s = max(release_duration_hours, 1.0/12.0) * 3600.0
 
-        update!(15, "Generating particles ($(release_duration_hours)h release)...")
+        update!(15, "Generating particles ($(release_duration_hours)h release, $(ncomp) isotope(s))...")
 
         particle_prop = ParticleProperties(diameter_μm=5.0, density_gcm3=2.0)
         npp_radii = Float64[]
         npp_densities = Float64[]
         npp_size_indices = Int[]
 
-        pos_s, act_s, released_s = Transport.generate_release_particles(
-            rng, source, 0, 1,
-            ones(Float64, era5.nx_met, era5.ny_met),
-            ones(Float64, era5.nx_met, era5.ny_met),
-            domain.dx, domain.dy, domain.hlevel,
-        )
-        if released_s && !isempty(pos_s)
-            for (k, (pos, activity)) in enumerate(zip(pos_s, act_s))
+        for (icomp, src) in enumerate(sources)
+            pos_s, act_s, released_s = Transport.generate_release_particles(
+                rng, src, 0, 1,
+                ones(Float64, era5.nx_met, era5.ny_met),
+                ones(Float64, era5.nx_met, era5.ny_met),
+                domain.dx, domain.dy, domain.hlevel,
+            )
+            (released_s && !isempty(pos_s)) || continue
+            for (pos, activity) in zip(pos_s, act_s)
                 sigma_z = Transport.height_to_sigma_hybrid(
                     release_x, release_y, pos[3], init_met, 0.0)
-                # Stagger birth: particle k is "born" at a random time in the release window
                 age = rand(rng) * rel_dur_s
+                # Activity vector across components: nonzero only at this isotope's slot
+                mass = zeros(Float64, ncomp); mass[icomp] = activity
                 Transport.add_particle!(state.ensemble,
                     SVector{3,Float64}(pos[1], pos[2], sigma_z),
                     SVector{3,Float64}(0.0, 0.0, 0.0),
-                    [activity], age, icomp=1)
+                    mass, age, icomp=icomp)
                 push!(npp_radii, 5.0 * 0.5e-6)
                 push!(npp_densities, 2000.0)
                 push!(npp_size_indices, 1)
@@ -337,7 +376,9 @@ function run_dispersion_simulation(;
             cache_init_file_idx=5, cache_init_time_idx=1,
             sigma_already_initialized=true)
 
-        store_animation_data!(snapshots, domain, Float64[]; release_mode="npp", units="kBq/m²")
+        store_animation_data!(snapshots, domain, Float64[];
+                              heights_m_ascending=Float64.(domain.hlevel),
+                              release_mode="npp", units="kBq/m²")
         update!(85, "Computing deposition...")
 
         # Build deposition field on fine grid (kBq/m²)
@@ -497,7 +538,9 @@ function run_dispersion_simulation(;
         cache_init_file_idx=5, cache_init_time_idx=1,
         sigma_already_initialized=true)
 
-    store_animation_data!(snapshots, domain, Float64[]; release_mode="bomb", units="mSv/h")
+    store_animation_data!(snapshots, domain, Float64[];
+                          heights_m_ascending=Float64.(domain.hlevel),
+                          release_mode="bomb", units="mSv/h")
     update!(85, "Computing dose rates...")
 
     # Build dose rate field on fine grid
@@ -635,18 +678,23 @@ function run_simulation_with_source(;
     stack_height_m::Float64 = 100.0,
     isotope::String = "Cs-137",
     release_duration_hours::Float64 = 1.0,
+    isotopes::Vector{String} = String[],
+    activities_tbq::Vector{Float64} = Float64[],
+    halflives_hours::Vector{Float64} = Float64[],
     progress_callback = nothing,
 )
     if weather_source == "arl"
         return run_arl_dispersion_simulation(;
             arl_dir, lat, lon, yield_kt, start_date, start_hour,
             duration_hours, n_particles, release_mode, activity_tbq,
-            stack_height_m, isotope, release_duration_hours, progress_callback)
+            stack_height_m, isotope, release_duration_hours,
+            isotopes, activities_tbq, halflives_hours, progress_callback)
     else
         return run_dispersion_simulation(;
             lat, lon, yield_kt, start_date, start_hour,
             duration_hours, n_particles, release_mode, activity_tbq,
-            stack_height_m, isotope, release_duration_hours, progress_callback)
+            stack_height_m, isotope, release_duration_hours,
+            isotopes, activities_tbq, halflives_hours, progress_callback)
     end
 end
 
@@ -663,6 +711,9 @@ function run_arl_dispersion_simulation(;
     stack_height_m::Float64 = 100.0,
     isotope::String = "Cs-137",
     release_duration_hours::Float64 = 1.0,
+    isotopes::Vector{String} = String[],
+    activities_tbq::Vector{Float64} = Float64[],
+    halflives_hours::Vector{Float64} = Float64[],
     progress_callback = nothing,
 )
     update!(pct, msg) = isnothing(progress_callback) || progress_callback(pct, msg)
@@ -829,7 +880,9 @@ function run_arl_dispersion_simulation(;
             cache_init_file_idx=init_file_idx, cache_init_time_idx=init_time_idx,
             sigma_already_initialized=true)
 
-        store_animation_data!(snapshots, domain, Float64[]; release_mode="bomb", units="mSv/h")
+        store_animation_data!(snapshots, domain, Float64[];
+                              heights_m_ascending=Float64.(domain.hlevel),
+                              release_mode="bomb", units="mSv/h")
         update!(85, "Computing dose rates...")
 
         # Build dose rate field on fine grid, dynamically sized from domain
@@ -874,51 +927,49 @@ function run_arl_dispersion_simulation(;
         # --- NPP (Point Release) mode ---
         half_h = 5.0
         geometry = ColumnRelease(stack_height_m - half_h, stack_height_m + half_h)
-        total_activity = activity_tbq * 1e12  # TBq → Bq
+
+        iso_list, act_list, hl_list = _resolve_isotopes(
+            isotopes, activities_tbq, halflives_hours, isotope, activity_tbq)
+        ncomp = length(iso_list)
+        n_per_iso = max(1, div(n_particles, ncomp))
 
         # See note in run_dispersion_simulation: BombRelease avoids the 3600s/step
         # Bq/s misinterpretation; staggered birth ages handle continuous release.
-        source = ReleaseSource(
-            (release_x, release_y), geometry,
-            BombRelease(0.0), [total_activity], n_particles,
-        )
+        sources = [ReleaseSource(
+                       (release_x, release_y), geometry,
+                       BombRelease(0.0), [a * 1e12], n_per_iso,
+                   ) for a in act_list]
 
-        # Decay setup
-        hl = get(ISOTOPE_HALFLIVES, isotope, 0.0)
-        if hl > 0.0
-            decay_params = [Transport.DecayParams(
-                kdecay=Transport.ExponentialDecay, halftime_hours=hl)]
-        else
-            decay_params = [Transport.DecayParams(
-                kdecay=Transport.NoDecay, halftime_hours=0.0)]
-        end
+        decay_params = _build_decay_params(iso_list, hl_list)
 
-        state = Transport.initialize_simulation(domain, [source], [isotope], decay_params;
+        state = Transport.initialize_simulation(domain, sources, iso_list, decay_params;
                                                  log_depositions=true)
 
         rel_dur_s = max(release_duration_hours, 1.0/12.0) * 3600.0
-        update!(18, "Generating particles ($(release_duration_hours)h release)...")
+        update!(18, "Generating particles ($(release_duration_hours)h release, $(ncomp) isotope(s))...")
 
         particle_prop = ParticleProperties(diameter_μm=5.0, density_gcm3=2.0)
         npp_radii = Float64[]
         npp_densities = Float64[]
         npp_size_indices = Int[]
 
-        pos_s, act_s, released_s = Transport.generate_release_particles(
-            rng, source, 0, 1,
-            ones(Float64, arl.nx_met, arl.ny_met),
-            ones(Float64, arl.nx_met, arl.ny_met),
-            domain.dx, domain.dy, domain.hlevel,
-        )
-        if released_s && !isempty(pos_s)
+        for (icomp, src) in enumerate(sources)
+            pos_s, act_s, released_s = Transport.generate_release_particles(
+                rng, src, 0, 1,
+                ones(Float64, arl.nx_met, arl.ny_met),
+                ones(Float64, arl.nx_met, arl.ny_met),
+                domain.dx, domain.dy, domain.hlevel,
+            )
+            (released_s && !isempty(pos_s)) || continue
             for (pos, activity) in zip(pos_s, act_s)
                 sigma_z = Transport.height_to_sigma_hybrid(
                     release_x, release_y, pos[3], init_met, 0.0)
                 age = rand(rng) * rel_dur_s
+                mass = zeros(Float64, ncomp); mass[icomp] = activity
                 Transport.add_particle!(state.ensemble,
                     SVector{3,Float64}(pos[1], pos[2], sigma_z),
                     SVector{3,Float64}(0.0, 0.0, 0.0),
-                    [activity], age, icomp=1)
+                    mass, age, icomp=icomp)
                 push!(npp_radii, 5.0 * 0.5e-6)
                 push!(npp_densities, 2000.0)
                 push!(npp_size_indices, 1)
@@ -959,7 +1010,9 @@ function run_arl_dispersion_simulation(;
             cache_init_file_idx=init_file_idx, cache_init_time_idx=init_time_idx,
             sigma_already_initialized=true)
 
-        store_animation_data!(snapshots, domain, Float64[]; release_mode="npp", units="kBq/m²")
+        store_animation_data!(snapshots, domain, Float64[];
+                              heights_m_ascending=Float64.(domain.hlevel),
+                              release_mode="npp", units="kBq/m²")
         update!(85, "Computing deposition...")
 
         # Build deposition field on fine grid (kBq/m²)

@@ -70,7 +70,20 @@ export async function fetchPrediction({ site, date, hour, release_duration, rele
 
 export async function fetchObservations() {
   const resp = await fetch('/api/observations');
-  if (!resp.ok) throw new Error('No observations');
+  if (!resp.ok) {
+    let msg = `HTTP ${resp.status}`;
+    try {
+      const ct = resp.headers.get('Content-Type') || '';
+      if (ct.includes('application/json')) {
+        const err = await resp.json();
+        if (err && err.error) msg = err.error;
+      } else {
+        const text = await resp.text();
+        if (text) msg = text;
+      }
+    } catch { /* swallow parse errors, fall back to status code */ }
+    throw new Error(msg);
+  }
   return resp.json();
 }
 

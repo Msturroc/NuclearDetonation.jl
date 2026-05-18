@@ -14,6 +14,25 @@ export const DATASET_DEFAULTS = {
   },
 };
 
+// Common reactor / fallout isotopes shown as datalist suggestions on the
+// source-term editor. Any built-in name (Cs-137, I-131, Sr-90, Generic) is
+// resolved against ISOTOPE_HALFLIVES in web/src/simulation.jl when no
+// halflife override is supplied; everything else needs an explicit halflife.
+export const ISOTOPE_SUGGESTIONS = [
+  { name: 'Cs-137',  halflife_hours: 30.17 * 365.25 * 24 },
+  { name: 'I-131',   halflife_hours: 8.02 * 24 },
+  { name: 'Sr-90',   halflife_hours: 28.9 * 365.25 * 24 },
+  { name: 'Cs-134',  halflife_hours: 2.062 * 365.25 * 24 },
+  { name: 'Co-60',   halflife_hours: 5.27 * 365.25 * 24 },
+  { name: 'I-133',   halflife_hours: 20.8 },
+  { name: 'Ru-103',  halflife_hours: 39.26 * 24 },
+  { name: 'Ru-106',  halflife_hours: 373.6 * 24 },
+  { name: 'Te-132',  halflife_hours: 3.20 * 24 },
+  { name: 'Xe-133',  halflife_hours: 5.25 * 24 },
+  { name: 'Pu-239',  halflife_hours: 24110 * 365.25 * 24 },
+  { name: 'Generic', halflife_hours: 0 },
+];
+
 // NPP plant markers (site key matches prediction model filenames)
 export const NPP_PLANTS = [
   { name: 'Hinkley Point C', site: 'hinkley',     lat: 51.2086, lon: -3.1304 },

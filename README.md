@@ -20,7 +20,18 @@ NuclearDetonation.jl is a Julia package for modelling nuclear weapon effects and
 
 ### Web GUI
 
-An interactive web interface built with React and Leaflet lets you configure and run simulations in the browser. Start it with `julia --threads=2 --project=web web/app.jl`.
+An interactive web interface built with React and Leaflet lets you configure and run simulations in the browser without writing code. Start it with `julia --threads=2 --project=web web/app.jl`, then open `http://localhost:9000`.
+
+The GUI supports:
+
+- **Two release modes** — instantaneous bomb detonations (yield in kT) and continuous point-source releases such as nuclear power plant accidents.
+- **Multi-isotope source terms** — for point releases, build an arbitrary mix of radionuclides, each with its own activity and an optional custom half-life. Common reactor and fallout isotopes (Cs-137, I-131, Sr-90, Co-60, …) are offered as presets.
+- **Built-in and custom weather** — ships with ERA5 reanalysis for the Nevada Test Site (1953) and the ETEX experiment (Europe, 1994); ARL-format weather files can be uploaded for other regions and dates.
+- **Dose-rate and deposition contours** overlaid on the map with switchable display units, plus a time-stepped animation of the dispersing plume at any model level.
+- **Historical observation overlays** — digitised dose-rate contours from the Nancy test and gridded ETEX measurements, for visual model validation.
+- **Run history** — completed simulations are persisted to PostgreSQL when available, so past runs survive restarts and identical parameters return cached results instantly.
+
+See [`web/README.md`](web/README.md) for development, database setup, and standalone-installer build instructions.
 
 <p align="center">
   <img src="docs/web_gui_screenshot.png" width="100%" alt="Web GUI showing Nancy test fallout dispersion with dose rate contours"/>

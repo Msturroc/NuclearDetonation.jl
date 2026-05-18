@@ -16,6 +16,7 @@ struct AnimationState
     ny::Int
     nz::Int
     pressure_levels::Vector{Float64}  # ascending: TOA → surface (matching nz dim)
+    heights_m::Vector{Float64}        # surface → TOA in metres MSL (matching nz dim)
     release_mode::String              # "bomb" or "npp"
     units::String                     # e.g. "mSv/h" or "Bq"
 end
@@ -36,11 +37,18 @@ const NPP_PLANTS = [
 ]
 
 """
-    store_animation_data!(snapshots, domain, pressure_levels; release_mode, units)
+    store_animation_data!(snapshots, domain, pressure_levels_ascending;
+                          heights_m_ascending=Float64[],
+                          release_mode, units)
 
 Extract concentration fields from simulation snapshots and store for animation.
+
+`heights_m_ascending`: heights in metres MSL, in surface→TOA order (matching the
+nz dimension of the concentration array — `domain.hlevel` after `update_domain_vertical!`).
+When non-empty, takes precedence over `pressure_levels_ascending` for level labelling.
 """
 function store_animation_data!(snapshots, domain, pressure_levels_ascending;
+                               heights_m_ascending::AbstractVector=Float64[],
                                release_mode::String="bomb", units::String="mSv/h")
     isempty(snapshots) && return
 
@@ -60,11 +68,47 @@ function store_animation_data!(snapshots, domain, pressure_levels_ascending;
         Float64.(pressure_levels_ascending)
     end
 
+    hmeters = Float64.(heights_m_ascending)
+
     ANIMATION_STATE[] = AnimationState(
         concentrations, times_s,
         domain.lat_min, domain.lat_max, lon_min, lon_max,
-        nx, ny, nz, plevs, release_mode, units,
+        nx, ny, nz, plevs, hmeters, release_mode, units,
     )
+end
+
+# --- Level label formatting ---
+
+"""Format a height (metres MSL) as a short label."""
+function _height_label(h_m::Real)
+    h_m <= 0 && return "Surface"
+    h_m < 1000 && return "$(round(Int, h_m)) m"
+    # Consistent 1-decimal km for everything from 1 km upward, so adjacent levels
+    # don't mix "10.0 km" with "10 km" formatting.
+    return "$(round(h_m / 1000, digits=1)) km"
+end
+
+"""Build a level label for index k (1=surface, nz=TOA per accumulate_concentration)."""
+function _level_label(anim::AnimationState, k::Int)
+    k == 0 && return "Column Total"
+    1 <= k <= anim.nz || return "Level $k"
+    if !isempty(anim.heights_m) && length(anim.heights_m) >= k
+        h = anim.heights_m[k]
+        return "$(_height_label(h))" *
+               (k == 1 ? " (surface)" : k == anim.nz ? " (top)" : "")
+    elseif maximum(anim.pressure_levels) > anim.nz
+        hpa = anim.pressure_levels[k]
+        if hpa >= 950
+            alt_m = round(Int, 44330 * (1.0 - (hpa / 1013.25)^0.19))
+            return "Surface (~$(alt_m)m)"
+        else
+            alt_km = round(44.33 * (1.0 - (hpa / 1013.25)^0.19), digits=1)
+            return "$(round(Int, hpa)) hPa (~$(alt_km)km)"
+        end
+    else
+        return k == anim.nz ? "Level $k (top)" :
+               k == 1 ? "Level $k (surface)" : "Level $k"
+    end
 end
 
 # --- Colormap (blue → cyan → green → yellow → red) ---
@@ -174,9 +218,7 @@ function get_animation_frames(level::Int)
     log_min = log_max - 5.0
     log_range = 5.0
 
-    level_label = level == 0 ? "Column Total" :
-        (anim.pressure_levels[level] > anim.nz ?
-            "$(round(Int, anim.pressure_levels[level])) hPa" : "Level $level")
+    level_label = _level_label(anim, level)
 
     encoded_frames = String[]
     for conc in anim.concentrations
@@ -251,20 +293,12 @@ function get_available_levels()
     # Column Total as first (default) option
     push!(levels, Dict("index" => 0, "hpa" => 0.0, "label" => "Column Total (all heights)"))
 
-    has_real_pressures = maximum(anim.pressure_levels) > anim.nz
     for k in 1:anim.nz
         has_data[k] || continue  # skip empty levels
         hpa = anim.pressure_levels[k]
-        label = if !has_real_pressures
-            k == anim.nz ? "Level $k (lowest)" : k == 1 ? "Level $k (highest)" : "Level $k"
-        elseif hpa >= 950
-            alt_m = round(Int, 44330 * (1.0 - (hpa / 1013.25)^0.19))
-            "Surface (~$(alt_m)m)"
-        else
-            alt_km = round(44.33 * (1.0 - (hpa / 1013.25)^0.19), digits=1)
-            "$(round(Int, hpa)) hPa (~$(alt_km)km)"
-        end
-        push!(levels, Dict("index" => k, "hpa" => hpa, "label" => label))
+        h_m = length(anim.heights_m) >= k ? anim.heights_m[k] : 0.0
+        push!(levels, Dict("index" => k, "hpa" => hpa, "height_m" => h_m,
+                           "label" => _level_label(anim, k)))
     end
     return Dict(
         "n_levels" => length(levels),
@@ -598,10 +632,7 @@ function generate_gif(level::Int; fps::Int=2, target_px::Int=1200)
     bw_med = max(1, round(Int, fs_med * 0.12))
     pad = max(8, round(Int, h * 0.01))
 
-    level_str = level == 0 ? "Column Total" : begin
-        hpa = anim.pressure_levels[level]
-        hpa > anim.nz ? "$(round(Int, hpa)) hPa" : "Level $(round(Int, hpa))"
-    end
+    level_str = _level_label(anim, level)
 
     log_range = 5.0
     hi_label = _sci_label(10.0^(log_min + log_range))
@@ -661,10 +692,7 @@ function generate_mp4(level::Int; fps::Int=4, target_px::Int=1200)
     bw_med = max(1, round(Int, fs_med * 0.12))
     pad = max(8, round(Int, h * 0.01))
 
-    level_str = level == 0 ? "Column Total" : begin
-        hpa = anim.pressure_levels[level]
-        hpa > anim.nz ? "$(round(Int, hpa)) hPa" : "Level $(round(Int, hpa))"
-    end
+    level_str = _level_label(anim, level)
 
     log_range = 5.0
     hi_label = _sci_label(10.0^(log_min + log_range))

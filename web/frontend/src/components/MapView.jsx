@@ -74,14 +74,14 @@ function ContourLayer({ geojson, baseUnits, displayUnit }) {
 }
 
 // Observation overlay
-function ObservationLayer({ dataset }) {
+function ObservationLayer({ dataset, onError }) {
   const [obsData, setObsData] = useState(null);
 
   useEffect(() => {
     fetchObservations()
-      .then(data => setObsData(data))
-      .catch(() => setObsData(null));
-  }, [dataset]);
+      .then(data => { setObsData(data); onError && onError(null); })
+      .catch(err => { setObsData(null); onError && onError(err.message || String(err)); });
+  }, [dataset, onError]);
 
   if (!obsData || !obsData.geojson) return null;
 
@@ -159,7 +159,7 @@ export default function MapView({
   geojson, showContours, showObs,
   weatherBounds, baseUnits, displayUnit,
   onMapClick, onNPPClick,
-  animData, dataset,
+  animData, dataset, onObsError,
 }) {
   const [hintHidden, setHintHidden] = useState(false);
 
@@ -183,6 +183,7 @@ export default function MapView({
           attribution='&copy; OpenStreetMap contributors &copy; CARTO'
           subdomains="abcd"
           maxZoom={20}
+          maxNativeZoom={18}
         />
         <MapClickHandler onClick={handleClick} />
         <MapSync lat={lat} lon={lon} zoom={zoom} />
@@ -226,7 +227,7 @@ export default function MapView({
         )}
 
         {/* Observation overlay */}
-        {showObs && <ObservationLayer dataset={dataset} />}
+        {showObs && <ObservationLayer dataset={dataset} onError={onObsError} />}
 
         {/* Animation overlay */}
         {animData?.visible && <AnimationOverlay animData={animData} />}

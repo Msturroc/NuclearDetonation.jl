@@ -34,6 +34,18 @@ function _web_dir()
 end
 const WEB_DIR_BAKED = dirname(@__DIR__)  # kept for diagnostics
 
+# Resolve a path under data/ at runtime. Source-tree layout uses pkgdir,
+# bundled (PackageCompiler) layout puts data next to the executable.
+function _resolve_bundled_path(relpath::String)
+    pkg = pkgdir(NuclearDetonation)
+    src_candidate = pkg === nothing ? "" : joinpath(pkg, "data", relpath)
+    isfile(src_candidate) && return src_candidate
+    bundled = joinpath(dirname(Sys.BINDIR), "data", relpath)
+    isfile(bundled) && return bundled
+    # Last resort: return source-tree candidate so the downstream error names a real path
+    return isempty(src_candidate) ? bundled : src_candidate
+end
+
 function mime_type(path::String)
     endswith(path, ".html") && return "text/html"
     endswith(path, ".css")  && return "text/css"
@@ -187,7 +199,30 @@ function api_simulate(req::HTTP.Request)
     arl_dir        = String(get(params, :arl_dir, ""))
     release_duration_hours = Float64(get(params, :release_duration_hours, 1.0))
 
+    # Multi-isotope source terms: accept array of {isotope, activity_tbq, halflife_hours?}
+    # entries, otherwise fall back to the legacy single-isotope scalars. A NaN in
+    # halflives_vec means "use preset / ISOTOPE_HALFLIVES lookup downstream".
+    isotopes_vec       = String[]
+    activities_tbq_vec = Float64[]
+    halflives_vec      = Float64[]
+    if haskey(params, :source_terms)
+        for entry in params.source_terms
+            iso = String(get(entry, :isotope, ""))
+            a   = Float64(get(entry, :activity_tbq, 0.0))
+            (isempty(iso) || a <= 0.0) && continue
+            push!(isotopes_vec, iso)
+            push!(activities_tbq_vec, a)
+            hl = haskey(entry, :halflife_hours) ? Float64(entry.halflife_hours) : NaN
+            push!(halflives_vec, hl)
+        end
+    end
+
     # Build parameter dict for database operations
+    # For multi-isotope NPP runs, capture the full source-term list (or the legacy
+    # scalar pair). Cache key includes this so different source-term lists don't collide.
+    eff_isotopes  = release_mode == "npp" ? (isempty(isotopes_vec) ? [isotope] : isotopes_vec) : String[]
+    eff_actvtbq   = release_mode == "npp" ? (isempty(activities_tbq_vec) ? [activity_tbq] : activities_tbq_vec) : Float64[]
+
     run_params = Dict(
         "dataset" => get(params, :dataset, nothing),
         "release_mode" => release_mode,
@@ -198,9 +233,9 @@ function api_simulate(req::HTTP.Request)
         "duration_hours" => duration_hours,
         "n_particles" => n_particles,
         "yield_kt" => release_mode == "bomb" ? yield_kt : nothing,
-        "activity_tbq" => release_mode == "npp" ? activity_tbq : nothing,
+        "activity_tbq" => release_mode == "npp" ? sum(eff_actvtbq) : nothing,
         "stack_height_m" => release_mode == "npp" ? stack_height_m : nothing,
-        "isotope" => release_mode == "npp" ? isotope : nothing,
+        "isotope" => release_mode == "npp" ? join(eff_isotopes, ",") : nothing,
         "release_duration_hours" => release_mode == "npp" ? release_duration_hours : nothing,
         "arl_dir" => weather_source == "arl" ? arl_dir : nothing,
     )
@@ -251,6 +286,8 @@ function api_simulate(req::HTTP.Request)
                 lat, lon, yield_kt, start_date, start_hour,
                 duration_hours, n_particles,
                 release_mode, activity_tbq, stack_height_m, isotope, release_duration_hours,
+                isotopes = isotopes_vec, activities_tbq = activities_tbq_vec,
+                halflives_hours = halflives_vec,
                 progress_callback = (pct, msg) -> begin
                     APP[].progress_pct = pct
                     APP[].progress_msg = msg
@@ -681,7 +718,7 @@ function api_observations()
 end
 
 function _load_etex_observations()
-    meas_file = joinpath(pkgdir(NuclearDetonation), "data", "etex", "meas-t1.txt")
+    meas_file = _resolve_bundled_path(joinpath("etex", "meas-t1.txt"))
     # Parse station data: compute TIC per station
     stations = Dict{Int, @NamedTuple{lat::Float64, lon::Float64, tic::Float64}}()
     for line in readlines(meas_file)[3:end]

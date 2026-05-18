@@ -1,8 +1,97 @@
 import { useState, useCallback } from 'react';
-import { formatValue, getUnitInfo, BOMB_BASE_LEVELS, BOMB_COLORS, NPP_BASE_LEVELS, NPP_COLORS, DOSE_UNITS } from '../constants';
+import { formatValue, getUnitInfo, BOMB_BASE_LEVELS, BOMB_COLORS, NPP_BASE_LEVELS, NPP_COLORS, DOSE_UNITS, ISOTOPE_SUGGESTIONS } from '../constants';
 import { loadARLFromPath, uploadARLFiles } from '../api';
 import AnimationPanel from './AnimationPanel';
 import HistoryPanel from './HistoryPanel';
+
+function SourceTermTable({ rows, onChange }) {
+  const updateRow = (i, field, value) => {
+    const next = rows.slice();
+    next[i] = { ...next[i], [field]: value };
+    onChange(next);
+  };
+  const addRow = () => {
+    onChange([...rows, { isotope: 'Cs-137', activity_tbq: 1.0, halflife_hours: null }]);
+  };
+  const removeRow = (i) => {
+    if (rows.length <= 1) return;
+    onChange(rows.filter((_, j) => j !== i));
+  };
+  // Look up the default halflife (hours) for an isotope name (case-insensitive match
+  // against the suggestion list). Returns null when the name isn't a known preset.
+  const presetHalflife = (name) => {
+    if (!name) return null;
+    const hit = ISOTOPE_SUGGESTIONS.find(s => s.name.toLowerCase() === name.toLowerCase());
+    return hit ? hit.halflife_hours : null;
+  };
+  return (
+    <div className="form-group">
+      <label>Source Terms</label>
+      <datalist id="isotope-suggestions">
+        {ISOTOPE_SUGGESTIONS.map(s => <option key={s.name} value={s.name} />)}
+      </datalist>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+        {rows.map((row, i) => {
+          const effectiveHL = row.halflife_hours != null
+            ? row.halflife_hours
+            : presetHalflife(row.isotope);
+          const isKnown = presetHalflife(row.isotope) !== null;
+          return (
+            <div key={i} style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap' }}>
+              <input
+                type="text"
+                list="isotope-suggestions"
+                value={row.isotope}
+                placeholder="e.g. Cs-137"
+                onChange={e => updateRow(i, 'isotope', e.target.value)}
+                style={{ flex: 2, minWidth: 80 }}
+                title="Isotope name (pick from list or type any nuclide)"
+              />
+              <input
+                type="number"
+                value={row.activity_tbq}
+                step="0.1" min="0.001" max="100000"
+                onChange={e => updateRow(i, 'activity_tbq', parseFloat(e.target.value))}
+                style={{ flex: 1, minWidth: 60 }}
+                title="Activity (TBq)"
+              />
+              <span style={{ fontSize: 11, color: '#666' }}>TBq</span>
+              <input
+                type="number"
+                value={row.halflife_hours ?? ''}
+                step="any" min="0"
+                placeholder={isKnown ? `${effectiveHL.toExponential(2)} h` : 'half-life (h)'}
+                onChange={e => {
+                  const v = e.target.value;
+                  updateRow(i, 'halflife_hours', v === '' ? null : parseFloat(v));
+                }}
+                style={{ flex: 1, minWidth: 80 }}
+                title="Half-life in hours (leave blank for preset value, 0 for no decay)"
+              />
+              <span style={{ fontSize: 11, color: '#666' }}>h</span>
+              <button
+                type="button"
+                onClick={() => removeRow(i)}
+                disabled={rows.length <= 1}
+                title="Remove this isotope"
+                style={{ padding: '2px 8px', fontSize: 13 }}
+              >−</button>
+            </div>
+          );
+        })}
+      </div>
+      <button
+        type="button"
+        onClick={addRow}
+        style={{ marginTop: 4, padding: '2px 8px', fontSize: 12, alignSelf: 'flex-start' }}
+      >+ Add isotope</button>
+      <div style={{ fontSize: 11, color: '#666', marginTop: 4 }}>
+        Pick from the dropdown or type any nuclide. Half-life is auto-filled for known
+        presets; otherwise enter it explicitly (0 = no decay).
+      </div>
+    </div>
+  );
+}
 
 export default function ControlPanel({
   dataset, onDatasetChange, datasetLoading,
@@ -10,10 +99,9 @@ export default function ControlPanel({
   weatherSource, onWeatherSourceChange,
   lat, onLatChange, lon, onLonChange,
   yieldKt, onYieldChange,
-  activityTbq, onActivityChange,
   releaseDuration, onReleaseDurationChange,
   stackHeight, onStackHeightChange,
-  isotope, onIsotopeChange,
+  sourceTerms, onSourceTermsChange,
   startDate, onStartDateChange,
   dateMin, dateMax,
   startHour, onStartHourChange,
@@ -23,7 +111,7 @@ export default function ControlPanel({
   progressPct, progressMsg, error,
   results, geojson,
   showContours, onToggleContours,
-  showObs, onToggleObs,
+  showObs, onToggleObs, obsError,
   baseUnits, displayUnit, onDisplayUnitChange,
   arlMetadata, onArlMetadataChange,
   era5Bounds,
@@ -217,32 +305,17 @@ export default function ControlPanel({
       {/* NPP fields */}
       {releaseMode === 'npp' && (
         <>
-          <div className="form-row">
-            <div className="form-group">
-              <label>Activity (TBq)</label>
-              <input type="number" value={activityTbq} step="0.1" min="0.001" max="100000"
-                onChange={e => onActivityChange(parseFloat(e.target.value))} />
-            </div>
+          <SourceTermTable rows={sourceTerms} onChange={onSourceTermsChange} />
+          <div className="form-row" style={{ marginTop: 4 }}>
             <div className="form-group">
               <label>Release Dur. (h)</label>
               <input type="number" value={releaseDuration} step="0.5" min="0.1" max="48"
                 onChange={e => onReleaseDurationChange(parseFloat(e.target.value))} />
             </div>
-          </div>
-          <div className="form-row" style={{ marginTop: 4 }}>
             <div className="form-group">
               <label>Stack Height (m)</label>
               <input type="number" value={stackHeight} step="10" min="10" max="500"
                 onChange={e => onStackHeightChange(parseFloat(e.target.value))} />
-            </div>
-            <div className="form-group">
-              <label>Isotope</label>
-              <select value={isotope} onChange={e => onIsotopeChange(e.target.value)}>
-                <option value="Cs-137">Cs-137</option>
-                <option value="I-131">I-131</option>
-                <option value="Sr-90">Sr-90</option>
-                <option value="Generic">Generic (no decay)</option>
-              </select>
             </div>
           </div>
         </>
@@ -335,6 +408,11 @@ export default function ControlPanel({
               onClick={onToggleObs}>
               {showObs ? 'Hide Observations' : 'Show Observations'}
             </button>
+            {showObs && obsError && (
+              <div className="error-box" style={{ flexBasis: '100%', marginTop: 4 }}>
+                Observations unavailable: {obsError}
+              </div>
+            )}
             <button className="btn-secondary"
               onClick={() => window.open('/api/results.csv', '_blank')}>
               Export CSV

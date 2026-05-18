@@ -140,6 +140,18 @@ end
 # Copy app.jl
 cp(joinpath(src_dir, "app.jl"), joinpath(web_out, "app.jl"); force=true)
 
+# Copy data/ (Nancy observations, ETEX measurements, etc.). Resolved at runtime
+# by load_nancy_observations and _load_etex_observations against
+# dirname(Sys.BINDIR)/../data/, so layout must match: <bundle>/data/<subdir>/...
+data_src = joinpath(dirname(src_dir), "data")
+if isdir(data_src)
+    data_dst = joinpath(out_dir, "data")
+    cp(data_src, data_dst; force=true)
+    println("Bundled data/ (observation datasets)")
+else
+    println("WARNING: data/ directory missing at $data_src. Observations overlay will fail at runtime.")
+end
+
 # Copy LocalPreferences.toml (suppresses CUDA artifact via XGBoost_GPU_jll)
 prefs_src = joinpath(src_dir, "LocalPreferences.toml")
 if isfile(prefs_src)

@@ -290,8 +290,22 @@ obs = NuclearDetonation.Transport.load_nancy_observations()
 ```
 """
 function load_nancy_observations()
-    contour_dir = joinpath(pkgdir(parentmodule(@__MODULE__)), "data", "nancy_observations")
-    load_nancy_observations(contour_dir)
+    load_nancy_observations(_resolve_data_dir("nancy_observations"))
+end
+
+"""
+Locate a bundled data subdirectory at runtime. Source-tree path is built from
+`pkgdir`; bundled (PackageCompiler) path lives next to the executable so the
+build user's home doesn't leak in via baked `@__DIR__`.
+"""
+function _resolve_data_dir(subdir::String)
+    pkg = pkgdir(parentmodule(@__MODULE__))
+    src_path = pkg === nothing ? "" : joinpath(pkg, "data", subdir)
+    isdir(src_path) && return src_path
+    bundled = joinpath(dirname(Sys.BINDIR), "data", subdir)
+    isdir(bundled) && return bundled
+    # Last resort — return the source path so the caller's error message names a real candidate
+    return isempty(src_path) ? bundled : src_path
 end
 
 

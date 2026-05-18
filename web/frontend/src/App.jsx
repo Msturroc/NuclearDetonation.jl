@@ -17,6 +17,9 @@ export default function App() {
   const [releaseDuration, setReleaseDuration] = useState(1.0);
   const [stackHeight, setStackHeight] = useState(100);
   const [isotope, setIsotope] = useState('Cs-137');
+  // Multi-isotope source terms (NPP mode). Defaults to one row matching legacy single-isotope.
+  // `halflife_hours: null` means "use preset value" — frontend leaves the resolution to the backend.
+  const [sourceTerms, setSourceTerms] = useState([{ isotope: 'Cs-137', activity_tbq: 1.0, halflife_hours: null }]);
   const [startDate, setStartDate] = useState('1953-03-24');
   const [startHour, setStartHour] = useState(13);
   const [duration, setDuration] = useState(12);
@@ -41,6 +44,7 @@ export default function App() {
   const [geojson, setGeojson] = useState(null);
   const [showContours, setShowContours] = useState(false);
   const [showObs, setShowObs] = useState(false);
+  const [obsError, setObsError] = useState(null);
 
   // --- Display state ---
   const [baseUnits, setBaseUnits] = useState('mSv/h');
@@ -83,6 +87,11 @@ export default function App() {
       if (d.stack_height_m) setStackHeight(d.stack_height_m);
       if (d.isotope) setIsotope(d.isotope);
       if (d.release_duration) setReleaseDuration(d.release_duration);
+      setSourceTerms([{
+        isotope: d.isotope || 'Cs-137',
+        activity_tbq: d.activity_tbq || 1.0,
+        halflife_hours: null,
+      }]);
     }
   }, []);
 
@@ -156,9 +165,29 @@ export default function App() {
     if (releaseMode === 'bomb') {
       params.yield_kt = yieldKt;
     } else {
-      params.activity_tbq = activityTbq;
+      // Filter to valid rows; if none, fall back to legacy scalars
+      const validTerms = (sourceTerms || []).filter(
+        t => t.isotope && Number(t.activity_tbq) > 0
+      );
+      if (validTerms.length > 0) {
+        params.source_terms = validTerms.map(t => {
+          const entry = {
+            isotope: t.isotope,
+            activity_tbq: Number(t.activity_tbq),
+          };
+          if (t.halflife_hours != null && !Number.isNaN(Number(t.halflife_hours))) {
+            entry.halflife_hours = Number(t.halflife_hours);
+          }
+          return entry;
+        });
+        // Mirror first entry into legacy scalars for back-compat / history records
+        params.isotope = validTerms[0].isotope;
+        params.activity_tbq = Number(validTerms[0].activity_tbq);
+      } else {
+        params.isotope = isotope;
+        params.activity_tbq = activityTbq;
+      }
       params.stack_height_m = stackHeight;
-      params.isotope = isotope;
       params.release_duration_hours = releaseDuration;
     }
 
@@ -223,7 +252,7 @@ export default function App() {
     }
   }, [lat, lon, startDate, startHour, duration, particles, releaseMode,
       weatherSource, yieldKt, activityTbq, stackHeight, isotope,
-      releaseDuration, arlMetadata]);
+      releaseDuration, arlMetadata, sourceTerms]);
 
   // Load a past run from history
   const handleLoadHistoryRun = useCallback(async (data) => {
@@ -320,10 +349,9 @@ export default function App() {
         lat={lat} onLatChange={setLat}
         lon={lon} onLonChange={setLon}
         yieldKt={yieldKt} onYieldChange={setYieldKt}
-        activityTbq={activityTbq} onActivityChange={setActivityTbq}
         releaseDuration={releaseDuration} onReleaseDurationChange={setReleaseDuration}
         stackHeight={stackHeight} onStackHeightChange={setStackHeight}
-        isotope={isotope} onIsotopeChange={setIsotope}
+        sourceTerms={sourceTerms} onSourceTermsChange={setSourceTerms}
         startDate={startDate} onStartDateChange={setStartDate}
         dateMin={dateMin} dateMax={dateMax}
         startHour={startHour} onStartHourChange={setStartHour}
@@ -340,7 +368,8 @@ export default function App() {
         showContours={showContours}
         onToggleContours={() => setShowContours(c => !c)}
         showObs={showObs}
-        onToggleObs={() => setShowObs(o => !o)}
+        onToggleObs={() => { setShowObs(o => !o); setObsError(null); }}
+        obsError={obsError}
         baseUnits={baseUnits}
         displayUnit={displayUnit}
         onDisplayUnitChange={setDisplayUnit}
@@ -372,6 +401,7 @@ export default function App() {
         onNPPClick={handleNPPClick}
         animData={animData}
         dataset={dataset}
+        onObsError={setObsError}
       />
     </div>
   );

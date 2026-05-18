@@ -8,3 +8,15 @@ build/compiled_app/
 .DS_Store
 *.cov
 lcov.info
+
+# Scratch / run outputs
+julia_particles_trace.csv
+*.log
+*.tar.gz
+*.aux
+*.out
+examples/*_results.txt
+examples/ERA5_data_snap/
+
+# Windows clipboard screenshot dumps
+{*}.png
