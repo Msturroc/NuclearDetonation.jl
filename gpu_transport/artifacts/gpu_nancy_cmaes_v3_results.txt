@@ -1,0 +1,29 @@
+Nancy GPU BIPOP-CMA-ES Results (Track B v3)
+============================================================
+Total evaluations: 9996
+Restarts: 4
+Wall time: 4.1 minutes
+Best loss: 0.2464159579091072
+Best score: 75.36%
+
+Best parameters:
+  d_median_fine: 80.94152478798657
+  sigma_g_fine: 2.63796184335313
+  d_median_coarse: 125.61476450081707
+  sigma_g_coarse: 2.289025276977355
+  frac_fine: 0.9331672859157709
+  frac_lower: 0.228153640716174
+  frac_middle: 0.015524222376122547
+  sigma_w_scale: 4.701699246776899
+  sigma_h_scale: 2.576975071575253
+  h_diff_scale: 0.09945474985029626
+  tl_scale: 1.5506023051811109
+  vd_scale: 6.692343443281087
+  vgrav_scale: 0.8427137049336091
+  omega_scale: 1.5160704425448435
+  mixing_height_scale: 4.082550488902751
+  tmix_scale: 7.076832936320501
+  surface_height_scale: 4.840467540127978
+  roughness_scale: 1.71341854463779
+  activity_scale: 47.02526033690926
+  smooth_sigma: 2.1107806077103044

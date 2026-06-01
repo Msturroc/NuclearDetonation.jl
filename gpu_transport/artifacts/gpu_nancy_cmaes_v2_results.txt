@@ -1,0 +1,29 @@
+Nancy Native BIPOP-CMA-ES Results
+============================================================
+Total evaluations: 996
+Restarts: 1
+Wall time: 13.1 minutes
+Best loss: 0.24627376093305653
+Best score: 75.37%
+
+Best parameters:
+  d_median_fine: 83.29738716487641
+  sigma_g_fine: 2.342818422771603
+  d_median_coarse: 166.00270469978472
+  sigma_g_coarse: 1.3576772066441742
+  frac_fine: 0.95
+  frac_lower: 0.14295495763831179
+  frac_middle: 0.07074706549661841
+  sigma_w_scale: 3.4519348619359733
+  sigma_h_scale: 7.562834795170286
+  h_diff_scale: 0.06952569883522247
+  tl_scale: 4.522383961215521
+  vd_scale: 2.5290491761533094
+  vgrav_scale: 0.9737291214817746
+  omega_scale: 1.7049903987038246
+  mixing_height_scale: 4.167888109340179
+  tmix_scale: 0.1
+  surface_height_scale: 2.838417125728916
+  roughness_scale: 1.4116152149722825
+  activity_scale: 49.73162135128702
+  smooth_sigma: 1.5342672898220258

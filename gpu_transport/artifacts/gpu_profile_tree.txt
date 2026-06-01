@@ -1,0 +1,804 @@
+Overhead ╎ [+additional indent] Count File:Line  Function
+=========================================================
+     ╎13761 @Base/Base.jl:352  (::Base.var"#start_profile_listener##0#start_pro…
+     ╎ 13761 @Base/Base.jl:332  profile_printing_listener(cond::Base.AsyncCondi…
+     ╎  13761 @Base/asyncevent.jl:163  _trywait(t::Base.AsyncCondition)
+     ╎   13761 @Base/condition.jl:141  wait(c::Base.GenericCondition{SpinLock};…
+     ╎    13761 @Base/task.jl:1228  wait()
+13760╎     13761 @Base/task.jl:1216  poptask(W::Base.IntrusiveLinkedListSynchro…
+     ╎13650 @Base/client.jl:550  _start()
+     ╎ 13650 @Base/client.jl:317  exec_options(opts::Base.JLOptions)
+     ╎  13650 @Base/Base.jl:306  include(mod::Module, _path::String)
+     ╎   13650 @Base/loading.jl:2930  _include(mapexpr::Function, mod::Module, …
+     ╎    13650 @Base/loading.jl:2870  include_string(mapexpr::typeof(identity)…
+     ╎     13650 @Base/boot.jl:489  eval(m::Module, e::Any)
+     ╎    ╎ 13650 …_run_simulation.jl:59  top-level scope
+     ╎    ╎  13628 …/cpu_reference.jl:206  run_reference_simulation(params::Vec…
+     ╎    ╎   13628 @NuclearDetonation/…:1595  run_simulation!
+     ╎    ╎    139   @NuclearDetonation/…:1909  run_simulation!(state::Simulati…
+     ╎    ╎     139   @NuclearDetonation/…:278  kwcall(::@NamedTuple{hanna_conf…
+   10╎    ╎    ╎ 27    @NuclearDetonation/…:474  integrate_timestep!(state::Sim…
+     ╎    ╎    ╎ 32    @NuclearDetonation/…:911  integrate_timestep!(state::Sim…
+     ╎    ╎    ╎  23    @NuclearDetonation/…:741  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   23    @NuclearDetonation/…:37  hybrid_profile
+     ╎    ╎    ╎    20    @NuclearDetonation/…:55  hybrid_profile(winds::WindFi…
+    1╎    ╎    ╎ 30    @NuclearDetonation/…:916  integrate_timestep!(state::Sim…
+     ╎    ╎    ╎  25    @NuclearDetonation/…:741  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   25    @NuclearDetonation/…:37  hybrid_profile
+     ╎    ╎    ╎    20    @NuclearDetonation/…:55  hybrid_profile(winds::WindFi…
+     ╎    ╎    23    @NuclearDetonation/…:1968  run_simulation!(state::Simulati…
+     ╎    ╎    194   @NuclearDetonation/…:1998  run_simulation!(state::Simulati…
+     ╎    ╎     194   @NuclearDetonation/…:396  kwcall(::@NamedTuple{config::ER…
+     ╎    ╎    ╎ 36    @NuclearDetonation/…:604  create_wind_interpolants(met_f…
+     ╎    ╎    ╎  36    @Interpolations/…:166  interpolate
+     ╎    ╎    ╎   36    @Interpolations/…:149  interpolate
+     ╎    ╎    ╎    34    @Base/array.jl:354  copy
+   34╎    ╎    ╎     34    @Base/boot.jl:588  GenericMemory
+    2╎    ╎    11285 @NuclearDetonation/…:2173  run_simulation!(state::Simulati…
+    7╎    ╎     11282 @NuclearDetonation/…:278  kwcall(::@NamedTuple{hanna_conf…
+    6╎    ╎    ╎ 38    @NuclearDetonation/…:384  integrate_timestep!(state::Sim…
+     ╎    ╎    ╎  25    @Interpolations/…:49  (::Interpolations.Extrapolation{F…
+   11╎    ╎    ╎ 32    @NuclearDetonation/…:385  integrate_timestep!(state::Sim…
+    4╎    ╎    ╎ 22    @NuclearDetonation/…:386  integrate_timestep!(state::Sim…
+   14╎    ╎    ╎ 270   @NuclearDetonation/…:455  integrate_timestep!(state::Sim…
+  256╎    ╎    ╎  256   @Base/boot.jl:499  Box
+   35╎    ╎    ╎ 1824  @NuclearDetonation/…:474  integrate_timestep!(state::Sim…
+   18╎    ╎    ╎  1789  @NuclearDetonation/…:37  kwcall(::@NamedTuple{heights_b…
+  233╎    ╎    ╎   233   @NuclearDetonation/…:0  hybrid_profile(winds::WindFiel…
+     ╎    ╎    ╎   44    @NuclearDetonation/…:43  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    44    @Base/…adcast.jl:894  materialize
+     ╎    ╎    ╎     43    @Base/…adcast.jl:919  copy
+     ╎    ╎    ╎    ╎ 32    @Base/…dcast.jl:227  similar
+     ╎    ╎    ╎    ╎  32    @Base/…dcast.jl:228  similar
+     ╎    ╎    ╎    ╎   32    @Base/…rray.jl:866  similar
+     ╎    ╎    ╎    ╎    32    @Base/…rray.jl:867  similar
+     ╎    ╎    ╎    ╎     32    @Base/boot.jl:660  Array
+     ╎    ╎    ╎    ╎    ╎ 23    @Base/boot.jl:647  Array
+   23╎    ╎    ╎    ╎    ╎  23    @Base/boot.jl:588  GenericMemory
+     ╎    ╎    ╎   1293  @NuclearDetonation/…:55  hybrid_profile(winds::WindFie…
+   25╎    ╎    ╎    108   @Interpolations/…:48  Extrapolation
+     ╎    ╎    ╎     63    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎ 40    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎  24    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎   24    @Interpolations/…:102  inbounds_position
+     ╎    ╎    ╎    ╎    24    @Interpolations/…:108  inbounds_index
+     ╎    ╎    ╎    ╎     24    @Interpolations/…:128  inbounds_index
+     ╎    ╎    ╎    1167  @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎     1021  @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎    ╎ 1021  @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎    ╎  1021  @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎   773   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    529   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎     53    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    ╎ 52    @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎  46    @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎   45    @Base/…rt.jl:308  searchsortedfirst
+    3╎    ╎    ╎    ╎    ╎    29    @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎     26    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    ╎ 26    @Base/…rs.jl:222  isless
+     ╎    ╎    ╎    ╎     391   @Interpolations/…:55  weightedindex_parts
+   83╎    ╎    ╎    ╎    ╎ 83    @Base/sort.jl:0  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 308   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎  302   @Base/sort.jl:308  searchsortedfirst
+   25╎    ╎    ╎    ╎    ╎   25    @Base/int.jl:0  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   20    @Base/…rt.jl:189  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    20    @Base/…rs.jl:321  !=
+   20╎    ╎    ╎    ╎    ╎     20    @Base/…on.jl:637  ==
+   12╎    ╎    ╎    ╎    ╎   229   @Base/…rt.jl:192  searchsortedfirst
+   31╎    ╎    ╎    ╎    ╎    31    @Base/…ls.jl:920  getindex
+     ╎    ╎    ╎    ╎    ╎    186   @Base/…ng.jl:118  lt
+   20╎    ╎    ╎    ╎    ╎     64    @Base/…at.jl:638  isless
+     ╎    ╎    ╎    ╎    ╎    ╎ 44    @Base/…at.jl:709  isnan
+   44╎    ╎    ╎    ╎    ╎    ╎  44    @Base/…at.jl:622  !=
+     ╎    ╎    ╎    ╎    ╎     122   @Base/…at.jl:640  isless
+     ╎    ╎    ╎    ╎    ╎    ╎ 72    @Base/…at.jl:633  _fpint
+   45╎    ╎    ╎    ╎    ╎    ╎  45    @Base/…ls.jl:799  ifelse
+   27╎    ╎    ╎    ╎    ╎    ╎  27    @Base/int.jl:379  xor
+   42╎    ╎    ╎    ╎    ╎    ╎ 42    @Base/int.jl:83  <
+     ╎    ╎    ╎    ╎     85    @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎ 72    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎  58    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎   39    @Interpolations/…:5  ratio
+   39╎    ╎    ╎    ╎    ╎    39    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎    132   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎     122   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 122   @Base/sort.jl:308  searchsortedfirst
+    5╎    ╎    ╎    ╎    ╎  87    @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   81    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    81    @Base/…rs.jl:222  isless
+   20╎    ╎    ╎    ╎    ╎     20    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎    ╎     24    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎    112   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎     103   @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎ 90    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎  71    @Interpolations/…:5  ratio
+     ╎    ╎    ╎    ╎    ╎   71    @Base/…on.jl:436  /
+   71╎    ╎    ╎    ╎    ╎    71    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎   148   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    148   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎     144   @Base/sort.jl:308  searchsortedfirst
+    5╎    ╎    ╎    ╎    ╎ 100   @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎  89    @Base/…ing.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎   89    @Base/…rs.jl:222  isless
+   28╎    ╎    ╎    ╎    ╎    28    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎    ╎    24    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎   100   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    94    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎     75    @Interpolations/…:72  weightedindex
+     ╎    ╎    ╎    ╎    ╎ 75    @Interpolations/…:10  fmap
+     ╎    ╎    ╎    ╎    ╎  75    @Interpolations/…:11  _fmap
+     ╎    ╎    ╎    ╎    ╎   75    @Interpolations/…:54  value_weights
+     ╎    ╎    ╎    ╎    ╎    75    @Base/…on.jl:435  -
+   75╎    ╎    ╎    ╎    ╎     75    @Base/…at.jl:496  -
+     ╎    ╎    ╎     146   @Interpolations/…:5  GriddedInterpolation
+     ╎    ╎    ╎    ╎ 146   @Interpolations/…:286  getindex
+     ╎    ╎    ╎    ╎  133   @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎   101   @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    71    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎     62    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 62    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  62    @Base/…ray.jl:929  getindex
+     ╎    ╎    ╎    ╎    ╎   46    @Base/…ay.jl:1377  _to_linear_index
+     ╎    ╎    ╎    ╎    ╎    46    @Base/…ay.jl:3049  _sub2ind
+     ╎    ╎    ╎    ╎    ╎     41    @Base/…ay.jl:3065  _sub2ind
+     ╎    ╎    ╎    ╎    ╎    ╎ 41    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎  41    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎   41    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎    41    @Base/…ay.jl:3081  _sub2ind_recurse
+   33╎    ╎    ╎    ╎    ╎    ╎     33    @Base/int.jl:88  *
+     ╎    ╎    ╎    ╎    30    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎     30    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 24    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  24    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎   24    @Base/…ay.jl:929  getindex
+     ╎    ╎    ╎    ╎   32    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎    32    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎     21    @Interpolations/…:302  interp_getindex
+   10╎    ╎    ╎   46    @NuclearDetonation/…:56  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    36    @Base/float.jl:712  isfinite
+   24╎    ╎    ╎     24    @Base/float.jl:496  -
+     ╎    ╎    ╎   62    @NuclearDetonation/…:129  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎    62    @Base/…ucedim.jl:979  extrema
+     ╎    ╎    ╎     62    @Base/…ucedim.jl:979  #extrema#751
+     ╎    ╎    ╎    ╎ 62    @Base/…cedim.jl:983  _extrema
+     ╎    ╎    ╎    ╎  62    @Base/…cedim.jl:983  #_extrema#753
+     ╎    ╎    ╎    ╎   62    @Base/…edim.jl:984  _extrema
+     ╎    ╎    ╎    ╎    62    @Base/…edim.jl:984  #_extrema#754
+     ╎    ╎    ╎    ╎     62    @Base/…edim.jl:326  mapreduce
+     ╎    ╎    ╎    ╎    ╎ 62    @Base/…dim.jl:326  #mapreduce#728
+     ╎    ╎    ╎    ╎    ╎  62    @Base/…dim.jl:334  _mapreduce_dim
+    1╎    ╎    ╎    ╎    ╎   60    @Base/…ce.jl:436  _mapreduce
+     ╎    ╎    ╎    ╎    ╎    59    @Base/…ce.jl:269  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎     58    @Base/…ce.jl:255  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎    ╎ 56    @Base/…op.jl:77  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎  56    @Base/…ce.jl:257  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎   55    @Base/…ce.jl:802  _extrema_rf
+   36╎    ╎    ╎    ╎    ╎    ╎    36    @Base/…ls.jl:799  ifelse
+     ╎    ╎    ╎   46    @NuclearDetonation/…:132  hybrid_profile(winds::WindFi…
+   22╎    ╎    ╎ 34    @NuclearDetonation/…:513  integrate_timestep!(state::Sim…
+   23╎    ╎    ╎ 41    @NuclearDetonation/…:518  integrate_timestep!(state::Sim…
+    7╎    ╎    ╎ 20    @NuclearDetonation/…:520  integrate_timestep!(state::Sim…
+   15╎    ╎    ╎ 25    @NuclearDetonation/…:524  integrate_timestep!(state::Sim…
+  135╎    ╎    ╎ 271   @NuclearDetonation/…:877  integrate_timestep!(state::Sim…
+  136╎    ╎    ╎  136   @Base/boot.jl:792  NamedTuple
+   26╎    ╎    ╎ 1993  @NuclearDetonation/…:911  integrate_timestep!(state::Sim…
+     ╎    ╎    ╎  29    @NuclearDetonation/…:726  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   21    @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎  24    @NuclearDetonation/…:727  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   23    @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎  37    @NuclearDetonation/…:728  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   31    @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎    21    @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎     21    @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎    ╎ 21    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎  1694  @NuclearDetonation/…:741  (::NuclearDetonation.Transpor…
+    2╎    ╎    ╎   1694  @NuclearDetonation/…:37  hybrid_profile
+  222╎    ╎    ╎    222   @NuclearDetonation/…:0  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    48    @NuclearDetonation/…:43  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎     48    @Base/…adcast.jl:894  materialize
+     ╎    ╎    ╎    ╎ 48    @Base/…dcast.jl:919  copy
+     ╎    ╎    ╎    ╎  35    @Base/…dcast.jl:227  similar
+     ╎    ╎    ╎    ╎   35    @Base/…cast.jl:228  similar
+     ╎    ╎    ╎    ╎    35    @Base/…rray.jl:866  similar
+     ╎    ╎    ╎    ╎     35    @Base/…rray.jl:867  similar
+     ╎    ╎    ╎    ╎    ╎ 35    @Base/boot.jl:660  Array
+     ╎    ╎    ╎    1243  @NuclearDetonation/…:55  hybrid_profile(winds::WindFi…
+   14╎    ╎    ╎     65    @Interpolations/…:48  Extrapolation
+     ╎    ╎    ╎    ╎ 39    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎  27    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎     1162  @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎    ╎ 1043  @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎    ╎  1043  @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎    ╎   1043  @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    818   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎     562   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    ╎ 80    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    ╎  71    @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎   64    @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎    64    @Base/…rt.jl:308  searchsortedfirst
+    2╎    ╎    ╎    ╎    ╎     47    @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    ╎ 45    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    ╎  45    @Base/…rs.jl:222  isless
+     ╎    ╎    ╎    ╎    ╎    ╎   20    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎    ╎ 386   @Interpolations/…:55  weightedindex_parts
+   61╎    ╎    ╎    ╎    ╎  61    @Base/sort.jl:0  find_knot_index
+     ╎    ╎    ╎    ╎    ╎  325   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎   320   @Base/…rt.jl:308  searchsortedfirst
+   26╎    ╎    ╎    ╎    ╎    26    @Base/int.jl:0  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    34    @Base/…rt.jl:189  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎     34    @Base/…rs.jl:321  !=
+   34╎    ╎    ╎    ╎    ╎    ╎ 34    @Base/…on.jl:637  ==
+     ╎    ╎    ╎    ╎    ╎    28    @Base/…rt.jl:190  searchsortedfirst
+   28╎    ╎    ╎    ╎    ╎     28    @Base/int.jl:536  >>>
+    6╎    ╎    ╎    ╎    ╎    223   @Base/…rt.jl:192  searchsortedfirst
+   23╎    ╎    ╎    ╎    ╎     23    @Base/…ls.jl:920  getindex
+     ╎    ╎    ╎    ╎    ╎     194   @Base/…ng.jl:118  lt
+   22╎    ╎    ╎    ╎    ╎    ╎ 78    @Base/…at.jl:638  isless
+     ╎    ╎    ╎    ╎    ╎    ╎  56    @Base/…at.jl:709  isnan
+   56╎    ╎    ╎    ╎    ╎    ╎   56    @Base/…at.jl:622  !=
+     ╎    ╎    ╎    ╎    ╎    ╎ 116   @Base/…at.jl:640  isless
+     ╎    ╎    ╎    ╎    ╎    ╎  78    @Base/…at.jl:633  _fpint
+   56╎    ╎    ╎    ╎    ╎    ╎   56    @Base/…ls.jl:799  ifelse
+   22╎    ╎    ╎    ╎    ╎    ╎   22    @Base/int.jl:379  xor
+   31╎    ╎    ╎    ╎    ╎    ╎  31    @Base/int.jl:83  <
+     ╎    ╎    ╎    ╎    ╎ 96    @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎  81    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎   64    @Interpolations/…:71  weightedindex
+   22╎    ╎    ╎    ╎    ╎    22    @Base/…at.jl:496  -
+     ╎    ╎    ╎    ╎    ╎    42    @Interpolations/…:5  ratio
+   42╎    ╎    ╎    ╎    ╎     42    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎     153   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎ 151   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎  145   @Base/sort.jl:308  searchsortedfirst
+    8╎    ╎    ╎    ╎    ╎   105   @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    92    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎     92    @Base/…rs.jl:222  isless
+   23╎    ╎    ╎    ╎    ╎    ╎ 23    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎    ╎    ╎ 23    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎    ╎    ╎ 28    @Base/…on.jl:488  <
+     ╎    ╎    ╎    ╎     103   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎ 94    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎  75    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎   58    @Interpolations/…:5  ratio
+     ╎    ╎    ╎    ╎    ╎    58    @Base/…on.jl:436  /
+   57╎    ╎    ╎    ╎    ╎     57    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎    122   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎     122   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 120   @Base/sort.jl:308  searchsortedfirst
+    7╎    ╎    ╎    ╎    ╎  88    @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   77    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    77    @Base/…rs.jl:222  isless
+     ╎    ╎    ╎    ╎    ╎     25    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎    103   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎     98    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎ 24    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎ 71    @Interpolations/…:72  weightedindex
+     ╎    ╎    ╎    ╎    ╎  71    @Interpolations/…:10  fmap
+     ╎    ╎    ╎    ╎    ╎   71    @Interpolations/…:11  _fmap
+     ╎    ╎    ╎    ╎    ╎    71    @Interpolations/…:54  value_weights
+     ╎    ╎    ╎    ╎    ╎     71    @Base/…on.jl:435  -
+   71╎    ╎    ╎    ╎    ╎    ╎ 71    @Base/…at.jl:496  -
+     ╎    ╎    ╎    ╎ 119   @Interpolations/…:5  GriddedInterpolation
+     ╎    ╎    ╎    ╎  119   @Interpolations/…:286  getindex
+     ╎    ╎    ╎    ╎   95    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    78    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎     57    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 50    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  50    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎   50    @Base/…ay.jl:929  getindex
+     ╎    ╎    ╎    ╎    ╎    27    @Base/…ay.jl:1377  _to_linear_index
+     ╎    ╎    ╎    ╎    ╎     27    @Base/…ay.jl:3049  _sub2ind
+     ╎    ╎    ╎    ╎    ╎    ╎ 24    @Base/…ay.jl:3065  _sub2ind
+     ╎    ╎    ╎    ╎    ╎    ╎  24    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎   24    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎    24    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎     24    @Base/…ay.jl:3081  _sub2ind_recurse
+   23╎    ╎    ╎    ╎    ╎    ╎    ╎ 23    @Base/int.jl:88  *
+   23╎    ╎    ╎    ╎    ╎    23    @Base/…ls.jl:920  getindex
+     ╎    ╎    ╎    ╎     21    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 21    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎   24    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎    24    @Interpolations/…:302  interp_getindex
+    7╎    ╎    ╎    25    @NuclearDetonation/…:56  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎    69    @NuclearDetonation/…:129  hybrid_profile(winds::WindF…
+     ╎    ╎    ╎     69    @Base/…ucedim.jl:979  extrema
+     ╎    ╎    ╎    ╎ 69    @Base/…cedim.jl:979  #extrema#751
+     ╎    ╎    ╎    ╎  69    @Base/…cedim.jl:983  _extrema
+     ╎    ╎    ╎    ╎   69    @Base/…edim.jl:983  #_extrema#753
+     ╎    ╎    ╎    ╎    69    @Base/…edim.jl:984  _extrema
+     ╎    ╎    ╎    ╎     69    @Base/…edim.jl:984  #_extrema#754
+     ╎    ╎    ╎    ╎    ╎ 69    @Base/…dim.jl:326  mapreduce
+     ╎    ╎    ╎    ╎    ╎  69    @Base/…dim.jl:326  #mapreduce#728
+     ╎    ╎    ╎    ╎    ╎   69    @Base/…im.jl:334  _mapreduce_dim
+     ╎    ╎    ╎    ╎    ╎    66    @Base/…ce.jl:436  _mapreduce
+     ╎    ╎    ╎    ╎    ╎     66    @Base/…ce.jl:269  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎    ╎ 66    @Base/…ce.jl:255  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎    ╎  64    @Base/…op.jl:77  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎   64    @Base/…ce.jl:257  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎    61    @Base/…ce.jl:802  _extrema_rf
+   46╎    ╎    ╎    ╎    ╎    ╎     46    @Base/…ls.jl:799  ifelse
+     ╎    ╎    ╎    37    @NuclearDetonation/…:132  hybrid_profile(winds::WindF…
+   10╎    ╎    ╎  31    @NuclearDetonation/…:785  (::NuclearDetonation.Transpor…
+   38╎    ╎    ╎ 128   @NuclearDetonation/…:912  integrate_timestep!(state::Sim…
+   89╎    ╎    ╎  89    @StaticArrays/…jl:173  SVector{3, Float64}(::Float64, :…
+   20╎    ╎    ╎ 1987  @NuclearDetonation/…:916  integrate_timestep!(state::Sim…
+     ╎    ╎    ╎  37    @NuclearDetonation/…:726  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   29    @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎  23    @NuclearDetonation/…:727  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   23    @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎    21    @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎     21    @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎    ╎ 21    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎  20    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎  1702  @NuclearDetonation/…:741  (::NuclearDetonation.Transpor…
+     ╎    ╎    ╎   1702  @NuclearDetonation/…:37  hybrid_profile
+  232╎    ╎    ╎    232   @NuclearDetonation/…:0  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    47    @NuclearDetonation/…:43  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎     47    @Base/…adcast.jl:894  materialize
+     ╎    ╎    ╎    ╎ 47    @Base/…dcast.jl:919  copy
+     ╎    ╎    ╎    ╎  20    @Base/…dcast.jl:947  copyto!
+     ╎    ╎    ╎    ╎   20    @Base/…cast.jl:994  copyto!
+     ╎    ╎    ╎    ╎    20    @Base/…loop.jl:77  macro expansion
+     ╎    ╎    ╎    ╎     20    @Base/…cast.jl:995  macro expansion
+     ╎    ╎    ╎    ╎    ╎ 20    @Base/…ray.jl:986  setindex!
+   20╎    ╎    ╎    ╎    ╎  20    @Base/…ray.jl:991  _setindex!
+     ╎    ╎    ╎    ╎  27    @Base/…dcast.jl:227  similar
+     ╎    ╎    ╎    ╎   27    @Base/…cast.jl:228  similar
+     ╎    ╎    ╎    ╎    27    @Base/…rray.jl:866  similar
+     ╎    ╎    ╎    ╎     27    @Base/…rray.jl:867  similar
+     ╎    ╎    ╎    ╎    ╎ 27    @Base/boot.jl:660  Array
+     ╎    ╎    ╎    1257  @NuclearDetonation/…:55  hybrid_profile(winds::WindFi…
+   21╎    ╎    ╎     75    @Interpolations/…:48  Extrapolation
+     ╎    ╎    ╎    ╎ 42    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎  26    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎     1161  @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎    ╎ 1004  @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎    ╎  1004  @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎    ╎   1004  @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    753   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎     507   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    ╎ 61    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    ╎  53    @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎   44    @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎    44    @Base/…rt.jl:308  searchsortedfirst
+    3╎    ╎    ╎    ╎    ╎     34    @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    ╎ 30    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    ╎  30    @Base/…rs.jl:222  isless
+     ╎    ╎    ╎    ╎    ╎ 352   @Interpolations/…:55  weightedindex_parts
+   70╎    ╎    ╎    ╎    ╎  70    @Base/sort.jl:0  find_knot_index
+     ╎    ╎    ╎    ╎    ╎  282   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎   276   @Base/…rt.jl:308  searchsortedfirst
+   20╎    ╎    ╎    ╎    ╎    20    @Base/int.jl:0  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    20    @Base/…rt.jl:189  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎     20    @Base/…rs.jl:321  !=
+   20╎    ╎    ╎    ╎    ╎    ╎ 20    @Base/…on.jl:637  ==
+     ╎    ╎    ╎    ╎    ╎    20    @Base/…rt.jl:190  searchsortedfirst
+   20╎    ╎    ╎    ╎    ╎     20    @Base/int.jl:536  >>>
+   12╎    ╎    ╎    ╎    ╎    207   @Base/…rt.jl:192  searchsortedfirst
+   21╎    ╎    ╎    ╎    ╎     21    @Base/…ls.jl:920  getindex
+     ╎    ╎    ╎    ╎    ╎     174   @Base/…ng.jl:118  lt
+   29╎    ╎    ╎    ╎    ╎    ╎ 82    @Base/…at.jl:638  isless
+     ╎    ╎    ╎    ╎    ╎    ╎  53    @Base/…at.jl:709  isnan
+   53╎    ╎    ╎    ╎    ╎    ╎   53    @Base/…at.jl:622  !=
+     ╎    ╎    ╎    ╎    ╎    ╎ 92    @Base/…at.jl:640  isless
+     ╎    ╎    ╎    ╎    ╎    ╎  54    @Base/…at.jl:633  _fpint
+   47╎    ╎    ╎    ╎    ╎    ╎   47    @Base/…ls.jl:799  ifelse
+   32╎    ╎    ╎    ╎    ╎    ╎  32    @Base/int.jl:83  <
+     ╎    ╎    ╎    ╎    ╎ 94    @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎  21    @Interpolations/…:61  weightedindex_parts2
+   21╎    ╎    ╎    ╎    ╎   21    @Base/…cs.jl:1340  clamp
+     ╎    ╎    ╎    ╎    ╎  73    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎   58    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎    48    @Interpolations/…:5  ratio
+   48╎    ╎    ╎    ╎    ╎     48    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎     129   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎ 124   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎  123   @Base/sort.jl:308  searchsortedfirst
+    6╎    ╎    ╎    ╎    ╎   97    @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    89    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎     89    @Base/…rs.jl:222  isless
+   22╎    ╎    ╎    ╎    ╎    ╎ 22    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎    ╎    ╎ 23    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎    ╎    ╎ 22    @Base/…on.jl:488  <
+     ╎    ╎    ╎    ╎     117   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎ 110   @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎  82    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎   66    @Interpolations/…:5  ratio
+     ╎    ╎    ╎    ╎    ╎    66    @Base/…on.jl:436  /
+   66╎    ╎    ╎    ╎    ╎     66    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎    147   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎     147   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 144   @Base/sort.jl:308  searchsortedfirst
+   12╎    ╎    ╎    ╎    ╎  100   @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   81    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    81    @Base/…rs.jl:222  isless
+   21╎    ╎    ╎    ╎    ╎     21    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎    ╎     20    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎    ╎     21    @Base/…on.jl:488  <
+     ╎    ╎    ╎    ╎    104   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎     101   @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎ 81    @Interpolations/…:72  weightedindex
+     ╎    ╎    ╎    ╎    ╎  81    @Interpolations/…:10  fmap
+     ╎    ╎    ╎    ╎    ╎   81    @Interpolations/…:11  _fmap
+     ╎    ╎    ╎    ╎    ╎    81    @Interpolations/…:54  value_weights
+     ╎    ╎    ╎    ╎    ╎     81    @Base/…on.jl:435  -
+   81╎    ╎    ╎    ╎    ╎    ╎ 81    @Base/…at.jl:496  -
+     ╎    ╎    ╎    ╎ 157   @Interpolations/…:5  GriddedInterpolation
+     ╎    ╎    ╎    ╎  157   @Interpolations/…:286  getindex
+     ╎    ╎    ╎    ╎   130   @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    95    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎     70    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 61    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  61    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎   61    @Base/…ay.jl:929  getindex
+     ╎    ╎    ╎    ╎    ╎    33    @Base/…ay.jl:1377  _to_linear_index
+     ╎    ╎    ╎    ╎    ╎     33    @Base/…ay.jl:3049  _sub2ind
+     ╎    ╎    ╎    ╎    ╎    ╎ 31    @Base/…ay.jl:3065  _sub2ind
+     ╎    ╎    ╎    ╎    ╎    ╎  31    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎   31    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎    31    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎     31    @Base/…ay.jl:3081  _sub2ind_recurse
+   26╎    ╎    ╎    ╎    ╎    ╎    ╎ 26    @Base/int.jl:88  *
+   28╎    ╎    ╎    ╎    ╎    28    @Base/…ls.jl:920  getindex
+     ╎    ╎    ╎    ╎     25    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 25    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  20    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎   20    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎    20    @Base/…ay.jl:929  getindex
+     ╎    ╎    ╎    ╎    35    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎     35    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 26    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎   27    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎    27    @Interpolations/…:302  interp_getindex
+    4╎    ╎    ╎    40    @NuclearDetonation/…:56  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎     36    @Base/float.jl:712  isfinite
+   25╎    ╎    ╎    ╎ 25    @Base/float.jl:496  -
+     ╎    ╎    ╎    56    @NuclearDetonation/…:129  hybrid_profile(winds::WindF…
+     ╎    ╎    ╎     56    @Base/…ucedim.jl:979  extrema
+     ╎    ╎    ╎    ╎ 56    @Base/…cedim.jl:979  #extrema#751
+     ╎    ╎    ╎    ╎  56    @Base/…cedim.jl:983  _extrema
+     ╎    ╎    ╎    ╎   56    @Base/…edim.jl:983  #_extrema#753
+     ╎    ╎    ╎    ╎    56    @Base/…edim.jl:984  _extrema
+     ╎    ╎    ╎    ╎     56    @Base/…edim.jl:984  #_extrema#754
+     ╎    ╎    ╎    ╎    ╎ 56    @Base/…dim.jl:326  mapreduce
+     ╎    ╎    ╎    ╎    ╎  56    @Base/…dim.jl:326  #mapreduce#728
+     ╎    ╎    ╎    ╎    ╎   56    @Base/…im.jl:334  _mapreduce_dim
+     ╎    ╎    ╎    ╎    ╎    55    @Base/…ce.jl:436  _mapreduce
+     ╎    ╎    ╎    ╎    ╎     55    @Base/…ce.jl:269  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎    ╎ 55    @Base/…ce.jl:255  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎    ╎  51    @Base/…op.jl:77  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎   51    @Base/…ce.jl:257  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎    50    @Base/…ce.jl:802  _extrema_rf
+   38╎    ╎    ╎    ╎    ╎    ╎     38    @Base/…ls.jl:799  ifelse
+     ╎    ╎    ╎    30    @NuclearDetonation/…:132  hybrid_profile(winds::WindF…
+    8╎    ╎    ╎  36    @NuclearDetonation/…:785  (::NuclearDetonation.Transpor…
+   32╎    ╎    ╎ 119   @NuclearDetonation/…:917  integrate_timestep!(state::Sim…
+   86╎    ╎    ╎  87    @StaticArrays/…jl:173  SVector{3, Float64}(::Float64, :…
+     ╎    ╎    ╎ 2305  @NuclearDetonation/…:929  integrate_timestep!(state::Sim…
+    5╎    ╎    ╎  2305  @NuclearDetonation/…:37  hybrid_profile
+  231╎    ╎    ╎   231   @NuclearDetonation/…:0  hybrid_profile(winds::WindFiel…
+     ╎    ╎    ╎   732   @NuclearDetonation/…:43  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    732   @Base/…adcast.jl:894  materialize
+     ╎    ╎    ╎     732   @Base/…adcast.jl:919  copy
+     ╎    ╎    ╎    ╎ 720   @Base/…dcast.jl:227  similar
+     ╎    ╎    ╎    ╎  720   @Base/…dcast.jl:228  similar
+     ╎    ╎    ╎    ╎   720   @Base/…rray.jl:866  similar
+     ╎    ╎    ╎    ╎    720   @Base/…rray.jl:867  similar
+     ╎    ╎    ╎    ╎     720   @Base/boot.jl:660  Array
+  701╎    ╎    ╎    ╎    ╎ 701   @Base/boot.jl:648  Array
+     ╎    ╎    ╎   1146  @NuclearDetonation/…:55  hybrid_profile(winds::WindFie…
+   13╎    ╎    ╎    79    @Interpolations/…:48  Extrapolation
+     ╎    ╎    ╎     46    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎ 30    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    1052  @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎     908   @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎    ╎ 908   @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎    ╎  908   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎   710   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    451   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎     69    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    ╎ 61    @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎  58    @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎   58    @Base/…rt.jl:308  searchsortedfirst
+    6╎    ╎    ╎    ╎    ╎    45    @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎     37    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    ╎ 37    @Base/…rs.jl:222  isless
+     ╎    ╎    ╎    ╎     288   @Interpolations/…:55  weightedindex_parts
+   32╎    ╎    ╎    ╎    ╎ 32    @Base/sort.jl:0  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 256   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎  253   @Base/sort.jl:308  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   25    @Base/…rt.jl:190  searchsortedfirst
+   25╎    ╎    ╎    ╎    ╎    25    @Base/int.jl:536  >>>
+   10╎    ╎    ╎    ╎    ╎   192   @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    172   @Base/…ng.jl:118  lt
+   23╎    ╎    ╎    ╎    ╎     72    @Base/…at.jl:638  isless
+     ╎    ╎    ╎    ╎    ╎    ╎ 49    @Base/…at.jl:709  isnan
+   49╎    ╎    ╎    ╎    ╎    ╎  49    @Base/…at.jl:622  !=
+     ╎    ╎    ╎    ╎    ╎     100   @Base/…at.jl:640  isless
+     ╎    ╎    ╎    ╎    ╎    ╎ 63    @Base/…at.jl:633  _fpint
+   42╎    ╎    ╎    ╎    ╎    ╎  42    @Base/…ls.jl:799  ifelse
+   21╎    ╎    ╎    ╎    ╎    ╎  21    @Base/int.jl:379  xor
+   33╎    ╎    ╎    ╎    ╎    ╎ 33    @Base/int.jl:83  <
+     ╎    ╎    ╎    ╎     94    @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎ 79    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎  53    @Interpolations/…:71  weightedindex
+   20╎    ╎    ╎    ╎    ╎   20    @Base/…at.jl:496  -
+     ╎    ╎    ╎    ╎    ╎   33    @Interpolations/…:5  ratio
+   33╎    ╎    ╎    ╎    ╎    33    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎    135   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎     128   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 127   @Base/sort.jl:308  searchsortedfirst
+   14╎    ╎    ╎    ╎    ╎  99    @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   84    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    84    @Base/…rs.jl:222  isless
+   20╎    ╎    ╎    ╎    ╎     20    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎    ╎     29    @Base/…rs.jl:181  signless
+     ╎    ╎    ╎    ╎    124   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎     120   @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎ 102   @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎  75    @Interpolations/…:5  ratio
+     ╎    ╎    ╎    ╎    ╎   75    @Base/…on.jl:436  /
+   74╎    ╎    ╎    ╎    ╎    74    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎   103   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    103   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎     101   @Base/sort.jl:308  searchsortedfirst
+    6╎    ╎    ╎    ╎    ╎ 72    @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎  62    @Base/…ing.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎   62    @Base/…rs.jl:222  isless
+   21╎    ╎    ╎    ╎    ╎    21    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎   95    @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    91    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎     70    @Interpolations/…:72  weightedindex
+     ╎    ╎    ╎    ╎    ╎ 70    @Interpolations/…:10  fmap
+     ╎    ╎    ╎    ╎    ╎  70    @Interpolations/…:11  _fmap
+     ╎    ╎    ╎    ╎    ╎   70    @Interpolations/…:54  value_weights
+     ╎    ╎    ╎    ╎    ╎    70    @Base/…on.jl:435  -
+   70╎    ╎    ╎    ╎    ╎     70    @Base/…at.jl:496  -
+     ╎    ╎    ╎     144   @Interpolations/…:5  GriddedInterpolation
+     ╎    ╎    ╎    ╎ 144   @Interpolations/…:286  getindex
+     ╎    ╎    ╎    ╎  122   @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎   99    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    72    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎     67    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 67    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  67    @Base/…ray.jl:929  getindex
+     ╎    ╎    ╎    ╎    ╎   41    @Base/…ay.jl:1377  _to_linear_index
+     ╎    ╎    ╎    ╎    ╎    41    @Base/…ay.jl:3049  _sub2ind
+     ╎    ╎    ╎    ╎    ╎     39    @Base/…ay.jl:3065  _sub2ind
+     ╎    ╎    ╎    ╎    ╎    ╎ 39    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎  39    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎   39    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎    39    @Base/…ay.jl:3081  _sub2ind_recurse
+   34╎    ╎    ╎    ╎    ╎    ╎     34    @Base/int.jl:88  *
+   26╎    ╎    ╎    ╎    ╎   26    @Base/…ls.jl:920  getindex
+     ╎    ╎    ╎    ╎    27    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎     27    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 20    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  20    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎   20    @Base/…ay.jl:929  getindex
+     ╎    ╎    ╎    ╎   23    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎    23    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎  22    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎   22    @Interpolations/…:302  interp_getindex
+    3╎    ╎    ╎   34    @NuclearDetonation/…:56  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    31    @Base/float.jl:712  isfinite
+   20╎    ╎    ╎     20    @Base/float.jl:496  -
+     ╎    ╎    ╎   47    @NuclearDetonation/…:129  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎    47    @Base/…ucedim.jl:979  extrema
+     ╎    ╎    ╎     47    @Base/…ucedim.jl:979  #extrema#751
+     ╎    ╎    ╎    ╎ 47    @Base/…cedim.jl:983  _extrema
+     ╎    ╎    ╎    ╎  47    @Base/…cedim.jl:983  #_extrema#753
+     ╎    ╎    ╎    ╎   47    @Base/…edim.jl:984  _extrema
+     ╎    ╎    ╎    ╎    47    @Base/…edim.jl:984  #_extrema#754
+     ╎    ╎    ╎    ╎     47    @Base/…edim.jl:326  mapreduce
+     ╎    ╎    ╎    ╎    ╎ 47    @Base/…dim.jl:326  #mapreduce#728
+     ╎    ╎    ╎    ╎    ╎  47    @Base/…dim.jl:334  _mapreduce_dim
+     ╎    ╎    ╎    ╎    ╎   46    @Base/…ce.jl:436  _mapreduce
+     ╎    ╎    ╎    ╎    ╎    46    @Base/…ce.jl:269  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎     46    @Base/…ce.jl:255  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎    ╎ 41    @Base/…op.jl:77  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎  41    @Base/…ce.jl:257  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎   41    @Base/…ce.jl:802  _extrema_rf
+   32╎    ╎    ╎    ╎    ╎    ╎    32    @Base/…ls.jl:799  ifelse
+     ╎    ╎    ╎   73    @NuclearDetonation/…:132  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎    21    @Base/array.jl:354  copy
+   21╎    ╎    ╎     21    @Base/boot.jl:588  GenericMemory
+   39╎    ╎    ╎    39    @Base/array.jl:356  copy
+   14╎    ╎    ╎ 43    @NuclearDetonation/…:1008  integrate_timestep!(state::Si…
+    6╎    ╎    ╎ 40    @NuclearDetonation/…:1033  integrate_timestep!(state::Si…
+     ╎    ╎    ╎ 31    @NuclearDetonation/…:1034  integrate_timestep!(state::Si…
+    5╎    ╎    ╎ 47    @NuclearDetonation/…:1150  integrate_timestep!(state::Si…
+     ╎    ╎    ╎  41    @Interpolations/…:49  (::Interpolations.Extrapolation{F…
+     ╎    ╎    ╎   24    @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎    24    @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎     24    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎ 21    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎  20    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎ 27    @NuclearDetonation/…:1162  integrate_timestep!(state::Si…
+     ╎    ╎    ╎  24    @NuclearDetonation/…:179  compute_hanna_parameters
+   21╎    ╎    ╎ 21    @NuclearDetonation/…:1277  integrate_timestep!(state::Si…
+   23╎    ╎    ╎ 23    @NuclearDetonation/…:1292  integrate_timestep!(state::Si…
+   51╎    ╎    ╎ 214   @NuclearDetonation/…:1295  integrate_timestep!(state::Si…
+   82╎    ╎    ╎  82    @Base/boot.jl:792  NamedTuple
+    5╎    ╎    ╎  81    @NuclearDetonation/…:221  kwcall(::@NamedTuple{fallback…
+     ╎    ╎    ╎   23    @NuclearDetonation/…:259  sigma_from_height(profile::H…
+     ╎    ╎    ╎    23    @Base/sort.jl:310  searchsortedfirst
+     ╎    ╎    ╎     23    @Base/sort.jl:310  #searchsortedfirst#4
+     ╎    ╎    ╎    ╎ 23    @Base/sort.jl:308  searchsortedfirst(v::SubArray{Fl…
+   35╎    ╎    ╎ 145   @NuclearDetonation/…:1305  integrate_timestep!(state::Si…
+   69╎    ╎    ╎  69    @Base/boot.jl:792  NamedTuple
+   10╎    ╎    ╎  41    @NuclearDetonation/…:143  kwcall(::@NamedTuple{fallback…
+   22╎    ╎    ╎ 23    @NuclearDetonation/…:1306  integrate_timestep!(state::Si…
+   27╎    ╎    ╎ 76    @NuclearDetonation/…:1310  integrate_timestep!(state::Si…
+     ╎    ╎    ╎  40    @Interpolations/…:49  (::Interpolations.Extrapolation{F…
+     ╎    ╎    ╎   21    @Interpolations/…:5  GriddedInterpolation
+     ╎    ╎    ╎    21    @Interpolations/…:286  getindex
+   13╎    ╎    ╎ 71    @NuclearDetonation/…:1311  integrate_timestep!(state::Si…
+     ╎    ╎    ╎  35    @Interpolations/…:49  (::Interpolations.Extrapolation{F…
+     ╎    ╎    ╎   24    @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎    24    @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎     24    @Interpolations/…:70  map3argf
+   20╎    ╎    ╎ 21    @NuclearDetonation/…:1312  integrate_timestep!(state::Si…
+   56╎    ╎    ╎ 58    @NuclearDetonation/…:1313  integrate_timestep!(state::Si…
+    7╎    ╎    ╎ 27    @NuclearDetonation/…:1356  integrate_timestep!(state::Si…
+   38╎    ╎    ╎ 128   @NuclearDetonation/…:1389  integrate_timestep!(state::Si…
+   89╎    ╎    ╎  89    @StaticArrays/…jl:173  SVector{3, Float64}(::Float64, :…
+   28╎    ╎    ╎ 28    @NuclearDetonation/…:1415  integrate_timestep!(state::Si…
+   23╎    ╎    ╎ 41    @NuclearDetonation/…:1417  integrate_timestep!(state::Si…
+   31╎    ╎    ╎ 43    @NuclearDetonation/…:1439  integrate_timestep!(state::Si…
+   17╎    ╎    ╎ 36    @NuclearDetonation/…:1440  integrate_timestep!(state::Si…
+    4╎    ╎    ╎ 411   @NuclearDetonation/…:1526  integrate_timestep!(state::Si…
+     ╎    ╎    ╎  31    @Base/…ings/io.jl:77  println
+     ╎    ╎    ╎   27    @Base/…ngs/io.jl:46  print
+     ╎    ╎    ╎    27    @Base/…ngs/io.jl:248  print
+     ╎    ╎    ╎     27    @Base/…ngs/io.jl:246  write
+   51╎    ╎    ╎  376   @Base/…ings/io.jl:193  string
+   31╎    ╎    ╎   34    @Base/…ngs/io.jl:146  print_to_string(::Int64, ::Strin…
+   38╎    ╎    ╎   275   @Base/…ngs/io.jl:151  print_to_string(::Int64, ::Strin…
+    1╎    ╎    ╎    213   @Base/…ngs/io.jl:35  print(io::IOBuffer, x::Float64)
+    2╎    ╎    ╎     208   @Base/…u/Ryu.jl:113  show
+     ╎    ╎    ╎    ╎ 123   @Base/…u/Ryu.jl:114  show(io::IOBuffer, x::Float64,…
+     ╎    ╎    ╎    ╎  123   @Base/…uffer.jl:168  StringVector
+     ╎    ╎    ╎    ╎   118   @Base/…ffer.jl:167  StringMemory
+   64╎    ╎    ╎    ╎    64    @Base/…ring.jl:109  _string_n
+   54╎    ╎    ╎    ╎    54    @Base/…ring.jl:120  unsafe_wrap
+    2╎    ╎    ╎    ╎ 66    @Base/…u/Ryu.jl:116  show(io::IOBuffer, x::Float64,…
+    1╎    ╎    ╎    ╎  22    @Base/…rtest.jl:314  writeshortest(buf::Vector{UIn…
+     ╎    ╎    1932  @NuclearDetonation/…:2198  run_simulation!(state::Simulati…
+     ╎    ╎     1932  @NuclearDetonation/…:815  kwcall(::@NamedTuple{use_trilin…
+     ╎    ╎    ╎ 1885  @NuclearDetonation/…:859  accumulate_concentration!(fiel…
+    2╎    ╎    ╎  1885  @NuclearDetonation/…:37  hybrid_profile
+  255╎    ╎    ╎   255   @NuclearDetonation/…:0  hybrid_profile(winds::WindFiel…
+     ╎    ╎    ╎   33    @NuclearDetonation/…:43  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    33    @Base/…adcast.jl:894  materialize
+     ╎    ╎    ╎     33    @Base/…adcast.jl:919  copy
+     ╎    ╎    ╎   1370  @NuclearDetonation/…:55  hybrid_profile(winds::WindFie…
+   18╎    ╎    ╎    96    @Interpolations/…:48  Extrapolation
+     ╎    ╎    ╎     60    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎ 44    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎  33    @Interpolations/…:103  inbounds_position
+     ╎    ╎    ╎    ╎   33    @Interpolations/…:102  inbounds_position
+     ╎    ╎    ╎    ╎    33    @Interpolations/…:108  inbounds_index
+     ╎    ╎    ╎    ╎     33    @Interpolations/…:128  inbounds_index
+     ╎    ╎    ╎    ╎    ╎ 21    @Interpolations/…:131  inbounds_index
+     ╎    ╎    ╎    ╎    ╎  21    @Interpolations/…:149  minp
+     ╎    ╎    ╎    1247  @Interpolations/…:49  Extrapolation
+     ╎    ╎    ╎     1103  @Interpolations/…:4  GriddedInterpolation
+     ╎    ╎    ╎    ╎ 1103  @Interpolations/…:66  weightedindexes
+     ╎    ╎    ╎    ╎  1103  @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎   822   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    565   @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎     53    @Interpolations/…:70  map3argf
+     ╎    ╎    ╎    ╎    ╎ 48    @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎  48    @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎   41    @Base/…rt.jl:308  searchsortedfirst
+    3╎    ╎    ╎    ╎    ╎    30    @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎     27    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    ╎ 27    @Base/…rs.jl:222  isless
+     ╎    ╎    ╎    ╎     394   @Interpolations/…:55  weightedindex_parts
+   76╎    ╎    ╎    ╎    ╎ 76    @Base/sort.jl:0  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 318   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎  309   @Base/sort.jl:308  searchsortedfirst
+   24╎    ╎    ╎    ╎    ╎   24    @Base/int.jl:0  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   24    @Base/…rt.jl:189  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    24    @Base/…rs.jl:321  !=
+   24╎    ╎    ╎    ╎    ╎     24    @Base/…on.jl:637  ==
+     ╎    ╎    ╎    ╎    ╎   27    @Base/…rt.jl:190  searchsortedfirst
+   27╎    ╎    ╎    ╎    ╎    27    @Base/int.jl:536  >>>
+    7╎    ╎    ╎    ╎    ╎   224   @Base/…rt.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎    198   @Base/…ng.jl:118  lt
+   20╎    ╎    ╎    ╎    ╎     84    @Base/…at.jl:638  isless
+     ╎    ╎    ╎    ╎    ╎    ╎ 64    @Base/…at.jl:709  isnan
+   64╎    ╎    ╎    ╎    ╎    ╎  64    @Base/…at.jl:622  !=
+     ╎    ╎    ╎    ╎    ╎     114   @Base/…at.jl:640  isless
+     ╎    ╎    ╎    ╎    ╎    ╎ 76    @Base/…at.jl:633  _fpint
+   57╎    ╎    ╎    ╎    ╎    ╎  57    @Base/…ls.jl:799  ifelse
+   33╎    ╎    ╎    ╎    ╎    ╎ 33    @Base/int.jl:83  <
+     ╎    ╎    ╎    ╎     118   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    ╎ 24    @Interpolations/…:61  weightedindex_parts2
+   20╎    ╎    ╎    ╎    ╎  24    @Base/…cs.jl:1340  clamp
+     ╎    ╎    ╎    ╎    ╎ 94    @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎  79    @Interpolations/…:71  weightedindex
+   27╎    ╎    ╎    ╎    ╎   27    @Base/…at.jl:496  -
+     ╎    ╎    ╎    ╎    ╎   52    @Interpolations/…:5  ratio
+   52╎    ╎    ╎    ╎    ╎    52    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎    149   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎     143   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎    ╎ 142   @Base/sort.jl:308  searchsortedfirst
+   10╎    ╎    ╎    ╎    ╎  104   @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎   92    @Base/…ng.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎    92    @Base/…rs.jl:222  isless
+   24╎    ╎    ╎    ╎    ╎     24    @Base/…ol.jl:41  |
+     ╎    ╎    ╎    ╎    ╎     32    @Base/…rs.jl:181  signless
+    4╎    ╎    ╎    ╎    ╎    ╎ 23    @Base/…cs.jl:16  signbit
+     ╎    ╎    ╎    ╎    108   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎     102   @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎    ╎ 86    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎    ╎  64    @Interpolations/…:5  ratio
+     ╎    ╎    ╎    ╎    ╎   64    @Base/…on.jl:436  /
+   62╎    ╎    ╎    ╎    ╎    62    @Base/…at.jl:498  /
+     ╎    ╎    ╎    ╎   175   @Interpolations/…:55  weightedindex_parts
+     ╎    ╎    ╎    ╎    175   @Interpolations/…:51  find_knot_index
+     ╎    ╎    ╎    ╎     175   @Base/sort.jl:308  searchsortedfirst
+   35╎    ╎    ╎    ╎    ╎ 35    @Base/sort.jl:0  searchsortedfirst
+    9╎    ╎    ╎    ╎    ╎ 119   @Base/sort.jl:192  searchsortedfirst
+     ╎    ╎    ╎    ╎    ╎  105   @Base/…ing.jl:118  lt
+     ╎    ╎    ╎    ╎    ╎   105   @Base/…rs.jl:222  isless
+     ╎    ╎    ╎    ╎    ╎    22    @Base/…at.jl:709  isnan
+   22╎    ╎    ╎    ╎    ╎     22    @Base/…at.jl:622  !=
+     ╎    ╎    ╎    ╎    ╎    36    @Base/…rs.jl:181  signless
+   15╎    ╎    ╎    ╎    ╎     28    @Base/…cs.jl:16  signbit
+     ╎    ╎    ╎    ╎   106   @Interpolations/…:56  weightedindex_parts
+     ╎    ╎    ╎    ╎    104   @Interpolations/…:62  weightedindex_parts2
+     ╎    ╎    ╎    ╎     22    @Interpolations/…:71  weightedindex
+     ╎    ╎    ╎    ╎     77    @Interpolations/…:72  weightedindex
+     ╎    ╎    ╎    ╎    ╎ 77    @Interpolations/…:10  fmap
+     ╎    ╎    ╎    ╎    ╎  77    @Interpolations/…:11  _fmap
+     ╎    ╎    ╎    ╎    ╎   77    @Interpolations/…:54  value_weights
+     ╎    ╎    ╎    ╎    ╎    77    @Base/…on.jl:435  -
+   77╎    ╎    ╎    ╎    ╎     77    @Base/…at.jl:496  -
+     ╎    ╎    ╎     144   @Interpolations/…:5  GriddedInterpolation
+     ╎    ╎    ╎    ╎ 144   @Interpolations/…:286  getindex
+     ╎    ╎    ╎    ╎  130   @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎   99    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    71    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎     63    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 63    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  63    @Base/…ray.jl:929  getindex
+     ╎    ╎    ╎    ╎    ╎   31    @Base/…ay.jl:1377  _to_linear_index
+     ╎    ╎    ╎    ╎    ╎    31    @Base/…ay.jl:3049  _sub2ind
+     ╎    ╎    ╎    ╎    ╎     28    @Base/…ay.jl:3065  _sub2ind
+     ╎    ╎    ╎    ╎    ╎    ╎ 28    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎  28    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎   28    @Base/…ay.jl:3081  _sub2ind_recurse
+     ╎    ╎    ╎    ╎    ╎    ╎    28    @Base/…ay.jl:3081  _sub2ind_recurse
+   32╎    ╎    ╎    ╎    ╎   32    @Base/…ls.jl:920  getindex
+     ╎    ╎    ╎    ╎    28    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎     28    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎ 24    @Interpolations/…:302  interp_getindex
+     ╎    ╎    ╎    ╎    ╎  24    @Interpolations/…:308  interp_getindex
+     ╎    ╎    ╎    ╎    ╎   24    @Base/…ay.jl:929  getindex
+     ╎    ╎    ╎    ╎   31    @Interpolations/…:303  interp_getindex
+     ╎    ╎    ╎    ╎    31    @Interpolations/…:302  interp_getindex
+    5╎    ╎    ╎   36    @NuclearDetonation/…:56  hybrid_profile(winds::WindFie…
+     ╎    ╎    ╎    31    @Base/float.jl:712  isfinite
+     ╎    ╎    ╎   66    @NuclearDetonation/…:129  hybrid_profile(winds::WindFi…
+     ╎    ╎    ╎    66    @Base/…ucedim.jl:979  extrema
+     ╎    ╎    ╎     66    @Base/…ucedim.jl:979  #extrema#751
+     ╎    ╎    ╎    ╎ 66    @Base/…cedim.jl:983  _extrema
+     ╎    ╎    ╎    ╎  66    @Base/…cedim.jl:983  #_extrema#753
+     ╎    ╎    ╎    ╎   66    @Base/…edim.jl:984  _extrema
+     ╎    ╎    ╎    ╎    66    @Base/…edim.jl:984  #_extrema#754
+     ╎    ╎    ╎    ╎     66    @Base/…edim.jl:326  mapreduce
+     ╎    ╎    ╎    ╎    ╎ 66    @Base/…dim.jl:326  #mapreduce#728
+     ╎    ╎    ╎    ╎    ╎  66    @Base/…dim.jl:334  _mapreduce_dim
+     ╎    ╎    ╎    ╎    ╎   64    @Base/…ce.jl:436  _mapreduce
+     ╎    ╎    ╎    ╎    ╎    64    @Base/…ce.jl:269  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎     64    @Base/…ce.jl:255  mapreduce_impl
+     ╎    ╎    ╎    ╎    ╎    ╎ 61    @Base/…op.jl:77  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎  61    @Base/…ce.jl:257  macro expansion
+     ╎    ╎    ╎    ╎    ╎    ╎   58    @Base/…ce.jl:802  _extrema_rf
+   44╎    ╎    ╎    ╎    ╎    ╎    44    @Base/…ls.jl:799  ifelse
+     ╎    ╎    ╎   82    @NuclearDetonation/…:132  hybrid_profile(winds::WindFi…
+   65╎    ╎    ╎    65    @Base/array.jl:356  copy
+Total snapshots: 27522. Utilization: 50% across all threads and tasks. Use the `groupby` kwarg to break down by thread and/or task.

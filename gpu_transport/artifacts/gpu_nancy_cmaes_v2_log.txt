@@ -1,0 +1,207 @@
+[v2] including upstream cmaes script (loop suppressed)
+======================================================================
+NANCY BIPOP-CMA-ES v4 — RandomWalk (32 threads)
+Pure optimiser: finds ONE best parameter set at d=20
+Noise handling: per-generation CRN (common random numbers)
+Restarts: BIPOP (alternating large/small population)
+v4: 3-layer release (NOAA 1984), tighter density/h_diff bounds
+======================================================================
+
+1. Loading ERA5 met data...
+   Pre-loading met data (files 5-11)...
+   Loaded 21 timesteps
+
+2. Setting up domain...
+   Release: grid (14.5, 7.9)
+
+3. Loading Nancy observations...
+   Fine obs grid: 283x237 (2km, 50% buffer)
+   Observed max plume extent: 340.0 km
+   Contour 0.4 mR/h: AR=2.6, angle=53.0°
+   Contour 4.0 mR/h: AR=5.1, angle=47.0°
+   Contour 100.0 mR/h: AR=8.5, angle=65.0°
+   Contour 10.0 mR/h: AR=5.1, angle=49.0°
+   Contour 1.0 mR/h: AR=3.3, angle=47.0°
+   Contour 40.0 mR/h: AR=7.5, angle=58.0°
+   Computed observed shapes for 6 contour levels
+
+4. 3-layer release (NOAA 1984 observed debris structure):
+   Lower:  0 – 3,800 m,  r=537 m  (NNW transport)
+   Middle: 3,800 – 6,100 m,  r=1,500 m  (NNE transport)
+   Upper:  6,100 – 12,500 m,  r=2,500 m  (NE at 50 mph)
+
+5. All data pre-loaded
+
+   Warm start from hardcoded APMC v7 best particle
+
+======================================================================
+BIPOP-CMA-ES Configuration:
+  Turbulence: RandomWalk
+  Dimension: 20
+  Default lambda: 12
+  Auto-sigma: C diagonal scaled from bounds (sigma_frac=0.3)
+  Budget: 0 evaluations
+  Threads: 32
+  Noise handling: per-generation CRN
+  Warm start: true
+======================================================================
+
+======================================================================
+BIPOP-CMA-ES COMPLETE — RandomWalk
+======================================================================
+Total evaluations: 0
+Restarts: 0
+Wall time: 0.0 minutes
+Best loss: Inf
+
+Score breakdown (best particle):
+  FMS (geo mean):   0.0
+  Shape:            0.0
+  Extent:           0.0
+  TOA:              0.0
+  Old combined (50%FMS+20%ext+30%TOA): 0.0%  <- compare to APMC
+  New combined (35%FMS+20%shp+15%ext+30%TOA): -Inf%
+
+Best parameters:
+  d_median_fine            51.9
+  sigma_g_fine             1.97
+  d_median_coarse          184.0
+  sigma_g_coarse           1.7
+  frac_fine                0.66
+  frac_lower               0.15
+  frac_middle              0.08
+  sigma_w_scale            3.93
+  sigma_h_scale            1.34
+  h_diff_scale             1.41
+  tl_scale                 1.0
+  vd_scale                 0.94
+  vgrav_scale              1.28
+  omega_scale              1.12
+  mixing_height_scale      2.28
+  tmix_scale               2.61
+  surface_height_scale     3.79
+  roughness_scale          2.38
+  activity_scale           30.0
+  smooth_sigma             2.1
+
+Particle size distribution:
+  Fine mode:   51.9 μm (sigma_g=1.97)
+  Coarse mode: 184.0 μm (sigma_g=1.7)
+  Fine fraction: 66.0%
+
+Layer mass fractions:
+  Lower  (0–3,800 m):     15.0%
+  Middle (3,800–6,100 m): 8.0%
+  Upper  (6,100–12,500 m): 77.0%
+
+Calibration:
+  Total activity: 30.0×10¹⁵ Bq = 3.0e16 Bq
+  Smooth sigma:   2.1 cells
+
+Results saved to nancy_cmaes_rw_results.txt
+Checkpoint saved to nancy_cmaes_rw_best.txt
+
+======================================================================
+NANCY NATIVE BIPOP-CMA-ES   (budget: 1000 evals)
+======================================================================
+    using upstream OU checkpoint as warm start
+
+--------------------------------------------------
+RESTART #1 (large, λ=12, σ_frac=0.3)
+--------------------------------------------------
+  Gen   1 [   12/1000] FMS=0.33 shp=0.76 ext=1.00 toa=1.00 | new=71.6% | σ=0.954 [23s] ***
+  Gen   2 [   24/1000] FMS=0.30 shp=0.88 ext=1.00 toa=0.92 | new=70.7% | σ=0.923 [33s]
+  Gen   3 [   36/1000] FMS=0.31 shp=0.78 ext=1.00 toa=0.92 | new=69.0% | σ=0.894 [42s]
+  Gen   4 [   48/1000] FMS=0.30 shp=0.86 ext=1.00 toa=1.00 | new=72.8% | σ=0.863 [51s] ***
+  Gen   5 [   60/1000] FMS=0.30 shp=0.75 ext=1.00 toa=1.00 | new=70.3% | σ=0.848 [58s]
+  Gen   6 [   72/1000] FMS=0.30 shp=0.77 ext=1.00 toa=1.00 | new=71.0% | σ=0.826 [64s]
+  Gen   7 [   84/1000] FMS=0.32 shp=0.75 ext=1.00 toa=1.00 | new=71.4% | σ=0.809 [73s]
+  Gen   8 [   96/1000] FMS=0.30 shp=0.86 ext=1.00 toa=0.92 | new=70.1% | σ=0.787 [83s]
+  Gen   9 [  108/1000] FMS=0.31 shp=0.77 ext=1.00 toa=1.00 | new=71.2% | σ=0.780 [92s]
+  Gen  10 [  120/1000] FMS=0.32 shp=0.80 ext=1.00 toa=1.00 | new=72.1% | σ=0.773 [100s]
+  Gen  11 [  132/1000] FMS=0.33 shp=0.79 ext=1.00 toa=0.94 | new=70.8% | σ=0.760 [109s]
+  Gen  12 [  144/1000] FMS=0.31 shp=0.83 ext=1.00 toa=1.00 | new=72.4% | σ=0.750 [118s]
+  Gen  13 [  156/1000] FMS=0.28 shp=0.86 ext=1.00 toa=0.92 | new=69.7% | σ=0.736 [127s]
+  Gen  14 [  168/1000] FMS=0.33 shp=0.77 ext=1.00 toa=1.00 | new=71.9% | σ=0.715 [134s]
+  Gen  15 [  180/1000] FMS=0.28 shp=0.74 ext=1.00 toa=1.00 | new=69.7% | σ=0.692 [143s]
+  Gen  16 [  192/1000] FMS=0.26 shp=0.90 ext=1.00 toa=1.00 | new=72.1% | σ=0.681 [148s]
+  Gen  17 [  204/1000] FMS=0.34 shp=0.76 ext=1.00 toa=1.00 | new=72.1% | σ=0.669 [157s]
+  Gen  18 [  216/1000] FMS=0.35 shp=0.75 ext=1.00 toa=1.00 | new=72.4% | σ=0.648 [167s]
+  Gen  19 [  228/1000] FMS=0.33 shp=0.81 ext=1.00 toa=1.00 | new=72.6% | σ=0.632 [178s]
+  Gen  20 [  240/1000] FMS=0.32 shp=0.77 ext=1.00 toa=1.00 | new=71.6% | σ=0.617 [186s]
+  Gen  21 [  252/1000] FMS=0.34 shp=0.73 ext=1.00 toa=0.92 | new=69.1% | σ=0.601 [191s]
+  Gen  22 [  264/1000] FMS=0.32 shp=0.67 ext=1.00 toa=0.94 | new=67.9% | σ=0.586 [197s]
+  Gen  23 [  276/1000] FMS=0.34 shp=0.80 ext=1.00 toa=1.00 | new=72.9% | σ=0.573 [202s] ***
+  Gen  24 [  288/1000] FMS=0.30 shp=0.81 ext=1.00 toa=1.00 | new=71.7% | σ=0.571 [209s]
+  Gen  25 [  300/1000] FMS=0.32 shp=0.84 ext=1.00 toa=0.94 | new=71.5% | σ=0.565 [218s]
+  Gen  26 [  312/1000] FMS=0.28 shp=0.84 ext=1.00 toa=1.00 | new=71.7% | σ=0.553 [226s]
+  Gen  27 [  324/1000] FMS=0.31 shp=0.80 ext=1.00 toa=0.94 | new=70.2% | σ=0.542 [237s]
+  Gen  28 [  336/1000] FMS=0.31 shp=0.76 ext=1.00 toa=1.00 | new=71.0% | σ=0.536 [248s]
+  Gen  29 [  348/1000] FMS=0.29 shp=0.81 ext=1.00 toa=1.00 | new=71.1% | σ=0.531 [258s]
+  Gen  30 [  360/1000] FMS=0.29 shp=0.78 ext=1.00 toa=1.00 | new=70.7% | σ=0.535 [268s]
+  Gen  31 [  372/1000] FMS=0.28 shp=0.70 ext=1.00 toa=1.00 | new=68.6% | σ=0.538 [280s]
+  Gen  32 [  384/1000] FMS=0.30 shp=0.80 ext=1.00 toa=1.00 | new=71.5% | σ=0.526 [290s]
+  Gen  33 [  396/1000] FMS=0.24 shp=0.93 ext=1.00 toa=1.00 | new=72.0% | σ=0.520 [300s]
+  Gen  34 [  408/1000] FMS=0.31 shp=0.81 ext=1.00 toa=1.00 | new=72.1% | σ=0.511 [311s]
+  Gen  35 [  420/1000] FMS=0.29 shp=0.81 ext=1.00 toa=1.00 | new=71.3% | σ=0.498 [320s]
+  Gen  36 [  432/1000] FMS=0.31 shp=0.80 ext=1.00 toa=1.00 | new=71.8% | σ=0.486 [330s]
+  Gen  37 [  444/1000] FMS=0.29 shp=0.77 ext=1.00 toa=1.00 | new=70.6% | σ=0.475 [340s]
+  Gen  38 [  456/1000] FMS=0.32 shp=0.79 ext=1.00 toa=1.00 | new=71.9% | σ=0.464 [350s]
+  Gen  39 [  468/1000] FMS=0.27 shp=0.83 ext=1.00 toa=1.00 | new=71.1% | σ=0.454 [356s]
+  Gen  40 [  480/1000] FMS=0.28 shp=0.82 ext=1.00 toa=1.00 | new=71.1% | σ=0.445 [365s]
+  Gen  41 [  492/1000] FMS=0.30 shp=0.82 ext=1.00 toa=1.00 | new=72.0% | σ=0.436 [371s]
+  Gen  42 [  504/1000] FMS=0.31 shp=0.90 ext=1.00 toa=0.96 | new=72.8% | σ=0.435 [379s]
+  Gen  43 [  516/1000] FMS=0.30 shp=0.78 ext=1.00 toa=1.00 | new=71.0% | σ=0.440 [386s]
+  Gen  44 [  528/1000] FMS=0.27 shp=0.92 ext=1.00 toa=1.00 | new=72.9% | σ=0.438 [397s] ***
+  Gen  45 [  540/1000] FMS=0.31 shp=0.80 ext=1.00 toa=1.00 | new=72.0% | σ=0.436 [408s]
+  Gen  46 [  552/1000] FMS=0.28 shp=0.84 ext=1.00 toa=1.00 | new=71.5% | σ=0.434 [418s]
+  Gen  47 [  564/1000] FMS=0.25 shp=0.88 ext=1.00 toa=1.00 | new=71.2% | σ=0.437 [430s]
+  Gen  48 [  576/1000] FMS=0.30 shp=0.87 ext=1.00 toa=1.00 | new=72.8% | σ=0.440 [439s]
+  Gen  49 [  588/1000] FMS=0.28 shp=0.91 ext=1.00 toa=1.00 | new=72.9% | σ=0.433 [447s] ***
+  Gen  50 [  600/1000] FMS=0.27 shp=0.94 ext=1.00 toa=1.00 | new=73.2% | σ=0.425 [455s] ***
+  Gen  51 [  612/1000] FMS=0.31 shp=0.82 ext=1.00 toa=1.00 | new=72.3% | σ=0.421 [463s]
+  Gen  52 [  624/1000] FMS=0.28 shp=0.91 ext=1.00 toa=1.00 | new=72.9% | σ=0.408 [472s]
+  Gen  53 [  636/1000] FMS=0.30 shp=0.84 ext=1.00 toa=1.00 | new=72.2% | σ=0.397 [481s]
+  Gen  54 [  648/1000] FMS=0.31 shp=0.83 ext=1.00 toa=1.00 | new=72.5% | σ=0.391 [492s]
+  Gen  55 [  660/1000] FMS=0.30 shp=0.93 ext=1.00 toa=1.00 | new=73.9% | σ=0.387 [504s] ***
+  Gen  56 [  672/1000] FMS=0.32 shp=0.81 ext=1.00 toa=1.00 | new=72.5% | σ=0.383 [516s]
+  Gen  57 [  684/1000] FMS=0.31 shp=0.83 ext=1.00 toa=1.00 | new=72.5% | σ=0.378 [528s]
+  Gen  58 [  696/1000] FMS=0.33 shp=0.88 ext=1.00 toa=1.00 | new=74.0% | σ=0.372 [539s] ***
+  Gen  59 [  708/1000] FMS=0.34 shp=0.84 ext=1.00 toa=1.00 | new=73.6% | σ=0.364 [551s]
+  Gen  60 [  720/1000] FMS=0.33 shp=0.87 ext=1.00 toa=0.92 | new=71.6% | σ=0.349 [558s]
+  Gen  61 [  732/1000] FMS=0.32 shp=0.85 ext=1.00 toa=1.00 | new=73.1% | σ=0.340 [567s]
+  Gen  62 [  744/1000] FMS=0.32 shp=0.88 ext=1.00 toa=1.00 | new=73.8% | σ=0.336 [576s]
+  Gen  63 [  756/1000] FMS=0.30 shp=0.87 ext=1.00 toa=1.00 | new=72.9% | σ=0.330 [586s]
+  Gen  64 [  768/1000] FMS=0.33 shp=0.81 ext=1.00 toa=1.00 | new=72.9% | σ=0.325 [598s]
+  Gen  65 [  780/1000] FMS=0.34 shp=0.81 ext=1.00 toa=1.00 | new=73.0% | σ=0.319 [609s]
+  Gen  66 [  792/1000] FMS=0.33 shp=0.87 ext=1.00 toa=1.00 | new=73.9% | σ=0.315 [619s]
+  Gen  67 [  804/1000] FMS=0.32 shp=0.89 ext=1.00 toa=1.00 | new=73.8% | σ=0.309 [628s]
+  Gen  68 [  816/1000] FMS=0.32 shp=0.86 ext=1.00 toa=1.00 | new=73.2% | σ=0.310 [637s]
+  Gen  69 [  828/1000] FMS=0.34 shp=0.80 ext=1.00 toa=1.00 | new=72.7% | σ=0.308 [648s]
+  Gen  70 [  840/1000] FMS=0.32 shp=0.93 ext=1.00 toa=0.94 | new=73.0% | σ=0.309 [656s]
+  Gen  71 [  852/1000] FMS=0.32 shp=0.92 ext=1.00 toa=0.97 | new=73.7% | σ=0.310 [667s]
+  Gen  72 [  864/1000] FMS=0.34 shp=0.79 ext=1.00 toa=1.00 | new=72.7% | σ=0.309 [679s]
+  Gen  73 [  876/1000] FMS=0.29 shp=0.94 ext=1.00 toa=1.00 | new=74.0% | σ=0.303 [688s] ***
+  Gen  74 [  888/1000] FMS=0.33 shp=0.90 ext=1.00 toa=1.00 | new=74.6% | σ=0.293 [696s] ***
+  Gen  75 [  900/1000] FMS=0.32 shp=0.89 ext=1.00 toa=1.00 | new=74.1% | σ=0.286 [706s]
+  Gen  76 [  912/1000] FMS=0.31 shp=0.87 ext=1.00 toa=1.00 | new=73.3% | σ=0.285 [715s]
+  Gen  77 [  924/1000] FMS=0.34 shp=0.84 ext=1.00 toa=1.00 | new=73.7% | σ=0.283 [724s]
+  Gen  78 [  936/1000] FMS=0.33 shp=0.94 ext=1.00 toa=1.00 | new=75.4% | σ=0.280 [733s] ***
+  Gen  79 [  948/1000] FMS=0.32 shp=0.92 ext=1.00 toa=0.94 | new=73.1% | σ=0.279 [742s]
+  Gen  80 [  960/1000] FMS=0.31 shp=0.87 ext=1.00 toa=1.00 | new=73.4% | σ=0.281 [751s]
+  Gen  81 [  972/1000] FMS=0.29 shp=0.91 ext=1.00 toa=1.00 | new=73.3% | σ=0.282 [762s]
+  Gen  82 [  984/1000] FMS=0.32 shp=0.90 ext=1.00 toa=1.00 | new=74.2% | σ=0.281 [774s]
+  Gen  83 [  996/1000] FMS=0.33 shp=0.83 ext=1.00 toa=1.00 | new=73.1% | σ=0.283 [785s]
+  Run used 996 evals.  Budget: large=996, small=0
+
+======================================================================
+NATIVE BIPOP-CMA-ES COMPLETE
+======================================================================
+Total evaluations: 996
+Restarts:          1
+Wall time:         13.1 minutes
+Best loss:         0.246274
+Best score:        75.37%
+
+Saved /home/marc/julia_snap_explorations/gpu_nancy_cmaes_v2_results.txt
+Saved /home/marc/julia_snap_explorations/gpu_nancy_cmaes_v2_best.txt
