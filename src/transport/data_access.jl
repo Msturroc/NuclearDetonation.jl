@@ -3,7 +3,7 @@
 
 using Pkg.Artifacts
 
-export nancy_era5_files, smoky_era5_files, etex_era5_files
+export nancy_era5_files, smoky_era5_files, etex_era5_files, us_test_era5_files
 
 """
 Locate Artifacts.toml at runtime. `@__DIR__` gets baked at precompile time to
@@ -123,6 +123,48 @@ function etex_era5_files()
     end
     rootpath = artifact_path(hash)
     datadir = joinpath(rootpath, "etex_era5_data")
+    if !isdir(datadir)
+        datadir = rootpath
+    end
+    sort(filter(f -> endswith(f, "_snap.nc"), readdir(datadir, join=true)))
+end
+
+"""
+    us_test_era5_files(test::AbstractString; local_dir=nothing)
+
+Return sorted paths to the ERA5 `_snap.nc` files for a US/NTS nuclear test.
+`test` is one of `"trinity"`, `"harry"`, `"smallboy"`, `"doppler"` — the artifact
+name is `<test>_era5_data` (registered in Artifacts.toml, hosted on Zenodo).
+
+On first call, triggers a download from Zenodo (~80–280 MB per test); subsequent
+calls use the cached artifact. Pass `local_dir` to bypass the artifact and read a
+directory of `_snap.nc` files directly (mirrors `smoky_era5_files`).
+
+# Example
+```julia
+met_files = us_test_era5_files("trinity")
+results   = run_simulation!(state, met_files, ...)
+```
+"""
+function us_test_era5_files(test::AbstractString; local_dir::Union{String,Nothing}=nothing)
+    if local_dir !== nothing && isdir(local_dir)
+        files = sort(filter(f -> endswith(f, "_snap.nc"), readdir(local_dir, join=true)))
+        if !isempty(files)
+            return files
+        end
+    end
+    name = "$(lowercase(test))_era5_data"
+    hash = artifact_hash(name, _artifacts_toml())
+    if hash === nothing
+        error("Artifact '$name' not found in Artifacts.toml. " *
+              "Expected one of trinity/harry/smallboy/doppler; ERA5 data must be " *
+              "uploaded to Zenodo and registered first.")
+    end
+    if !artifact_exists(hash)
+        ensure_artifact_installed(name, _artifacts_toml())
+    end
+    rootpath = artifact_path(hash)
+    datadir = joinpath(rootpath, name)
     if !isdir(datadir)
         datadir = rootpath
     end

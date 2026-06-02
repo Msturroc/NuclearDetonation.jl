@@ -36,3 +36,51 @@ lazy = true
     [[etex_era5_data.download]]
     url = "https://zenodo.org/records/19112773/files/etex_era5_data.tar.gz"
     sha256 = "46ac9995eb3a50ba3a24f01bec119b5e9b1393bc4267cb738ed389fcc29de3b4"
+
+# ERA5 reanalysis data for the Trinity nuclear test
+# 16-18 July 1945, subdomain lat [30,42.9] lon [-120,-100], 137 hybrid levels
+#
+# DOI: 10.5281/zenodo.20509225
+[trinity_era5_data]
+git-tree-sha1 = "687adf0accf8a665fde14999479b616c0cb1eb33"
+lazy = true
+
+    [[trinity_era5_data.download]]
+    url = "https://zenodo.org/records/20509225/files/trinity_era5_data.tar.gz"
+    sha256 = "6292a8b0859636612fe9895cc9b7dde980ed123280fb531f55e9ce8b288bd176"
+
+# ERA5 reanalysis data for the Upshot-Knothole Harry nuclear test
+# 19-21 May 1953, subdomain lat [30,42.9] lon [-120,-100], 137 hybrid levels
+#
+# DOI: 10.5281/zenodo.20509233
+[harry_era5_data]
+git-tree-sha1 = "57581561b9d01968c546bdbb078fd559c952e69e"
+lazy = true
+
+    [[harry_era5_data.download]]
+    url = "https://zenodo.org/records/20509233/files/harry_era5_data.tar.gz"
+    sha256 = "20ded57b64403c62dbac401355c10b2619de0ea22599dc7810fcaba366d3622c"
+
+# ERA5 reanalysis data for the Operation Sunbeam Small Boy nuclear test
+# 14-16 July 1962, subdomain lat [30,42.9] lon [-120,-100], 137 hybrid levels
+#
+# DOI: 10.5281/zenodo.20509237
+[smallboy_era5_data]
+git-tree-sha1 = "f2e1225ca5c8a793eba0fb0aaacf5177a518fd10"
+lazy = true
+
+    [[smallboy_era5_data.download]]
+    url = "https://zenodo.org/records/20509237/files/smallboy_era5_data.tar.gz"
+    sha256 = "0afcedb60499f1676b4b42939db517b910fe109881a84bb9b889eefeadd76d08"
+
+# ERA5 reanalysis data for the Plumbbob Doppler nuclear test
+# 23 Aug 1957, subdomain lat [30,42.9] lon [-120,-100], 137 hybrid levels
+#
+# DOI: 10.5281/zenodo.20509247
+[doppler_era5_data]
+git-tree-sha1 = "fe9e6f6708c9a3c4b6bd0eefa0100134af5d7ce8"
+lazy = true
+
+    [[doppler_era5_data.download]]
+    url = "https://zenodo.org/records/20509247/files/doppler_era5_data.tar.gz"
+    sha256 = "aa5ed0eab8b58f17913392a4a01fe595a8561f0f9e6b72b5248d3ec44e598861"
