@@ -1,0 +1,673 @@
+{
+  "type": "FeatureCollection",
+  "name": "Plumbbob Doppler \u2014 fallout arrival isolines (hand-traced from DASA-1251 Fig. 202)",
+  "description": "",
+  "crs": {
+    "type": "name",
+    "properties": {
+      "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+    }
+  },
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.98792070844551,
+            37.24049847562011
+          ],
+          [
+            -115.91068058725692,
+            37.258873463771806
+          ],
+          [
+            -115.79615648180939,
+            37.263880226710256
+          ],
+          [
+            -115.67440181009982,
+            37.283687563875695
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 1.0,
+        "level_hr": 1.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.92661722852354,
+            37.39271900905368
+          ],
+          [
+            -115.77849896697963,
+            37.42332233874714
+          ],
+          [
+            -115.60818635583954,
+            37.45973549246469
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 2.0,
+        "level_hr": 2.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.74435764431539,
+            37.59143531701881
+          ],
+          [
+            -115.63147941469677,
+            37.62440091365386
+          ],
+          [
+            -115.54253104562224,
+            37.64807622683131
+          ],
+          [
+            -115.40704122549182,
+            37.6813621948767
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 3.0,
+        "level_hr": 3.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.61268169286568,
+            37.807280101474795
+          ],
+          [
+            -115.49188343089335,
+            37.835276590084206
+          ],
+          [
+            -115.4429257550485,
+            37.85030687146543
+          ],
+          [
+            -115.31310739335349,
+            37.875725704594736
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 4.0,
+        "level_hr": 4.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.52775513387579,
+            38.03348010881591
+          ],
+          [
+            -115.4136849382562,
+            38.05368452861374
+          ],
+          [
+            -115.29695104041485,
+            38.08351245956853
+          ],
+          [
+            -115.17187564407965,
+            38.09615756422303
+          ],
+          [
+            -115.11196437561802,
+            38.111324024779236
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 5.0,
+        "level_hr": 5.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.14631668944355,
+            38.53878345394635
+          ],
+          [
+            -115.03434461957124,
+            38.56175234146167
+          ],
+          [
+            -114.95043905589247,
+            38.58114681505228
+          ],
+          [
+            -114.88335305449208,
+            38.587537853013835
+          ],
+          [
+            -114.78116886798759,
+            38.604572679664884
+          ],
+          [
+            -114.66317011902329,
+            38.61439439702149
+          ],
+          [
+            -114.55549978035624,
+            38.61975723651415
+          ],
+          [
+            -114.44597562445634,
+            38.62722296274797
+          ],
+          [
+            -114.3191512869955,
+            38.62190569910449
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 8.0,
+        "level_hr": 8.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.28824983790331,
+            38.63504526760151
+          ],
+          [
+            -115.1641983794463,
+            38.66978070606922
+          ],
+          [
+            -115.04287520878496,
+            38.70236819985397
+          ],
+          [
+            -114.91390815436866,
+            38.717523997611245
+          ],
+          [
+            -114.80443013641089,
+            38.73297332699069
+          ],
+          [
+            -114.67453240085634,
+            38.755199169745815
+          ],
+          [
+            -114.5426631453875,
+            38.76224331937482
+          ],
+          [
+            -114.45369915807254,
+            38.77215545726641
+          ],
+          [
+            -114.33289923619058,
+            38.77282218685135
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 9.0,
+        "level_hr": 9.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.66631017874089,
+            38.89521150671132
+          ],
+          [
+            -115.52092927083419,
+            38.91199280056472
+          ],
+          [
+            -115.38085347176688,
+            38.93464625011828
+          ],
+          [
+            -115.22025986953493,
+            38.9540951477771
+          ],
+          [
+            -115.08050355591106,
+            38.97604278192337
+          ],
+          [
+            -114.89289044490351,
+            38.992226673425634
+          ],
+          [
+            -114.72856705642918,
+            39.01942645007495
+          ],
+          [
+            -114.5991742729231,
+            39.03077566669324
+          ],
+          [
+            -114.43817070366916,
+            39.04816364524507
+          ],
+          [
+            -114.31252863211252,
+            39.055962721038796
+          ],
+          [
+            -114.16374980199419,
+            39.055962721038796
+          ],
+          [
+            -114.10086952583384,
+            39.055962721038796
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 11.0,
+        "level_hr": 11.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.63528973371557,
+            39.02022925411097
+          ],
+          [
+            -115.49931890997689,
+            39.04626302513549
+          ],
+          [
+            -115.37124886694143,
+            39.067814136446295
+          ],
+          [
+            -115.21658460802232,
+            39.08498338481458
+          ],
+          [
+            -115.09816514742225,
+            39.10628458677531
+          ],
+          [
+            -114.96008230090895,
+            39.127167964103585
+          ],
+          [
+            -114.83746944649963,
+            39.13393467627258
+          ],
+          [
+            -114.69653657762649,
+            39.15683303698922
+          ],
+          [
+            -114.59402360169658,
+            39.16458343996191
+          ],
+          [
+            -114.46861790221156,
+            39.179815890867076
+          ],
+          [
+            -114.32444390656582,
+            39.1930290742236
+          ],
+          [
+            -114.18401237047803,
+            39.1930290742236
+          ],
+          [
+            -114.05708528366917,
+            39.199667618597346
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 12.0,
+        "level_hr": 12.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.57816550064597,
+            39.18834255988289
+          ],
+          [
+            -115.46178526493811,
+            39.195301107229184
+          ],
+          [
+            -115.30337707281973,
+            39.21895871635226
+          ],
+          [
+            -115.11614003508322,
+            39.24148899629756
+          ],
+          [
+            -114.97078683163379,
+            39.25767050771077
+          ],
+          [
+            -114.8319978161883,
+            39.27545822221828
+          ],
+          [
+            -114.65392358560226,
+            39.297727763408346
+          ],
+          [
+            -114.4835458890291,
+            39.297727763408346
+          ],
+          [
+            -114.3522804021027,
+            39.297727763408346
+          ],
+          [
+            -114.17457281348311,
+            39.30137560688834
+          ],
+          [
+            -114.0142323828341,
+            39.29886913511149
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 13.0,
+        "level_hr": 13.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.44434471962857,
+            39.35683656089811
+          ],
+          [
+            -115.32842006014234,
+            39.37785009934622
+          ],
+          [
+            -115.19567592443836,
+            39.39271976874832
+          ],
+          [
+            -115.0232846914889,
+            39.41409662421954
+          ],
+          [
+            -114.88775627846005,
+            39.42634239182129
+          ],
+          [
+            -114.6939016597464,
+            39.441979538787706
+          ],
+          [
+            -114.49653727533764,
+            39.446433237577885
+          ],
+          [
+            -114.33754962386442,
+            39.45038509935238
+          ],
+          [
+            -114.2135629534823,
+            39.44331017993216
+          ],
+          [
+            -114.1109458323713,
+            39.44023007813359
+          ],
+          [
+            -113.95714653018649,
+            39.414544233286335
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 14.0,
+        "level_hr": 14.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.41604321710966,
+            38.22745823451523
+          ],
+          [
+            -115.30748573220639,
+            38.24326159928451
+          ],
+          [
+            -115.17688464767974,
+            38.2657473096823
+          ],
+          [
+            -115.04354682490849,
+            38.27863832894541
+          ],
+          [
+            -114.93859647448905,
+            38.28441049805669
+          ],
+          [
+            -114.85762548010024,
+            38.28937850933729
+          ],
+          [
+            -114.77056171203677,
+            38.28937850933729
+          ],
+          [
+            -114.70876116463698,
+            38.28937850933729
+          ],
+          [
+            -114.61550744273622,
+            38.28924958086557
+          ],
+          [
+            -114.58719300640725,
+            38.28454637258028
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 6.0,
+        "level_hr": 6.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.19914143051729,
+            38.41428996957632
+          ],
+          [
+            -115.13061900370057,
+            38.428012321574826
+          ],
+          [
+            -115.0279300537737,
+            38.4394958513783
+          ],
+          [
+            -114.93814222313904,
+            38.45053775851494
+          ],
+          [
+            -114.86143282032309,
+            38.45768780496996
+          ],
+          [
+            -114.7740135298013,
+            38.46746004693949
+          ],
+          [
+            -114.67917489602453,
+            38.473227341628395
+          ],
+          [
+            -114.59495244051111,
+            38.475223905031584
+          ],
+          [
+            -114.51816743635746,
+            38.471230778225205
+          ],
+          [
+            -114.44405956460331,
+            38.46949865223564
+          ],
+          [
+            -114.36675093441809,
+            38.46590766527486
+          ],
+          [
+            -114.29198106053121,
+            38.46068983984774
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 7.0,
+        "level_hr": 7.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    },
+    {
+      "type": "Feature",
+      "geometry": {
+        "type": "LineString",
+        "coordinates": [
+          [
+            -115.55111978327241,
+            38.73250354548652
+          ],
+          [
+            -115.35945303860065,
+            38.77678129408913
+          ],
+          [
+            -115.20388038707388,
+            38.80388944968655
+          ],
+          [
+            -115.0361039669173,
+            38.83729538945254
+          ],
+          [
+            -114.89522713649828,
+            38.87270989588682
+          ],
+          [
+            -114.74315285765066,
+            38.88959105637262
+          ],
+          [
+            -114.55828299013002,
+            38.91427854335543
+          ],
+          [
+            -114.4173862407957,
+            38.923972063403674
+          ],
+          [
+            -114.2399059493376,
+            38.93117304757247
+          ]
+        ]
+      },
+      "properties": {
+        "TOA_hrs": 10.0,
+        "level_hr": 10.0,
+        "source": "DASA-1251 Vol I Fig. 202 \u2014 hand-traced in trace_doppler.py",
+        "calibration_correction": "calibration_correction: per-point affine remap true_X_mi=-20.3371+0.98315*buggy_X_mi, true_Y_mi=-1.3460+0.99526*buggy_Y_mi (empirical gridlines PX_X0=694, PX_Y0=2644). Applied 2026-05-20."
+      }
+    }
+  ]
+}
