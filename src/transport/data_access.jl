@@ -3,7 +3,8 @@
 
 using Pkg.Artifacts
 
-export nancy_era5_files, smoky_era5_files, etex_era5_files, us_test_era5_files
+export nancy_era5_files, smoky_era5_files, etex_era5_files, us_test_era5_files,
+       predict_wp33_era5_dir, predict_wp33_era5_files
 
 """
 Locate Artifacts.toml at runtime. `@__DIR__` gets baked at precompile time to
@@ -169,4 +170,55 @@ function us_test_era5_files(test::AbstractString; local_dir::Union{String,Nothin
         datadir = rootpath
     end
     sort(filter(f -> endswith(f, "_snap.nc"), readdir(datadir, join=true)))
+end
+
+"""
+    predict_wp33_era5_dir(; local_dir=nothing) -> String
+
+Return the root directory of the PREDICT WP3.3 ERA5 data (artifact
+`predict_wp33_era5_data`, Zenodo DOI 10.5281/zenodo.20515925). The directory
+contains one subdirectory per scenario (e.g. `scenario_1_bergen_20240106/`),
+each with 24 `_snap.nc` files. Use [`predict_wp33_era5_files`](@ref) to get the
+files for a single scenario.
+
+On first call, triggers a ~2.9 GB download from Zenodo; subsequent calls use the
+cached artifact. Pass `local_dir` to bypass the artifact (mirrors `smoky_era5_files`).
+"""
+function predict_wp33_era5_dir(; local_dir::Union{String,Nothing}=nothing)
+    if local_dir !== nothing && isdir(local_dir)
+        return local_dir
+    end
+    name = "predict_wp33_era5_data"
+    hash = artifact_hash(name, _artifacts_toml())
+    if hash === nothing
+        error("Artifact '$name' not found in Artifacts.toml. " *
+              "WP3.3 ERA5 data must be uploaded to Zenodo and registered first.")
+    end
+    if !artifact_exists(hash)
+        ensure_artifact_installed(name, _artifacts_toml())
+    end
+    rootpath = artifact_path(hash)
+    datadir = joinpath(rootpath, name)
+    return isdir(datadir) ? datadir : rootpath
+end
+
+"""
+    predict_wp33_era5_files(scenario::AbstractString; local_dir=nothing)
+
+Return sorted paths to the ERA5 `_snap.nc` files for one WP3.3 scenario, e.g.
+`"scenario_1_bergen_20240106"`. Resolves the combined `predict_wp33_era5_data`
+artifact and reads the named scenario subdirectory.
+
+# Example
+```julia
+met_files = predict_wp33_era5_files("scenario_5_emden_20230116")
+```
+"""
+function predict_wp33_era5_files(scenario::AbstractString;
+                                 local_dir::Union{String,Nothing}=nothing)
+    root = predict_wp33_era5_dir(; local_dir=local_dir)
+    scendir = joinpath(root, scenario)
+    isdir(scendir) || error("WP3.3 scenario '$scenario' not found under $root. " *
+        "Available: " * join(filter(d -> isdir(joinpath(root, d)), readdir(root)), ", "))
+    sort(filter(f -> endswith(f, "_snap.nc"), readdir(scendir, join=true)))
 end

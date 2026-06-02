@@ -84,3 +84,16 @@ lazy = true
     [[doppler_era5_data.download]]
     url = "https://zenodo.org/records/20509247/files/doppler_era5_data.tar.gz"
     sha256 = "aa5ed0eab8b58f17913392a4a01fe595a8561f0f9e6b72b5248d3ec44e598861"
+
+# ERA5 reanalysis data for the PREDICT WP3.3 hypothetical detonation scenarios.
+# Eight 48-hour Bergen (Norway) & Emden (Germany) weather windows, 137 hybrid
+# levels, combined into one record (8 scenario subdirs).
+#
+# DOI: 10.5281/zenodo.20515925
+[predict_wp33_era5_data]
+git-tree-sha1 = "b76efec8347db14c284457f95574d413e8bbae66"
+lazy = true
+
+    [[predict_wp33_era5_data.download]]
+    url = "https://zenodo.org/records/20515925/files/predict_wp33_era5_data.tar.gz"
+    sha256 = "2e9ee38b14b026dd4236172890573eb04a177bcaa21048aff2a4c6e153c1c5c2"
