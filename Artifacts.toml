@@ -87,13 +87,15 @@ lazy = true
 
 # ERA5 reanalysis data for the PREDICT WP3.3 hypothetical detonation scenarios.
 # Eight 48-hour Bergen (Norway) & Emden (Germany) weather windows, 137 hybrid
-# levels, combined into one record (8 scenario subdirs).
+# levels, combined into one record (8 scenario subdirs). Each scenario has 24
+# _snap.nc files plus era5_precip_hourly.nc (precip for the wet-deposition /
+# precip-delivery products). v2 added the precip files omitted from v1.
 #
-# DOI: 10.5281/zenodo.20515925
+# DOI (version): 10.5281/zenodo.20518206  | concept DOI: 10.5281/zenodo.20515924
 [predict_wp33_era5_data]
-git-tree-sha1 = "b76efec8347db14c284457f95574d413e8bbae66"
+git-tree-sha1 = "f3d9e7a0713ad455c0728bfed83a56f052faaa71"
 lazy = true
 
     [[predict_wp33_era5_data.download]]
-    url = "https://zenodo.org/records/20515925/files/predict_wp33_era5_data.tar.gz"
-    sha256 = "2e9ee38b14b026dd4236172890573eb04a177bcaa21048aff2a4c6e153c1c5c2"
+    url = "https://zenodo.org/records/20518206/files/predict_wp33_era5_data.tar.gz"
+    sha256 = "d26d610fccad2410afa92deb9187f833fc980e3b2f2131e9a487d608b863dd83"
