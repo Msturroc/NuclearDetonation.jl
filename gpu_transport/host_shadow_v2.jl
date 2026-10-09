@@ -442,7 +442,17 @@ function generate_shadow_particles(params::Vector{Float64}, gen_seed::UInt64)
     vgrav_scale       = params[13]
     activity_scale    = params[19]
 
-    frac_upper = clamp(1.0 - frac_lower - frac_middle, 0.05, 1.0)
+    # Layer mass fractions. 23-param tests renormalise all three to sum to 1
+    # (matching the CPU smoky path); Nancy (20-param) keeps its clamp-only form.
+    if length(params) >= 23
+        frac_upper_raw = max(1.0 - frac_lower - frac_middle, 0.05)
+        frac_total  = frac_lower + frac_middle + frac_upper_raw
+        frac_lower  = frac_lower  / frac_total
+        frac_middle = frac_middle / frac_total
+        frac_upper  = frac_upper_raw / frac_total
+    else
+        frac_upper = clamp(1.0 - frac_lower - frac_middle, 0.05, 1.0)
+    end
     rng = Random.MersenneTwister(gen_seed)
 
     size_bins = generate_bimodal_bins(d_median_fine, sigma_g_fine,
@@ -452,20 +462,32 @@ function generate_shadow_particles(params::Vector{Float64}, gen_seed::UInt64)
                                           d_median_coarse, sigma_g_coarse,
                                           frac_fine, size_bins)
 
-    n_particles = 1000
+    n_particles = parse(Int, get(ENV, "N_PARTICLES", "10000"))
     total_activity = activity_scale * 1.0e15
     n_lower  = round(Int, n_particles * frac_lower)
     n_middle = round(Int, n_particles * frac_middle)
     n_upper  = n_particles - n_lower - n_middle
 
+    # Release geometry (spec §3): 23-param tests build cylinders from the
+    # tunable cloud heights params[21..23] (sorted so stem<cap<cloud); Nancy
+    # (20-param) uses its fixed DASA-derived LAYER_LOWER/MIDDLE/UPPER.
+    if length(params) >= 23
+        stem_top_m, cap_mid_m, cloud_top_m = sort([params[21], params[22], params[23]])
+        layer_lower  = Transport.CylinderRelease(0.0, stem_top_m, 0.2 * stem_top_m)
+        layer_middle = Transport.CylinderRelease(stem_top_m, cap_mid_m, 0.25 * (cap_mid_m - stem_top_m))
+        layer_upper  = Transport.CylinderRelease(cap_mid_m, cloud_top_m, 0.25 * (cloud_top_m - cap_mid_m))
+    else
+        layer_lower, layer_middle, layer_upper = LAYER_LOWER, LAYER_MIDDLE, LAYER_UPPER
+    end
+
     sources = [
-        Transport.ReleaseSource((RELEASE_X, RELEASE_Y), LAYER_LOWER,
+        Transport.ReleaseSource((RELEASE_X, RELEASE_Y), layer_lower,
                                 Transport.BombRelease(0.0),
                                 [total_activity * frac_lower],  max(n_lower, 1)),
-        Transport.ReleaseSource((RELEASE_X, RELEASE_Y), LAYER_MIDDLE,
+        Transport.ReleaseSource((RELEASE_X, RELEASE_Y), layer_middle,
                                 Transport.BombRelease(0.0),
                                 [total_activity * frac_middle], max(n_middle, 1)),
-        Transport.ReleaseSource((RELEASE_X, RELEASE_Y), LAYER_UPPER,
+        Transport.ReleaseSource((RELEASE_X, RELEASE_Y), layer_upper,
                                 Transport.BombRelease(0.0),
                                 [total_activity * frac_upper],  max(n_upper, 1)),
     ]
@@ -477,7 +499,7 @@ function generate_shadow_particles(params::Vector{Float64}, gen_seed::UInt64)
     for src in sources
         pos_s, act_s, released_s = Transport.generate_release_particles(
             rng, src, 0, 1,
-            ones(Float64, NX, NY), ones(Float64, NY, NY),
+            ones(Float64, NX, NY), ones(Float64, NX, NY),  # xm/ym map fields — both NX×NY (was NY,NY: broke non-square US grids)
             DOMAIN.dx, DOMAIN.dy, DOMAIN.hlevel)
         if released_s && !isempty(pos_s)
             append!(positions_m, pos_s)

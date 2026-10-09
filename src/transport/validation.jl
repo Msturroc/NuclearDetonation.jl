@@ -446,6 +446,63 @@ end
 
 
 # ============================================================================
+# US continental-test observations (Trinity / Harry / SmallBoy / Doppler)
+# ----------------------------------------------------------------------------
+# All four are WGS84-native (no UTM conversion) like Smoky, so they reuse the
+# `load_*_geojson_wgs84` helpers. Each test's GeoJSON uses a different property
+# key for the dose level and TOA hour (the digitisation scripts differed), so
+# the keys are passed explicitly. The returned container is `SmokyObservations`
+# (the generic WGS84 holder — only `.dose_rate_contours` / `.toa_contours` are
+# consumed by the calibration scorer; metadata is filled from the test record).
+# Detonation coords/yields match examples/calibration_us_tests/cmaes_calibration.jl.
+# ============================================================================
+
+function load_trinity_observations(contour_dir::String)
+    dose = load_doserate_geojson_wgs84(joinpath(contour_dir, "Trinity_doserate_contours.geojson");
+                                       rate_key = "Trinity_contours")
+    toa  = load_toa_geojson_wgs84(joinpath(contour_dir, "Trinity_TOA.geojson");
+                                  hour_key = "TOA_hrs")
+    return SmokyObservations(dose, toa, 33.6773, -106.4754, 21.0, 30.0,
+                             "1945-07-16T11:29:00Z")  # Trinity, 100-ft tower
+end
+load_trinity_observations() = load_trinity_observations(
+    joinpath(pkgdir(parentmodule(@__MODULE__)), "data", "trinity_observations"))
+
+function load_harry_observations(contour_dir::String)
+    dose = load_doserate_geojson_wgs84(joinpath(contour_dir, "Harry_doserate_contours.geojson");
+                                       rate_key = "Contours")
+    toa  = load_toa_geojson_wgs84(joinpath(contour_dir, "Harry_TOA.geojson");
+                                  hour_key = "TOA_Harry_hrs")
+    return SmokyObservations(dose, toa, 37.0980, -116.0228, 32.0, 91.0,
+                             "1953-05-19T12:05:00Z")  # Upshot-Knothole Harry, 300-ft tower
+end
+load_harry_observations() = load_harry_observations(
+    joinpath(pkgdir(parentmodule(@__MODULE__)), "data", "harry_observations"))
+
+function load_smallboy_observations(contour_dir::String)
+    dose = load_doserate_geojson_wgs84(joinpath(contour_dir, "SmallBoy_doserate_contours.geojson");
+                                       rate_key = "Exposure_rate_mR_per_hr")
+    toa  = load_toa_geojson_wgs84(joinpath(contour_dir, "SmallBoy_TOA.geojson");
+                                  hour_key = "TOA_Hours")
+    return SmokyObservations(dose, toa, 36.8070, -115.9350, 1.65, 3.0,
+                             "1962-07-14T18:30:00Z")  # Operation Sunbeam Small Boy, near-surface
+end
+load_smallboy_observations() = load_smallboy_observations(
+    joinpath(pkgdir(parentmodule(@__MODULE__)), "data", "smallboy_observations"))
+
+function load_doppler_observations(contour_dir::String)
+    dose = load_doserate_geojson_wgs84(joinpath(contour_dir, "Doppler_doserate_contours.geojson");
+                                       rate_key = "level_mR_per_hr_H12")
+    toa  = load_toa_geojson_wgs84(joinpath(contour_dir, "Doppler_TOA.geojson");
+                                  hour_key = "TOA_hrs")
+    return SmokyObservations(dose, toa, 37.0867, -116.0237, 11.0, 457.0,
+                             "1957-08-23T12:30:00Z")  # Plumbbob Doppler, 1500-ft balloon
+end
+load_doppler_observations() = load_doppler_observations(
+    joinpath(pkgdir(parentmodule(@__MODULE__)), "data", "doppler_observations"))
+
+
+# ============================================================================
 # Rasterisation: Convert Polygons to Grid Masks
 # ============================================================================
 

@@ -1,0 +1,62 @@
+Small Boy BIPOP-CMA-ES Results — Ornstein-Uhlenbeck
+============================================================
+Total evaluations: 0
+Restarts: 0
+Wall time: 0.0 minutes
+Best loss: Inf
+Best score: -Inf%
+
+Best parameters:
+  d_median_fine: 100.0
+  sigma_g_fine: 2.669
+  d_median_coarse: 141.861
+  sigma_g_coarse: 2.523
+  frac_fine: 0.7
+  frac_lower: 0.15
+  frac_middle: 0.35
+  sigma_w_scale: 4.028
+  sigma_h_scale: 2.22
+  h_diff_scale: 0.2055
+  tl_scale: 4.458
+  vd_scale: 4.397
+  vgrav_scale: 0.5532
+  omega_scale: 2.557
+  mixing_height_scale: 4.105
+  tmix_scale: 1.29
+  surface_height_scale: 1.554
+  roughness_scale: 1.174
+  activity_scale: 48.418
+  smooth_sigma: 2.172
+  stem_top_m: 899.4252906669685
+  cap_mid_m: 2735.299415798942
+  cloud_top_m: 4570.679893680275
+
+Particle size distribution:
+  Fine: 100.0 μm (σ_g=2.67)
+  Coarse: 141.9 μm (σ_g=2.52)
+  Fine fraction: 70.0%
+
+Bounds:
+  d_median_fine: [20.0, 100.0]
+  sigma_g_fine: [1.05, 3.5]
+  d_median_coarse: [80.0, 300.0]
+  sigma_g_coarse: [1.1, 8.0]
+  frac_fine: [0.05, 0.7]
+  frac_lower: [0.01, 0.5]
+  frac_middle: [0.01, 0.5]
+  sigma_w_scale: [0.01, 20.0]
+  sigma_h_scale: [0.1, 15.0]
+  h_diff_scale: [0.05, 4.0]
+  tl_scale: [0.1, 10.0]
+  vd_scale: [0.1, 20.0]
+  vgrav_scale: [0.0001, 10.0]
+  omega_scale: [0.1, 10.0]
+  mixing_height_scale: [0.1, 5.0]
+  tmix_scale: [0.1, 10.0]
+  surface_height_scale: [0.1, 10.0]
+  roughness_scale: [0.1, 10.0]
+  activity_scale: [1.0, 1000.0]
+  smooth_sigma: [0.5, 10.0]
+  stem_top_m: [100.0, 8000.0]
+  cap_mid_m: [500.0, 9000.0]
+  cloud_top_m: [2000.0, 12000.0]

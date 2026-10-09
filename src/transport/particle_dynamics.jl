@@ -993,8 +993,19 @@ sols = simulate_particles(positions, (0.0, 3600.0), winds, params_vec)
 
 # Notes
 - Uses EnsembleThreads() for automatic parallel execution across CPU cores
-- For GPU acceleration, use `parallel=EnsembleGPUArray()` (requires DiffEqGPU.jl)
 - Adaptive time stepping means each particle uses optimal dt
+
+# GPU acceleration (requires DiffEqGPU.jl, not yet a dependency)
+This is an ensemble of low-dimensional non-stiff ODEs — the workload where
+DiffEqGPU.jl's kernel path is benchmarked on par with hand-written CUDA-C++.
+Prefer `EnsembleGPUKernel(CUDA.CUDABackend())` with a GPU solver such as
+`GPUTsit5()` — NOT `EnsembleGPUArray()`, which is the older, much slower path.
+Switching is a real port, not a flag swap; the kernel path requires:
+- an out-of-place RHS returning an `SVector` (current `particle_velocity!` is in-place)
+- `isbits` parameters: `winds::WindFields` cannot be captured into a kernel, so the
+  trilinear wind interpolation must be reimplemented over plain device arrays
+- a GPU-compatible solver (`GPUTsit5`/`GPUVern7`), not the CPU `Tsit5()`
+- reworking the `ContinuousCallback` domain-bounds check (not supported in GPU kernels)
 """
 function simulate_particles(initial_positions::Vector,
                            tspan::Tuple,

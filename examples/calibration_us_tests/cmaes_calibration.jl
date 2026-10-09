@@ -96,8 +96,46 @@ elseif TEST_NAME == "doppler"
         load_obs = Transport.load_doppler_observations,
         era5_dir = "/run/media/marc/e34b80f3-0992-4981-a17f-e396750ea8b4/era5_calibration/scenario_4_doppler_19570823",
     )
+elseif TEST_NAME == "nancy"
+    # Nancy — Upshot-Knothole, 24 kT tower shot, NTS Yucca Flat, 24 Mar 1953.
+    # Added for the RIVM intercomparison export only (calibration lived in the
+    # 20-param examples/nancy_cmaes_particle_size.jl). That model used a FIXED
+    # 3-layer release from the NOAA 1984 debris analysis (tops 3,800 / 6,100 /
+    # 12,500 m AGL; radii 537 / 1,500 / 2,500 m). We carry both here as
+    # `layer_heights` + `layer_radii` so the 23-param rho_core reproduces the
+    # calibrated geometry exactly — the optional `layer_radii` overrides the
+    # derived-radius formula in rho_core (guarded; other tests unaffected).
+    # ERA5 source is resolved specially in the ERA5_DIR block (nancy artifact).
+    (
+        label = "Nancy",
+        yield_kt = 24.0,
+        source_lat = 37.0956,
+        source_lon = -116.1028,
+        surface_elev_m = 1409.0,
+        start_dt = Dates.DateTime(1953, 3, 24, 13, 0),
+        load_obs = Transport.load_nancy_observations,
+        era5_dir = "",
+        layer_heights = (3800.0, 6100.0, 12500.0),
+        layer_radii   = (537.0, 1500.0, 2500.0),
+    )
+elseif TEST_NAME == "smoky"
+    # Smoky — Plumbbob, 44 kT tower shot, NTS Area 2b, 31 Aug 1957. Added for
+    # the RIVM export. Smoky's calibration script (smoky_cmaes_particle_size.jl)
+    # is the 23-param model this file was derived from — identical rho_core and
+    # release-radius formula — so the calibrated best vector exports faithfully
+    # with no geometry override. ERA5 resolved specially (local corrected snaps).
+    (
+        label = "Smoky",
+        yield_kt = 44.0,
+        source_lat = 37.177,
+        source_lon = -116.046,
+        surface_elev_m = 1409.0,
+        start_dt = Dates.DateTime(1957, 8, 31, 12, 0),
+        load_obs = Transport.load_smoky_observations,
+        era5_dir = "",
+    )
 else
-    error("Unknown test '$TEST_NAME'. Expected: trinity, harry, smallboy, doppler.")
+    error("Unknown test '$TEST_NAME'. Expected: trinity, harry, smallboy, doppler, nancy, smoky.")
 end
 
 # Glasstone-Dolan: cloud heights scale as W^0.215. Smoky reference at 44 kT.
@@ -314,7 +352,35 @@ end
 # ============================================================================
 
 println("\n1. Loading ERA5 met data...")
-const ERA5_DIR = TEST_CONFIG.era5_dir
+# Portability: the per-test era5_dir is the CPU box's external drive. On any box
+# where that isn't mounted (e.g. the GPU box), fall back to the published Zenodo
+# artifact, which holds the identical *_snap.nc files.
+const ERA5_DIR = if TEST_NAME == "nancy"
+    # Nancy ships its own ERA5 (era5_19530324_*_snap.nc) as a registered Zenodo
+    # artifact — same `_snap.nc` layout the US tests use, so the filter below works.
+    art = dirname(first(Transport.nancy_era5_files()))
+    println("   Nancy ERA5: $art")
+    art
+elseif TEST_NAME == "smoky"
+    # Smoky uses the locally-regenerated CORRECTED snaps (era5_smoky_*_snap.nc) —
+    # the Zenodo smoky artifact had faulty b-coefficients (see project_smoky_regression).
+    # Fall back to the artifact only if the local corrected dir is absent.
+    local_snaps = normpath(joinpath(@__DIR__, "..", "smoky_example", "ERA5_data"))
+    if isdir(local_snaps) && any(f -> endswith(f, "_snap.nc"), readdir(local_snaps))
+        println("   Smoky ERA5 (local corrected snaps): $local_snaps")
+        local_snaps
+    else
+        art = dirname(first(Transport.smoky_era5_files()))
+        println("   Smoky ERA5 (Zenodo fallback — CHECK b-coeffs): $art")
+        art
+    end
+elseif isdir(TEST_CONFIG.era5_dir)
+    TEST_CONFIG.era5_dir
+else
+    art = dirname(first(Transport.us_test_era5_files(TEST_NAME)))
+    println("   external drive not mounted — using Zenodo artifact: $art")
+    art
+end
 isdir(ERA5_DIR) || error("ERA5 directory not found: $ERA5_DIR — run download + merge first.")
 const ERA5_FILES = sort(filter(f -> endswith(f, "_snap.nc"),
                                [joinpath(ERA5_DIR, f) for f in readdir(ERA5_DIR)]))
@@ -335,9 +401,25 @@ const MET_CACHE = Dict{Tuple{Int,Int}, Transport.MeteoFields}()
 const CACHE_START_FILE     = TEST_NAME == "doppler"  ? 1 :
                              TEST_NAME == "smallboy" ? 7 : 5
 const CACHE_START_TIME_IDX = 1   # all tests: first hour in the start file
-const CACHE_END_FILE       = TEST_NAME == "doppler"  ? 7 :
-                             TEST_NAME == "smallboy" ? 13 : 11
-const SIM_HOURS            = TEST_NAME == "smallboy" ? 18 : 12   # SmallBoy needs H+15 TOA coverage
+# SmallBoy: 18 h run. The GPU window builder makes 2 windows/file (consumed
+# positionally, 1 per sim-hour, same scheme as the 12 h tests), so an 18 h run
+# needs ≥9 files; files 7-16 give 20 windows (margin over the n_hours assertion).
+# SIM_HOURS env extends the run (RIVM 48 h protocol); 2 windows per remaining
+# snap file caps the reachable hours, so 24-file artifacts top out at H+40
+# (H+36 for SmallBoy's later start file).
+const SIM_HOURS = let
+    default_hours = TEST_NAME == "smallboy" ? 18 : 12   # SmallBoy needs H+15 TOA coverage
+    req = parse(Int, get(ENV, "SIM_HOURS", string(default_hours)))
+    cap = 2 * (length(ERA5_FILES) - CACHE_START_FILE + 1)
+    req > cap && println("   SIM_HOURS=$req exceeds met coverage — capping at $cap")
+    min(req, cap)
+end
+const CACHE_END_FILE = let
+    default_end = TEST_NAME == "doppler"  ? 7 :
+                  TEST_NAME == "smallboy" ? 16 : 11
+    needed = CACHE_START_FILE + cld(SIM_HOURS, 2) - 1
+    min(max(default_end, needed), length(ERA5_FILES))
+end
 println("   Pre-loading met data (files $(CACHE_START_FILE)-$(CACHE_END_FILE))...")
 for file_idx in CACHE_START_FILE:CACHE_END_FILE
     NCDataset(ERA5_FILES[file_idx]) do ds
@@ -416,6 +498,37 @@ const CELL_AREA_M2 = let
     (dlat * 111_000.0) * (dlon * 111_000.0 * cosd(ref_lat))
 end
 const DOSE_FACTOR = 1.9e-6 * 12.0^(-1.2) * 100.0 / CELL_AREA_M2  # K_DOSE * decay_12h * mSv→mR / area
+
+# ALPHA_SCAN — post-hoc source-term refit. Dose is exactly linear in the
+# activity parameter, so the optimal activity under a different deposition
+# window can be found by scanning a multiplier α on an already-exported field
+# (smoothing commutes with scaling). Uses the same OBS_MASKS and geo-mean FMS
+# as the calibration loss; no simulation. ALPHA_SCAN=<path.nc> then exits.
+const ALPHA_SCAN_NC = get(ENV, "ALPHA_SCAN", "")
+if !isempty(ALPHA_SCAN_NC)
+    dose_scan = NCDataset(ALPHA_SCAN_NC) do ds
+        Float64.(nomissing(ds["dose_rate_mR_hr"][:, :], 0.0))
+    end
+    size(dose_scan) == (length(LON_GRID), length(LAT_GRID)) ||
+        error("ALPHA_SCAN: grid mismatch for $ALPHA_SCAN_NC")
+    function fms_at_alpha(alpha)
+        scores = Float64[]
+        for (dose_rate, obs_mask) in OBS_MASKS
+            model_mask = (dose_scan .* alpha) .>= dose_rate
+            inter = Float64(sum(model_mask .& obs_mask))
+            uni   = Float64(sum(model_mask .| obs_mask))
+            push!(scores, uni > 0 ? inter / uni : 0.0)
+        end
+        exp(sum(log(max(s, 0.005)) for s in scores) / length(scores))
+    end
+    alphas = exp10.(range(-1.0, 0.5, length=301))
+    vals = [fms_at_alpha(a) for a in alphas]
+    bi = argmax(vals)
+    println("ALPHA_SCAN: $(basename(ALPHA_SCAN_NC))")
+    println("  fms(alpha=1.0) = $(round(fms_at_alpha(1.0), digits=4))")
+    println("  best alpha     = $(round(alphas[bi], digits=4))  fms = $(round(vals[bi], digits=4))")
+    exit()
+end
 
 function gaussian_smooth(field::Matrix{T}, sigma::Real; truncate::Real=4.0) where T
     radius = ceil(Int, sigma * truncate)
@@ -608,6 +721,12 @@ const LAST_DOSE_RAW       = Ref{Union{Nothing, Matrix{Float64}}}(nothing)
 const LAST_MODEL_SNAPSHOTS = Ref{Union{Nothing, Vector{Matrix{Float64}}}}(nothing)
 const LAST_SNAPSHOT_HOURS  = Ref{Union{Nothing, Vector{Float64}}}(nothing)
 
+# When false, rho_core ignores TEST_CONFIG.layer_radii and uses the generic
+# height-derived radii. The "before" (neutral literature) NC export sets this to
+# false so Nancy's baseline is as generic as the other four tests; the calibrated
+# "after" export leaves it true so Nancy reproduces its NOAA-1984 release radii.
+const USE_FIXED_LAYER_RADII = Ref(true)
+
 function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64)
     # Unpack 23 parameters (v6: added stem_top_m, cap_mid_m, cloud_top_m)
     d_median_fine     = params[1]
@@ -665,9 +784,17 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
     n_upper  = max(n_particles - n_lower - n_middle, 1)
 
     # Build layer geometry from tuneable heights (radii scale with height)
-    layer_lower  = Transport.CylinderRelease(0.0, stem_top_m, 0.2 * stem_top_m)
-    layer_middle = Transport.CylinderRelease(stem_top_m, cap_mid_m, 0.25 * (cap_mid_m - stem_top_m))
-    layer_upper  = Transport.CylinderRelease(cap_mid_m, cloud_top_m, 0.25 * (cloud_top_m - cap_mid_m))
+    # Release radii: derived from the (tuneable) layer heights by default, but a
+    # test may pin fixed radii via TEST_CONFIG.layer_radii (Nancy reproduces its
+    # NOAA-1984 calibrated geometry: 537 / 1500 / 2500 m). Guarded — no effect on
+    # tests without the field (Trinity/Harry/SmallBoy/Doppler/Smoky).
+    fixed_radii = USE_FIXED_LAYER_RADII[] ? get(TEST_CONFIG, :layer_radii, nothing) : nothing
+    r_lower  = fixed_radii === nothing ? 0.2 * stem_top_m                 : fixed_radii[1]
+    r_middle = fixed_radii === nothing ? 0.25 * (cap_mid_m - stem_top_m)  : fixed_radii[2]
+    r_upper  = fixed_radii === nothing ? 0.25 * (cloud_top_m - cap_mid_m) : fixed_radii[3]
+    layer_lower  = Transport.CylinderRelease(0.0, stem_top_m, r_lower)
+    layer_middle = Transport.CylinderRelease(stem_top_m, cap_mid_m, r_middle)
+    layer_upper  = Transport.CylinderRelease(cap_mid_m, cloud_top_m, r_upper)
 
     sources = [
         Transport.ReleaseSource((RELEASE_X, RELEASE_Y), layer_lower,
@@ -830,6 +957,23 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
         end
         push!(model_snapshots, hourly_dep)
         push!(snapshot_hours, Float64(hour))
+    end
+
+    if get(ENV, "DEP_DIAG", "0") == "1"
+        n_released = parse(Int, get(ENV, "N_PARTICLES", "2500"))
+        n_events = length(sorted_events)
+        total_dep_mass = sum(e.mass for e in sorted_events; init=0.0)
+        println("DEP_DIAG: released=$(n_released) deposited_events=$(n_events) " *
+                "($(round(100 * n_events / n_released, digits=1))% of particles deposited by H+$(SIM_HOURS))")
+        prev = 0.0
+        for (h, snap) in zip(snapshot_hours, model_snapshots)
+            c = sum(snap)
+            pct = total_dep_mass > 0 ? 100 * c / total_dep_mass : 0.0
+            dpct = total_dep_mass > 0 ? 100 * (c - prev) / total_dep_mass : 0.0
+            println("DEP_DIAG: H+$(lpad(Int(h), 2)) cum=$(round(pct, digits=2))% of deposited mass (on obs grid)  " *
+                    "hourly +$(round(dpct, digits=2))%  abs=$(c)")
+            prev = c
+        end
     end
 
     final_dose = model_snapshots[end]
@@ -1263,6 +1407,72 @@ if TEST_NAME == "doppler"
             "(stem=$(round(x0[21])), cap_mid=$(round(x0[22])), cloud_top=$(round(x0[23]))) m")
 end
 
+# ============================================================================
+# NC_X0_FILE — single x0-injection hook driving both RIVM export stages.
+# ----------------------------------------------------------------------------
+# One mechanism, two stages (selected by NC_IMPROVEMENT):
+#   • "after"/"post"  : x0 = the calibrated best vector in NC_X0_FILE. Params
+#                       absent from the file (Nancy's best has only 20 — no layer
+#                       heights) fall back to this test's default geometry
+#                       (TEST_CONFIG.layer_heights for Nancy; warm-start heights
+#                       otherwise). NOT clamped to the optimiser bounds — Nancy's
+#                       calibrated d_fine/d_coarse legitimately sit outside the
+#                       US-test box and must export verbatim.
+#   • "before"/"pre"  : the file is the NEUTRAL literature recipe (all _scale=1,
+#                       literature particle size/fractions). The two genuinely
+#                       yield-dependent knobs are recomputed here per test:
+#                         activity_scale = LIT_ACTIVITY_PER_KT × yield  (∝ fission)
+#                         layer heights  = Glasstone-Dolan W^0.215 (Smoky 44 kT ref)
+#                       and fixed (calibrated) release radii are disabled so the
+#                       baseline is as generic for Nancy as for the other four.
+# ============================================================================
+const LIT_ACTIVITY_PER_KT = 2.5   # ×1e15 Bq per kT fission — neutral literature scaling
+
+function load_export_x0(path::String; before::Bool)
+    isfile(path) || error("NC_X0_FILE not found: $path")
+    vals = Dict{String, Float64}()
+    for line in eachline(path)
+        startswith(strip(line), "#") && continue
+        parts = split(line, "\t", limit=2)
+        length(parts) == 2 || continue
+        v = tryparse(Float64, strip(parts[2]))
+        v === nothing && continue
+        vals[strip(parts[1])] = v
+    end
+
+    # Per-test default geometry for params absent from the file. Nancy's
+    # calibrated layer tops (3,800/6,100/12,500 m) live in TEST_CONFIG, not in
+    # its 20-param best file; everything else defaults to the warm-start vector.
+    base = copy(WARM_START_PARAMS)
+    obs_heights = get(TEST_CONFIG, :layer_heights, nothing)
+    obs_heights === nothing || (base[21:23] .= collect(Float64, obs_heights))
+
+    x = copy(base)
+    for (j, pname) in enumerate(PARAM_NAMES)
+        haskey(vals, pname) && (x[j] = vals[pname])
+    end
+
+    if before
+        x[19] = LIT_ACTIVITY_PER_KT * TEST_CONFIG.yield_kt   # activity ∝ yield
+        x[21] = 1822.0 * YIELD_SCALE                          # stem_top  (Glasstone-Dolan)
+        x[22] = 5541.0 * YIELD_SCALE                          # cap_mid
+        x[23] = 9259.0 * YIELD_SCALE                          # cloud_top
+    end
+    return x
+end
+
+const NC_X0_FILE = get(ENV, "NC_X0_FILE", "")
+if !isempty(NC_X0_FILE)
+    nc_stage = lowercase(get(ENV, "NC_IMPROVEMENT", ""))
+    nc_before = nc_stage in ("pre", "before")
+    USE_FIXED_LAYER_RADII[] = !nc_before   # generic radii for the literature baseline
+    global x0 = load_export_x0(NC_X0_FILE; before=nc_before)
+    println("\n   NC_X0_FILE override ($(nc_before ? "before/literature" : "after/calibrated")): $(NC_X0_FILE)")
+    println("   x0[19] activity=$(round(x0[19], digits=2))  heights=" *
+            "($(round(x0[21])), $(round(x0[22])), $(round(x0[23]))) m  " *
+            "fixed_radii=$(USE_FIXED_LAYER_RADII[] && get(TEST_CONFIG, :layer_radii, nothing) !== nothing)")
+end
+
 println("\n" * "="^70)
 println("BIPOP-CMA-ES Configuration:")
 println("  Turbulence: $(TURB_NAME)")
@@ -1295,12 +1505,21 @@ function _viz_sweep(x0_local, turb, n_seeds)
 end
 
 if get(ENV, "VIZ_ONLY", "0") == "1"
-    n_seeds = parse(Int, get(ENV, "VIZ_SEEDS", "20"))
-    println("\nVIZ_ONLY: sweeping $n_seeds seeds at x0 to find the best fit.")
-    best_seed, best_diag = _viz_sweep(x0, TURB_SCHEME, n_seeds)
-    # Rerun the best seed so LAST_DOSE_SMOOTH holds its dose field.
+    nc_seed = get(ENV, "NC_SEED", "")
+    best_seed, best_diag = if !isempty(nc_seed)
+        # Fixed seed (e.g. match an NC_EXPORT file so figure and grid agree).
+        s = parse(UInt64, nc_seed)
+        println("\nVIZ_ONLY: fixed seed $s (NC_SEED override).")
+        s, rho_core(x0, TURB_SCHEME, s)
+    else
+        n_seeds = parse(Int, get(ENV, "VIZ_SEEDS", "20"))
+        println("\nVIZ_ONLY: sweeping $n_seeds seeds at x0 to find the best fit.")
+        bs, bd = _viz_sweep(x0, TURB_SCHEME, n_seeds)
+        # Rerun the best seed so LAST_DOSE_SMOOTH holds its dose field.
+        rho_core(x0, TURB_SCHEME, bs)
+        bs, bd
+    end
     println("\nBest seed: $(best_seed)")
-    rho_core(x0, TURB_SCHEME, best_seed)
     println("  loss=$(round(best_diag.loss, digits=4))  fms=$(round(best_diag.fms, digits=4))  " *
             "shape=$(round(best_diag.shape, digits=4))  bearing=$(round(best_diag.bearing, digits=4))  " *
             "extent=$(round(best_diag.extent, digits=4))  toa=$(round(best_diag.toa, digits=4))")
@@ -1453,13 +1672,23 @@ end
 # baseline vector (see bundle_rivm_netcdf.jl).
 # ============================================================================
 if get(ENV, "NC_EXPORT", "0") == "1"
-    n_seeds = parse(Int, get(ENV, "VIZ_SEEDS", "5"))
-    println("\nNC_EXPORT: sweeping $n_seeds seeds at x0 for a representative field.")
-    best_seed, best_diag = _viz_sweep(x0, TURB_SCHEME, n_seeds)
+    nc_seed = get(ENV, "NC_SEED", "")
+    best_seed, best_diag = if !isempty(nc_seed)
+        # Fixed seed (e.g. reuse the best-of-5 seed from a prior export so a
+        # SIM_HOURS rerun differs only by the longer integration).
+        s = parse(UInt64, nc_seed)
+        println("\nNC_EXPORT: fixed seed $s (NC_SEED override).")
+        s, rho_core(x0, TURB_SCHEME, s)
+    else
+        n_seeds = parse(Int, get(ENV, "VIZ_SEEDS", "5"))
+        println("\nNC_EXPORT: sweeping $n_seeds seeds at x0 for a representative field.")
+        bs, bd = _viz_sweep(x0, TURB_SCHEME, n_seeds)
+        # Rerun the best seed so LAST_DOSE_SMOOTH / LAST_DOSE_RAW hold its field.
+        rho_core(x0, TURB_SCHEME, bs)
+        bs, bd
+    end
     println("Best seed: $(best_seed)  loss=$(round(best_diag.loss, digits=4)) " *
             "fms=$(round(best_diag.fms, digits=4)) brg=$(round(best_diag.bearing, digits=4))")
-    # Rerun the best seed so LAST_DOSE_SMOOTH / LAST_DOSE_RAW hold its field.
-    rho_core(x0, TURB_SCHEME, best_seed)
     dose_smooth = LAST_DOSE_SMOOTH[]
     dose_raw    = LAST_DOSE_RAW[]
     dose_smooth === nothing && error("NC_EXPORT: no dose field stashed — sim produced no deposition.")
@@ -1509,7 +1738,7 @@ if get(ENV, "NC_EXPORT", "0") == "1"
         crs_var.attrib["semi_major_axis"] = 6378137.0
         crs_var.attrib["inverse_flattening"] = 298.257223563
 
-        ds.attrib["title"] = "PREDICT US-test intercomparison — $nc_label"
+        ds.attrib["title"] = "PREDICT US-test intercomparison: $nc_label"
         ds.attrib["institution"] = "NuclearDetonation.jl"
         ds.attrib["source"] = "NuclearDetonation.jl Lagrangian particle dispersion"
         ds.attrib["Conventions"] = "CF-1.8"
@@ -1519,6 +1748,7 @@ if get(ENV, "NC_EXPORT", "0") == "1"
         ds.attrib["source_lon"] = TEST_CONFIG.source_lon
         ds.attrib["detonation_time"] = Dates.format(det_time, "yyyy-mm-dd HH:MM:SS") * " UTC"
         ds.attrib["turbulence_scheme"] = TURB_NAME
+        ds.attrib["deposition_integrated_hours"] = SIM_HOURS
         ds.attrib["n_particles"] = parse(Int, get(ENV, "N_PARTICLES", "2500"))
         ds.attrib["dose_decay"] = "Way-Wigner t^-1.2 to H+12"
         ds.attrib["smooth_sigma_cells"] = x0[20]

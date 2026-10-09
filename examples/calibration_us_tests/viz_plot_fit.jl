@@ -34,10 +34,6 @@ contour_colors = [_PALETTE[clamp(i, 1, length(_PALETTE))]
 
 fig = Figure(size = (1400, 1200), fontsize = 14)
 
-Label(fig[0, 1:2],
-    "$(TEST_CONFIG.label) $(Int(round(TEST_CONFIG.yield_kt))) kT: Observed vs Model",
-    fontsize = 18, font = :bold)
-
 gl_dose_obs = fig[1, 1] = GridLayout()
 gl_dose_mod = fig[1, 2] = GridLayout()
 gl_toa_obs  = fig[2, 1] = GridLayout()
@@ -79,10 +75,13 @@ scatter!(ax_dose_mod, [_GZ_LON], [_GZ_LAT];
 
 dose_entries = [LineElement(color = c, linewidth = 3) for c in contour_colors]
 dose_labels  = ["$(l) mR/h" for l in contour_levels]
+# Wrap a crowded legend onto extra rows (~7 entries/row) so it stays within its
+# half-width column instead of overlapping the adjacent panel's legend.
+dose_nbanks = max(1, cld(length(dose_entries), 7))
 Legend(gl_dose_obs[2, 1], dose_entries, dose_labels, "Dose Rate (H+12)";
-    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = dose_nbanks)
 Legend(gl_dose_mod[2, 1], dose_entries, dose_labels, "Dose Rate (H+12)";
-    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = dose_nbanks)
 
 # --- TOA preparation --------------------------------------------------
 obs_toa = OBS.toa_contours
@@ -143,10 +142,13 @@ scatter!(ax_toa_mod, [_GZ_LON], [_GZ_LAT];
 toa_entries = [LineElement(color = toa_cmap[i], linewidth = 3)
                for i in eachindex(obs_hours)]
 toa_labels  = ["H+$(Int(round(h)))" for h in obs_hours]
+# TOA often carries many hours; wrap onto extra rows so the two columns'
+# legends don't smoosh into each other.
+toa_nbanks = max(1, cld(length(toa_entries), 7))
 Legend(gl_toa_obs[2, 1], toa_entries, toa_labels, "Time of Arrival";
-    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = toa_nbanks)
 Legend(gl_toa_mod[2, 1], toa_entries, toa_labels, "Time of Arrival";
-    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = 1)
+    orientation = :horizontal, tellwidth = false, tellheight = true, nbanks = toa_nbanks)
 
 linkaxes!(ax_dose_obs, ax_dose_mod, ax_toa_obs, ax_toa_mod)
 colsize!(fig.layout, 1, Relative(0.5))

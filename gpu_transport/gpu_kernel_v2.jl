@@ -587,6 +587,7 @@ Twelve kernel launches per 12-hour Nancy simulation (one per met window) with
 """
 function run_gpu_shadow(params::Vector{Float64}, gen_seed::UInt64;
                         rng_seed::UInt64 = gen_seed,
+                        n_hours::Int = 12,
                         windows::Union{Nothing,Vector{GpuMetWindow}} = nothing)
     sigma_w_scale     = Float32(params[8])
     sigma_h_scale     = Float32(params[9])
@@ -604,7 +605,7 @@ function run_gpu_shadow(params::Vector{Float64}, gen_seed::UInt64;
     pts = generate_shadow_particles(params, gen_seed)
     if pts.n == 0
         nx_obs, ny_obs = length(LON_GRID), length(LAT_GRID)
-        return zeros(Float32, nx_obs, ny_obs), zeros(Float32, nx_obs, ny_obs, 12), 0
+        return zeros(Float32, nx_obs, ny_obs), zeros(Float32, nx_obs, ny_obs, n_hours), 0
     end
 
     # Geometry from a sample tape (host side, used for grid_scale + map_ratio)
@@ -614,12 +615,12 @@ function run_gpu_shadow(params::Vector{Float64}, gen_seed::UInt64;
 
     # Met windows
     win_list = windows === nothing ? load_nancy_gpu_windows() : windows
-    @assert length(win_list) >= 12 "Need at least 12 met windows for Nancy 12-hour run; got $(length(win_list))"
+    @assert length(win_list) >= n_hours "Need at least $(n_hours) met windows for a $(n_hours)-hour run; got $(length(win_list))"
 
     # Output grid (host + device)
     nx_obs, ny_obs = length(LON_GRID), length(LAT_GRID)
     dep_dev = CUDA.zeros(Float32, nx_obs, ny_obs)
-    hourly_host = zeros(Float32, nx_obs, ny_obs, 12)
+    hourly_host = zeros(Float32, nx_obs, ny_obs, n_hours)
 
     lon_dev = CuArray(Float32.(LON_GRID))
     lat_dev = CuArray(Float32.(LAT_GRID))
@@ -654,8 +655,8 @@ function run_gpu_shadow(params::Vector{Float64}, gen_seed::UInt64;
     threads = 256
     blocks = cld(pts.n, threads)
 
-    # Twelve launches — one per met window
-    for h in 1:12
+    # One launch per met window (n_hours total)
+    for h in 1:n_hours
         win = win_list[h]
         @cuda threads=threads blocks=blocks transport_window_kernel!(
             xs_dev, ys_dev, σs_dev, u_turbs_dev, v_turbs_dev, w_turbs_dev,
