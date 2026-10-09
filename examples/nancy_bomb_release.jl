@@ -206,7 +206,7 @@ state = Transport.initialize_simulation(domain, sources, ["MixedFP"], decay_para
                                          log_depositions=true)
 
 rng = Random.MersenneTwister(42)
-init_met = met_cache[(5, 1)]
+init_met = met_cache[(5, 2)]  # 13:00 UTC in file 5 (12-14); Nancy fired at 13:10 UTC
 
 snap_bins = [ParticleProperties(diameter_μm=b.d, density_gcm3=2.5) for b in size_bins]
 particle_radii = Float64[]
@@ -282,7 +282,7 @@ Transport.run_simulation!(state, era5_files,
     dry_deposition_enabled=true, wet_deposition_enabled=false,
     release_height_m=12500.0, met_data_cache=met_cache,
     met_format_override=met_format, met_dimensions=(nx_met, ny_met, nk_met),
-    cache_init_file_idx=5, cache_init_time_idx=1,
+    cache_init_file_idx=5, cache_init_time_idx=2,
     sigma_already_initialized=true)
 
 println("   Simulation complete")

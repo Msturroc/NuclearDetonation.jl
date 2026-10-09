@@ -173,6 +173,7 @@ println("   Pre-loading met data (files 5-11)...")
 const MET_CACHE = Dict{Tuple{Int,Int}, Transport.MeteoFields}()
 const CACHE_START_FILE = 5
 const CACHE_END_FILE = 11
+const CACHE_START_TIME_IDX = 2   # 13:00 UTC in file 5 (12-14); Nancy fired at 13:10 UTC
 for file_idx in CACHE_START_FILE:CACHE_END_FILE
     NCDataset(ERA5_FILES[file_idx]) do ds
         times = Transport.get_time_variable(MET_FORMAT, ds)
@@ -422,7 +423,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
     state = Transport.initialize_simulation(DOMAIN, sources, ["MixedFP"], decay_params;
                                         log_depositions=true)
 
-    init_met = MET_CACHE[(CACHE_START_FILE, 1)]
+    init_met = MET_CACHE[(CACHE_START_FILE, CACHE_START_TIME_IDX)]
 
     # Generate particles from all 3 layers
     positions_m = Tuple{Float64,Float64,Float64}[]
@@ -430,7 +431,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
     for src in sources
         pos_s, act_s, released_s = Transport.generate_release_particles(
             rng, src, 0, 1,
-            ones(Float64, NX, NY), ones(Float64, NY, NY),
+            ones(Float64, NX, NY), ones(Float64, NX, NY),
             DOMAIN.dx, DOMAIN.dy, DOMAIN.hlevel
         )
         if released_s && !isempty(pos_s)
@@ -541,7 +542,7 @@ function rho_core(params::Vector{Float64}, turb_scheme::Symbol, gen_seed::UInt64
         met_format_override=MET_FORMAT,
         met_dimensions=(NX, NY, NK),
         cache_init_file_idx=CACHE_START_FILE,
-        cache_init_time_idx=1,
+        cache_init_time_idx=CACHE_START_TIME_IDX,
         sigma_already_initialized=true
     )
 
