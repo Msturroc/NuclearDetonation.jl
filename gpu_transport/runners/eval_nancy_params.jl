@@ -43,3 +43,30 @@ if get(ENV, "PARITY", "0") == "1" && !isempty(ARGS)
     @printf("CPU shadow vs GPU kernel: max |Δ| / max = %.3e  (sum cpu %.4e, gpu %.4e)\n",
             rel, sum(dep_cpu), sum(dep_gpu))
 end
+
+# Package check: score the first file with Transport.run_simulation! itself (the
+# model the GUI runs), via cpu_reference.jl. Slow (CPU), so few seeds.
+if get(ENV, "PACKAGE", "0") == "1" && !isempty(ARGS)
+    include(joinpath(ROOT, "gpu_transport", "cpu_reference.jl"))
+    p = read_params(ARGS[1])
+    seeds = EVAL_SEEDS[1:parse(Int, get(ENV, "PACKAGE_SEEDS", "2"))]
+    nx_obs, ny_obs = length(LON_GRID), length(LAT_GRID)
+    rs = map(seeds) do seed
+        t = @elapsed ref = run_reference_simulation(p, seed)
+        hourly = zeros(Float64, nx_obs, ny_obs, 12)
+        for evt in ref.deposition_log
+            lat, lon = Transport.grid_to_latlon(DOMAIN, evt.x, evt.y)
+            lon > 180 && (lon -= 360)
+            i, j = searchsortedlast(LON_GRID, lon), searchsortedlast(LAT_GRID, lat)
+            (1 <= i <= nx_obs && 1 <= j <= ny_obs) || continue
+            h0 = clamp(ceil(Int, evt.time / 3600), 1, 12)   # in every snapshot from its hour on
+            @views hourly[i, j, h0:12] .+= evt.mass
+        end
+        r = score_deposition(hourly[:, :, 12], hourly, p[20])
+        @printf("  package run (seed %d): score %.2f%%  fms %.3f shape %.3f bear %.3f toa %.3f  [%.0f s]\n",
+                findfirst(==(seed), EVAL_SEEDS), 100 * (1 - r.loss), r.fms, r.shape, r.bearing, r.toa, t)
+        r
+    end
+    sc = [100 * (1 - r.loss) for r in rs]
+    @printf("%-60s package score %.2f ± %.2f %%\n", basename(ARGS[1]), mean(sc), length(sc) > 1 ? std(sc) : 0.0)
+end

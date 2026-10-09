@@ -56,8 +56,13 @@ const FAILED_CORR = CorrResult(1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0)
 # `params` arrives in PHYSICAL space (caller decodes from log space first).
 # ---------------------------------------------------------------------------
 function rho_core_corrected(params::Vector{Float64}, gen_seed::UInt64)
-    smooth_sigma = params[20]
     final_dep, hourly_dep, n_alive = run_gpu_shadow(params, gen_seed; windows = GPU_WINDOWS)
+    return score_deposition(final_dep, hourly_dep, params[20])
+end
+
+# Score a deposition field on the observation grid (final + 12 hourly cumulative
+# snapshots), so any forward model (GPU, CPU shadow, package reference) is scored alike.
+function score_deposition(final_dep, hourly_dep, smooth_sigma)
     nx_obs, ny_obs = length(LON_GRID), length(LAT_GRID)
     sum(final_dep) <= 0 && return FAILED_CORR
 

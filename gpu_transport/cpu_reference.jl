@@ -90,7 +90,7 @@ function run_reference_simulation(params::Vector{Float64}, gen_seed::UInt64)
                                           d_median_coarse, sigma_g_coarse,
                                           frac_fine, size_bins)
 
-    n_particles = 1000
+    n_particles = parse(Int, get(ENV, "REF_N_PARTICLES", "1000"))   # GPU runs use 10000
     total_activity = activity_scale * 1.0e15
     n_lower  = round(Int, n_particles * frac_lower)
     n_middle = round(Int, n_particles * frac_middle)

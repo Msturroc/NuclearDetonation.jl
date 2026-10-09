@@ -16,7 +16,7 @@ using Random, Statistics, Printf, StaticArrays, CUDA
 using NuclearDetonation
 using NuclearDetonation.Transport
 
-const ROOT = "/home/marc/NuclearDetonation.jl"
+const ROOT = normpath(joinpath(@__DIR__, "..", ".."))
 include(joinpath(ROOT, "examples", "nancy_cmaes_particle_size.jl"))
 include(joinpath(ROOT, "gpu_transport", "host_shadow_v2.jl"))
 include(joinpath(ROOT, "gpu_transport", "met_upload.jl"))
@@ -25,7 +25,7 @@ include(joinpath(ROOT, "gpu_transport", "gpu_kernel_v2.jl"))
 const GPU_WINDOWS = load_nancy_gpu_windows()
 
 # Calibrated vector (physical units)
-const BEST = joinpath(ROOT, "gpu_transport", "artifacts", "gpu_nancy_corrected_best.txt")
+const BEST = get(ENV, "BEST_FILE", joinpath(ROOT, "gpu_transport", "artifacts", "gpu_nancy_corrected_best.txt"))
 params = Float64[]
 for ln in eachline(BEST)
     (startswith(ln, "#") || isempty(strip(ln))) && continue
@@ -40,7 +40,7 @@ final_dose = model_snapshots[end]
 dose_smooth_field = gaussian_smooth(final_dose .* DOSE_FACTOR, params[20])
 
 # Globals expected by viz_plot_fit.jl
-const TEST_NAME    = "nancy_gpu"
+const TEST_NAME    = get(ENV, "VIZ_NAME", "nancy_gpu")
 const TURB_SCHEME  = :OU
 const TEST_CONFIG  = (source_lat = SOURCE_LAT, source_lon = SOURCE_LON,
                       label = "Nancy (GPU, corrected loss)", yield_kt = 24.0)

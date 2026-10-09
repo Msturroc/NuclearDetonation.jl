@@ -1,0 +1,31 @@
+# Nancy GPU champion5 (corrected loss)
+# evals=6000 restarts=1 wall_min=10.26
+# opt_seed=1 obj_seed=0x000000005eedca11 x0=gpu_nancy_corrected_best.txt n_particles=10000
+# windows=19 bridge=true start_time_idx=2
+# score=82.48435892735957
+d_median_fine	112.99727469042493
+sigma_g_fine	3.101885041459283
+d_median_coarse	201.14364637286178
+sigma_g_coarse	1.5941127429898048
+frac_fine	0.6856291379634405
+frac_lower	0.01
+frac_middle	0.3740075620496296
+sigma_w_scale	4.999999999999999
+sigma_h_scale	7.999999999999999
+h_diff_scale	0.1011476451109138
+tl_scale	0.6848327319946219
+vd_scale	2.501006721160138
+vgrav_scale	1.9775265793235939
+omega_scale	2.9999999999999996
+mixing_height_scale	4.712971122138146
+tmix_scale	0.2812354406635032
+surface_height_scale	2.2354034334111783
+roughness_scale	3.224584674268853
+activity_scale	80.26598651398659
+smooth_sigma	1.011401047712717
+# loss	0.1751564107264043
+# fms	0.36093361437939286
+# shape	0.9370892853087233
+# bearing	0.9702339644121953
+# extent	1.0
+# toa	1.0
