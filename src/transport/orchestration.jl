@@ -1567,6 +1567,9 @@ Run complete atmospheric transport simulation.
 - `release_times_s`: Optional per-particle release time (seconds after the start).
   Particles with a later release time are held inactive — no transport, decay or
   deposition — until the model clock reaches it. Use for releases spread over time.
+- `bridge_met_files`: Step through the window from each met file's last time to the
+  next file's first time (default `true`). With `false`, that hour is skipped and
+  the weather runs ahead of the model clock — the behaviour before this option.
 
 # Returns
 - `snapshots::Vector{SimulationSnapshot}`: Saved simulation snapshots
@@ -1616,7 +1619,8 @@ function run_simulation!(state::SimulationState{T},
                         met_dimensions::Union{Nothing, Tuple{Int,Int,Int}}=nothing,
                         cache_init_file_idx::Int=1,
                         cache_init_time_idx::Int=1,
-                        release_times_s::Union{Nothing,AbstractVector{<:Real}}=nothing) where T<:Real
+                        release_times_s::Union{Nothing,AbstractVector{<:Real}}=nothing,
+                        bridge_met_files::Bool=true) where T<:Real
 
     if config.verbose
         println("="^70)
@@ -1975,12 +1979,41 @@ function run_simulation!(state::SimulationState{T},
         end
 
         # Process time windows for this file. A cached run may start part-way
-        # through its first file, at the window its init fields came from.
+        # through its first file, at the window its init fields came from. The
+        # extra last window bridges to the next file's first time step.
         first_window = file_idx == init_file_idx && !isnothing(met_data_cache) &&
                        !isempty(met_data_cache) ? init_time_idx1 : 1
-        for window_idx in first_window:n_time_windows_file
+        n_bridge = bridge_met_files && file_idx < file_range_end ? 1 : 0
+        for window_idx in first_window:(n_time_windows_file + n_bridge)
             # Load met fields from cache or file
-            if !isnothing(met_data_cache) && haskey(met_data_cache, (file_idx, window_idx))
+            if window_idx > n_time_windows_file
+                last_t = n_time_windows_file + 1
+                if !isnothing(met_data_cache) && haskey(met_data_cache, (file_idx, last_t)) &&
+                   haskey(met_data_cache, (file_idx + 1, 1))
+                    copy_met_fields!(met_fields, met_data_cache[(file_idx, last_t)])
+                    copy_time_level!(met_fields, 2, met_data_cache[(file_idx + 1, 1)], 1)
+                    time_diff = 3600.0  # Default 1 hour for cached data
+                else
+                    next_fields = MeteoFields(met_fields.nx, met_fields.ny, met_fields.nk;
+                                              T = eltype(met_fields.u1),
+                                              with_abs_temp = !isnothing(met_fields.t1_abs))
+                    t_last = NCDataset(era5_file) do ds
+                        met_fields.xm .= 1.0f0
+                        met_fields.ym .= 1.0f0
+                        read_met_fields!(met_format, met_fields, ds, last_t, last_t)
+                        get_time_variable(met_format, ds)[last_t]
+                    end
+                    t_next = NCDataset(era5_files[file_idx + 1]) do ds
+                        read_met_fields!(met_format, next_fields, ds, 1, 1)
+                        get_time_variable(met_format, ds)[1]
+                    end
+                    copy_time_level!(met_fields, 2, next_fields, 1)
+                    time_diff = Float64(value(t_next - t_last)) / 1000.0
+                    time_diff > 0 || continue  # overlapping files: nothing to bridge
+                end
+                state.domain.xm .= met_fields.xm
+                state.domain.ym .= met_fields.ym
+            elseif !isnothing(met_data_cache) && haskey(met_data_cache, (file_idx, window_idx))
                 if !(file_idx == init_file_idx && window_idx == init_time_idx1)
                     cached_mf = met_data_cache[(file_idx, window_idx)]
                     copy_met_fields!(met_fields, cached_mf)

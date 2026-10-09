@@ -104,4 +104,26 @@ const _Tx = NuclearDetonation.Transport
     end
 end
 
+@testset "orchestration: met window bridging" begin
+    # Two 1-step "files": every time-dependent field holds a marker value
+    mark(v) = begin
+        mf = _Tx.MeteoFields(3, 2, 4)
+        for name in (:u, :v, :w, :t, :ps, :pmsl, :hbl, :bl, :precip, :hflux, :p, :hlevel, :hlayer),
+            level in (1, 2)
+            fill!(getfield(mf, Symbol(name, level)), v)
+        end
+        mf.vlevel .= v
+        mf
+    end
+    last, next = mark(1.0f0), mark(2.0f0)
+    next.u1 .= 3.0f0    # time level 1 of the next file is what bridges to
+
+    br = _Tx.bridge_met_fields(last, next)
+    @test all(br.u1 .== 1) && all(br.u2 .== 3)
+    @test all(br.ps1 .== 1) && all(br.ps2 .== 2)
+    @test all(br.hlevel1 .== 1) && all(br.hlevel2 .== 2)
+    @test all(br.vlevel .== 1)          # static fields come from the earlier file
+    @test all(last.u2 .== 1)            # inputs untouched
+end
+
 println("✓ All orchestration tests passed!")

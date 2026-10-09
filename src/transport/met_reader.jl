@@ -322,6 +322,32 @@ function copy_met_fields!(dst::MeteoFields, src::MeteoFields)
 end
 
 """
+    copy_time_level!(dst::MeteoFields, level, src::MeteoFields, src_level) -> dst
+
+Copy one time level (1 or 2) of every time-dependent field from `src` into `dst`.
+"""
+function copy_time_level!(dst::MeteoFields, level::Int, src::MeteoFields, src_level::Int)
+    for name in (:u, :v, :w, :t, :ps, :pmsl, :hbl, :bl, :precip, :hflux, :p, :hlevel, :hlayer)
+        getfield(dst, Symbol(name, level)) .= getfield(src, Symbol(name, src_level))
+    end
+    d, s = getfield(dst, Symbol(:t, level, :_abs)), getfield(src, Symbol(:t, src_level, :_abs))
+    (isnothing(d) || isnothing(s)) || (d .= s)
+    return dst
+end
+
+"""
+    bridge_met_fields(last::MeteoFields, next::MeteoFields) -> MeteoFields
+
+Met window from the last time step of one met file to the first time step of the
+next: time level 1 from `last`, time level 2 from `next` (both taken from their
+time level 1). Stepping only through the windows inside each file skips this
+hour, so the weather runs ahead of the model clock.
+"""
+function bridge_met_fields(last::MeteoFields, next::MeteoFields)
+    return copy_time_level!(deepcopy(last), 2, next, 1)
+end
+
+"""
     compute_pressure_from_hybrid!(fields::MeteoFields{T}, time_level::Int=2) where T
 
 Compute 3D pressure field from hybrid coordinates using: p(i,j,k) = alevel(k) + blevel(k) * ps(i,j)
@@ -811,3 +837,4 @@ export MeteoParams, MeteoFields
 export init_meteo_params!, read_meteo_timestep!
 export load_netcdf_variable, unit_conversion_factor
 export compute_pressure_from_hybrid!
+export bridge_met_fields
