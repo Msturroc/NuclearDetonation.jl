@@ -14,11 +14,21 @@ The window opens straight away and loads the built-in ERA5 data in the
 background. The `--threads=2` flag runs simulations on a worker thread so the
 window stays responsive.
 
-Left-click the map to place the release, or click one of the NPP sites. Scroll
-to zoom, right-drag to pan, and Ctrl+click to reset the view. Exports (CSV, PNG,
+Drag the map to pan, and scroll or use the +/− buttons to zoom; Fit returns to
+the weather domain. Click the map to place the release, or click one of the NPP
+sites. Exports (CSV, PNG,
 GIF, MP4) go to the output folder shown at the bottom of the panel, which
 defaults to `Documents/NuclearDetonation`. Errors are also written to
 `error.log` there.
+
+## Map
+
+The basemap is OpenStreetMap's standard tiles, fetched as you pan and zoom, so
+it needs internet. Requests identify the app with its own User-Agent, as OSM's
+[tile usage policy](https://operations.osmfoundation.org/policies/tiles/)
+requires; the policy is fine with light use like this but not bulk downloading.
+Offline, Natural Earth country outlines bundled in `data/naturalearth/` show
+instead. To change provider, edit `gui/src/tiles.jl`.
 
 ## Point-release source terms
 
@@ -51,7 +61,8 @@ without GPU drivers, put Mesa's software `opengl32.dll` next to the executable.
 | `gui/src/window.jl` | Window layout, map layers, callbacks and exports |
 | `gui/src/simulation.jl` | Wraps the transport core: bomb and point-release setups |
 | `gui/src/animation.jl` | Plume animation frames per model level |
-| `gui/src/basemap.jl` | Natural Earth country outlines for the map |
+| `gui/src/tiles.jl` | OpenStreetMap tile provider for the map |
+| `gui/src/basemap.jl` | Offline Natural Earth country outlines under the tiles |
 | `gui/src/observations.jl` | Nancy and ETEX observation overlays |
 | `gui/src/prediction.jl` | XGBoost impact prediction for NPP sites |
 | `gui/src/arl_reader.jl`, `arl_converter.jl` | ARL weather files → ERA5-layout NetCDF |

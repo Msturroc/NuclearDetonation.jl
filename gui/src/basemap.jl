@@ -1,15 +1,16 @@
-# Offline map background: Natural Earth 1:50m country polygons (public domain,
+# Offline map background, drawn under the map tiles so the map still works
+# without internet: Natural Earth 1:50m country polygons (public domain,
 # naturalearthdata.com), shipped in data/naturalearth/ with properties stripped
 # and coordinates rounded to 0.001°.
 
 const BASEMAP = Ref{Any}(nothing)
 
-_ring(coords) = Point2f[Point2f(c[1], c[2]) for c in coords]
+_ring(coords) = Point2f[merc(c[1], c[2]) for c in coords]
 
 """
     load_basemap() -> Vector{Polygon}
 
-Country outlines as Makie polygons in lon/lat (-180..180). Parsed once and cached.
+Country outlines as Makie polygons in Web Mercator map coordinates. Parsed once and cached.
 """
 function load_basemap()
     isnothing(BASEMAP[]) || return BASEMAP[]

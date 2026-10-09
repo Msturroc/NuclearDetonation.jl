@@ -27,7 +27,7 @@ The GUI supports:
 - **Two release modes**: instantaneous bomb detonations (yield in kT, with the stabilised cloud height scaled from the calibrated Nancy geometry), and point-source releases such as nuclear power plant accidents, spread over a chosen release duration.
 - **Multi-isotope source terms**: for point releases, enter any mix of radionuclides, each with its own activity and an optional custom half-life. Common reactor and fallout isotopes (Cs-137, I-131, Sr-90, Co-60, …) have preset half-lives, and deposits decay per nuclide up to the end of the run.
 - **Built-in and custom weather**: ships with ERA5 reanalysis for the Nevada Test Site (1953) and the ETEX experiment (Europe, 1994). ARL-format weather files can be loaded for other regions and dates.
-- **Dose-rate and deposition contours** on an offline Natural Earth basemap, with switchable display units, plus a time-stepped animation of the plume at any model level.
+- **Dose-rate and deposition contours** on an OpenStreetMap basemap that you drag to pan and scroll to zoom, with switchable display units, plus a time-stepped animation of the plume at any model level. Without internet the map falls back to offline Natural Earth country outlines.
 - **Historical observation overlays**: digitised dose-rate contours from the Nancy test and gridded ETEX measurements, for visual model validation.
 - **Impact prediction**: with ARL weather loaded, clicking a UK or French NPP site runs an XGBoost classifier that predicts whether a release would reach Ireland.
 - **Exports**: deposition events as CSV, the map as PNG, and the animation as GIF or MP4.

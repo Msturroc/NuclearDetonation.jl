@@ -4,8 +4,10 @@ version = "2.0.0"
 
 [deps]
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+Downloads = "f43a241f-c20a-4ad4-852c-f6b1247861c6"
 GLMakie = "e9467ef8-e4e7-5192-8a1a-b1aee30e663a"
 JSON3 = "0f8b85d8-7281-11e9-16c2-39a750bddbf1"
+MapTiles = "fea52e5a-b371-463b-85f5-81770daa2737"
 NCDatasets = "85f8d34a-cbdd-5861-8df4-14fed0d494ab"
 NuclearDetonation = "07bec9bc-3f00-458c-9435-1b49c5fbef5e"
 PackageCompiler = "9b87118b-4619-50d2-8e1e-99f35a4d4d9d"
@@ -13,6 +15,8 @@ Printf = "de0858da-6303-5e67-8744-51eddeeeb8d7"
 Random = "9a3f8284-a2c9-5f02-9a11-845980a1fd5c"
 StaticArrays = "90137ffa-7385-5640-81b9-e52037218182"
 Statistics = "10745b16-79ce-11e8-11f9-7d13ad32a3b2"
+TileProviders = "263fe934-28e1-4ae9-998a-c2629c5fede6"
+Tyler = "e170d443-b9d6-418a-9ee8-061e966341ef"
 XGBoost = "009559a3-9522-5dbb-924b-0b6ed2b22bb9"
 
 [sources]
@@ -21,8 +25,11 @@ NuclearDetonation = {path = ".."}
 [compat]
 GLMakie = "0.13"
 JSON3 = "1"
+MapTiles = "1"
 NCDatasets = "0.14"
 PackageCompiler = "2"
 StaticArrays = "1"
+TileProviders = "0.1"
+Tyler = "0.2"
 XGBoost = "2"
 julia = "1.10"

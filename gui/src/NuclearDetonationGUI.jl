@@ -14,6 +14,9 @@ using Printf
 using JSON3
 using GLMakie
 using GLMakie: Makie
+using Tyler
+using TileProviders
+using Downloads
 using XGBoost
 
 export launch
@@ -27,6 +30,7 @@ include(joinpath(_SRC, "animation.jl"))
 include(joinpath(_SRC, "prediction.jl"))
 include(joinpath(_SRC, "basemap.jl"))
 include(joinpath(_SRC, "observations.jl"))
+include(joinpath(_SRC, "tiles.jl"))
 include(joinpath(_SRC, "window.jl"))
 
 # Locate the bundled gui/ root (prediction models). Compiled layout: exe in

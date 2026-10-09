@@ -58,6 +58,30 @@ _trim(x) = (r = round(x, digits=2); isinteger(r) ? string(Int(r)) : string(r))
 _lon_label(v) = string(_trim(abs(v)), "°", v < 0 ? "W" : v > 0 ? "E" : "")
 _lat_label(v) = string(_trim(abs(v)), "°", v < 0 ? "S" : v > 0 ? "N" : "")
 
+# --- Web Mercator map coordinates (what map tiles use) ---
+
+const MERC_R = 6_378_137.0
+const MERC_LAT_MAX = 85.05112878
+
+merc_x(lon) = MERC_R * deg2rad(lon)
+merc_y(lat) = MERC_R * log(tan(π / 4 + deg2rad(clamp(lat, -MERC_LAT_MAX, MERC_LAT_MAX)) / 2))
+merc(lon, lat) = Point2f(merc_x(lon), merc_y(lat))
+merc(p::Point2) = merc(p[1], p[2])
+lon_of(x) = rad2deg(x / MERC_R)
+lat_of(y) = rad2deg(2atan(exp(y / MERC_R)) - π / 2)
+
+# Axis ticks at round degrees
+function _degree_ticks(vmin, vmax, to_deg, from_deg, label)
+    degs = Makie.get_tickvalues(WilkinsonTicks(6; k_min = 4), to_deg(vmin), to_deg(vmax))
+    return from_deg.(degs), label.(degs)
+end
+lon_ticks(vmin, vmax) = _degree_ticks(vmin, vmax, lon_of, merc_x, _lon_label)
+lat_ticks(vmin, vmax) = _degree_ticks(vmin, vmax, lat_of, merc_y, _lat_label)
+
+# Map tiles (tiles.jl). Without internet the Natural Earth outlines underneath show instead.
+tile_provider() = OSMTiles()
+const IRELAND_VIEW = (lon_min = -12.0, lon_max = 2.0, lat_min = 49.0, lat_max = 57.0)
+
 function _log_ticks(lo, hi)
     ks = ceil(Int, lo):floor(Int, hi)
     return (Float64.(collect(ks)), [rich("10", superscript(string(k))) for k in ks])
@@ -149,6 +173,7 @@ mutable struct GUI
     playing::Bool
     colorbar::Colorbar
     colorbar_box::Box
+    tiles::Any                        # Tyler.Map providing the map tiles
 end
 
 function status!(g::GUI, msg::AbstractString; level::Symbol = :info)
@@ -158,18 +183,31 @@ end
 
 # --- Map layers (shared by the window and the exported figures) ---
 
-function map_axis(pos; kwargs...)
-    ax = Axis(pos; backgroundcolor = OCEAN_COLOR,
-              xgridcolor = (:black, 0.07), ygridcolor = (:black, 0.07),
-              xtickformat = vs -> _lon_label.(vs), ytickformat = vs -> _lat_label.(vs),
-              kwargs...)
-    poly!(ax, load_basemap(); color = LAND_COLOR, strokecolor = BORDER_COLOR,
-          strokewidth = 0.6, inspectable = false)
-    return ax
+"""
+    map_axis(fig, pos, view; kwargs...) -> (axis, tiles)
+
+Map axis in Web Mercator coordinates showing the lon/lat box `view`, with map
+tiles over an offline fallback of ocean and country outlines. Drag pans, scroll zooms.
+"""
+function map_axis(fig, pos, view; kwargs...)
+    # Fixed tick label space: degree labels change width as you zoom, which would
+    # resize the axis, re-fit the aspect-locked limits, change the ticks again and
+    # recurse until the stack overflows.
+    ax = Axis(pos; xticks = lon_ticks, yticks = lat_ticks, panbutton = Mouse.left,
+              xticklabelspace = 18.0, yticklabelspace = 52.0, kwargs...)
+    w, h = merc_x(180.0), merc_y(MERC_LAT_MAX)
+    ocean = poly!(ax, Rect2f(-w, -h, 2w, 2h); color = OCEAN_COLOR, inspectable = false)
+    land = poly!(ax, load_basemap(); color = LAND_COLOR, strokecolor = BORDER_COLOR,
+                 strokewidth = 0.6, inspectable = false)
+    translate!(ocean, 0, 0, -60); translate!(land, 0, 0, -50)
+    extent = Rect2f(view.lon_min, view.lat_min, view.lon_max - view.lon_min, view.lat_max - view.lat_min)
+    tiles = Tyler.Map(extent; figure = fig, axis = ax, provider = tile_provider(),
+                      max_parallel_downloads = 8)
+    return ax, tiles
 end
 
 function draw_npp!(ax)
-    pts = [Point2f(p.lon, p.lat) for p in NPP_PLANTS]
+    pts = [merc(p.lon, p.lat) for p in NPP_PLANTS]
     s = scatter!(ax, pts; color = :gold, strokecolor = :black, strokewidth = 1.5, markersize = 12)
     t = text!(ax, pts; text = [p.name for p in NPP_PLANTS], offset = (8, 0),
               align = (:left, :center), fontsize = 11, color = :black)
@@ -186,7 +224,7 @@ end
 
 function draw_contours(ax, res, visible)
     levels, colors = res.units == "kBq/m²" ? (DEP_LEVELS, DEP_COLORS) : (DOSE_LEVELS, DOSE_COLORS)
-    xs, ys = collect(res.lon_grid), collect(res.lat_grid)
+    xs, ys = merc_x.(res.lon_grid), merc_y.(res.lat_grid)
     plots = Any[]
     for (lv, c) in zip(levels, colors)
         lv < res.max_dose || continue  # never reached
@@ -202,13 +240,13 @@ function draw_observations(ax, obs, visible)
     plots = Any[]
     if obs.kind === :grid
         for (lv, c) in zip(obs.levels, obs.colors)
-            push!(plots, contour!(ax, obs.lons, obs.lats, obs.grid; levels = [lv], color = c,
+            push!(plots, contour!(ax, merc_x.(obs.lons), merc_y.(obs.lats), obs.grid; levels = [lv], color = c,
                                   linewidth = 2, linestyle = :dash, visible))
         end
     else
         for (val, pts) in obs.polygons
             c = obs.colors[findfirst(==(val), obs.levels)]
-            push!(plots, lines!(ax, pts; color = c, linewidth = 2, linestyle = :dash, visible))
+            push!(plots, lines!(ax, merc.(pts); color = c, linewidth = 2, linestyle = :dash, visible))
         end
     end
     foreach(p -> translate!(p, 0, 0, 25), plots)
@@ -216,11 +254,36 @@ function draw_observations(ax, obs, visible)
 end
 
 function plume_image!(ax, a, field, visible = true)
-    p = image!(ax, a.lon_min .. a.lon_max, a.lat_min .. a.lat_max, field;
+    p = image!(ax, merc_x(a.lon_min) .. merc_x(a.lon_max), merc_y(a.lat_min) .. merc_y(a.lat_max), field;
                colormap = PLUME_COLORMAP, colorrange = (a.log_min, a.log_max),
                lowclip = RGBAf(0, 0, 0, 0), interpolate = true, visible)
     translate!(p, 0, 0, 10)
     return p
+end
+
+"""
+Resample plume frames onto rows evenly spaced in Mercator y, so each frame can be
+drawn as one image on the map.
+"""
+function mercator_frames(a; upsample = 2)
+    ny = size(first(a.frames), 2)
+    ny < 2 && return a
+    nout = ny * upsample
+    y0, y1 = merc_y(a.lat_min), merc_y(a.lat_max)
+    src = map(1:nout) do j  # fractional source row (cell centres at integers)
+        lat = lat_of(y0 + (j - 0.5) / nout * (y1 - y0))
+        clamp((lat - a.lat_min) / (a.lat_max - a.lat_min) * ny + 0.5, 1.0, Float64(ny))
+    end
+    frames = map(a.frames) do f
+        out = similar(f, size(f, 1), nout)
+        for (j, s) in enumerate(src)
+            j0 = min(floor(Int, s), ny - 1)
+            w = Float32(s - j0)
+            @views out[:, j] .= (1 - w) .* f[:, j0] .+ w .* f[:, j0 + 1]
+        end
+        out
+    end
+    return merge(a, (; frames))
 end
 
 """Legend contents for the visible contour layers, or `nothing`."""
@@ -246,13 +309,14 @@ function legend_groups(g::GUI)
     return isempty(groups) ? nothing : (groups, labels, titles)
 end
 
-function add_legend!(pos, contents)
+"""Contour legend; by default overlaid on the map's bottom-right corner."""
+function add_legend!(pos, contents; kwargs...)
     groups, labels, titles = contents
     return Legend(pos, groups, labels, titles;
-                  tellwidth = false, tellheight = false, halign = :left, valign = :bottom,
+                  tellwidth = false, tellheight = false, halign = :right, valign = :bottom,
                   margin = (12, 12, 12, 12), backgroundcolor = (:white, 0.92),
                   framecolor = (:black, 0.3), labelsize = 11, titlesize = 12,
-                  patchsize = (18, 10), rowgap = 0, padding = (8, 8, 6, 6))
+                  patchsize = (18, 10), rowgap = 0, padding = (8, 8, 6, 6), kwargs...)
 end
 
 function rebuild_legend!(g::GUI)
@@ -262,10 +326,17 @@ function rebuild_legend!(g::GUI)
 end
 
 function set_view!(ax, lon_min, lon_max, lat_min, lat_max; pad = 0.05)
-    dx, dy = (lon_max - lon_min) * pad, (lat_max - lat_min) * pad
-    ax.autolimitaspect[] = 1 / cosd(clamp((lat_min + lat_max) / 2, -80, 80))
-    ax.limits[] = (lon_min - dx, lon_max + dx, lat_min - dy, lat_max + dy)
+    x0, x1, y0, y1 = merc_x(lon_min), merc_x(lon_max), merc_y(lat_min), merc_y(lat_max)
+    dx, dy = (x1 - x0) * pad, (y1 - y0) * pad
+    ax.limits[] = (x0 - dx, x1 + dx, y0 - dy, y1 + dy)
     reset_limits!(ax)
+end
+
+function zoom_map!(ax, factor)
+    lims = ax.finallimits[]
+    c = lims.origin .+ lims.widths ./ 2
+    w = lims.widths .* factor
+    limits!(ax, c[1] - w[1] / 2, c[1] + w[1] / 2, c[2] - w[2] / 2, c[2] + w[2] / 2)
 end
 
 function weather_bounds(g::GUI)
@@ -287,9 +358,9 @@ function refresh_domain!(g::GUI; fit = true)
         g.domain_pts[] = [Point2f(NaN, NaN)]
         return
     end
-    g.domain_pts[] = Point2f[(b.lon_min, b.lat_min), (b.lon_max, b.lat_min),
-                             (b.lon_max, b.lat_max), (b.lon_min, b.lat_max),
-                             (b.lon_min, b.lat_min)]
+    g.domain_pts[] = [merc(b.lon_min, b.lat_min), merc(b.lon_max, b.lat_min),
+                      merc(b.lon_max, b.lat_max), merc(b.lon_min, b.lat_max),
+                      merc(b.lon_min, b.lat_min)]
     fit && set_view!(g.ax, b.lon_min, b.lon_max, b.lat_min, b.lat_max)
 end
 
@@ -412,8 +483,10 @@ end
 function on_map_click!(g::GUI, lon, lat)
     lims = g.ax.finallimits[]
     w, h = lims.widths
+    click = merc(lon, lat)
     for plant in NPP_PLANTS
-        if hypot((plant.lon - lon) / w, (plant.lat - lat) / h) < 0.012
+        p = merc(plant.lon, plant.lat)
+        if hypot((p[1] - click[1]) / w, (p[2] - click[2]) / h) < 0.012
             return select_plant!(g, plant)
         end
     end
@@ -613,6 +686,7 @@ function load_animation!(g::GUI, level::Int)
     isnothing(g.plume_plot) || delete!(g.ax, g.plume_plot)
     g.plume_plot = nothing
     a = animation_frames(level)
+    a === nothing || (a = mercator_frames(a))
     g.anim = a
     if a === nothing
         g.colorbar.blockscene.visible[] = false
@@ -692,7 +766,10 @@ function export_figure(g::GUI; limits, frame = nothing, size = (1400, 1000))
     title = info === nothing ? "NuclearDetonation.jl" :
         "$(info.source) · $(info.summary) · release $(Dates.format(info.start, "yyyy-mm-dd HH:MM")) UTC"
     subtitle = Observable("")
-    ax = map_axis(fig[1, 1]; title, subtitle)
+    view = (lon_min = limits[1], lon_max = limits[2], lat_min = limits[3], lat_max = limits[4])
+    ax, _ = map_axis(fig, fig[1, 1], view; title, subtitle)
+    Label(fig[2, 1], TILE_ATTRIBUTION; halign = :right, fontsize = 10, color = MUTED_COLOR,
+          tellwidth = false)
     res = g.result
     res === nothing || draw_contours(ax, res, g.w.contours.active[])
     g.observations === nothing || draw_observations(ax, g.observations, g.w.obs.active[])
@@ -701,18 +778,22 @@ function export_figure(g::GUI; limits, frame = nothing, size = (1400, 1000))
         a = g.anim
         field = Observable(a.frames[frame])
         plume_image!(ax, a, field)
-        Colorbar(fig[1, 2]; colormap = PLUME_COLORMAP, limits = (a.log_min, a.log_max),
+        Colorbar(fig[1, 2][1, 1]; colormap = PLUME_COLORMAP, limits = (a.log_min, a.log_max),
                  ticks = _log_ticks(a.log_min, a.log_max), label = "Airborne activity · $(a.label)",
-                 height = Relative(0.6))
+                 height = 320, valign = :top)
     end
     draw_npp!(ax)
-    draw_release!(ax, g.release_pt[])
+    draw_release!(ax, merc(g.release_pt[]))
     contents = legend_groups(g)
-    contents === nothing || add_legend!(fig[1, 1], contents)
-    ax.autolimitaspect = 1 / cosd(clamp((limits[3] + limits[4]) / 2, -80, 80))
-    limits!(ax, limits...)
+    # Beside the map rather than over it, so it never hides the plume
+    contents === nothing || add_legend!(fig[1, 2][2, 1], contents; tellwidth = true,
+                                        halign = :left, valign = :top, margin = (0, 0, 0, 0))
     return fig, field, subtitle
 end
+
+# A first render requests the tiles for the view and waits for them, so the
+# saved image doesn't catch blurry low-zoom placeholders
+_load_tiles!(fig) = (Makie.colorbuffer(fig); nothing)
 
 function export_csv!(g::GUI)
     g.result === nothing && return status!(g, "Run a simulation first"; level = :error)
@@ -727,9 +808,11 @@ function save_png!(g::GUI)
     lims = g.ax.finallimits[]
     (x0, y0), (w, h) = lims.origin, lims.widths
     frame = g.w.plume.active[] && g.anim !== nothing ? g.frame[] : nothing
-    fig, _, subtitle = export_figure(g; limits = (x0, x0 + w, y0, y0 + h), frame)
+    fig, _, subtitle = export_figure(g; frame,
+        limits = (lon_of(x0), lon_of(x0 + w), lat_of(y0), lat_of(y0 + h)))
     frame === nothing || (subtitle[] = _frame_time(g, g.anim, frame))
     path = output_path(g, "map", "png")
+    _load_tiles!(fig)
     save(path, fig; px_per_unit = 1.5)
     _saved!(g, path)
 end
@@ -745,6 +828,7 @@ function export_animation!(g::GUI, ext)
         sleep(0.05)  # let the status line draw before rendering blocks the window
         fig, field, subtitle = export_figure(g; limits = (v.lon_min, v.lon_max, v.lat_min, v.lat_max),
                                              frame = 1, size = (1200, 900))
+        _load_tiles!(fig)
         record(fig, path, eachindex(a.frames); framerate = fps) do i
             field[] = a.frames[i]
             subtitle[] = _frame_time(g, a, i)
@@ -876,14 +960,20 @@ function build_gui(; size = (1500, 960))
     colsize!(panel, 3, Fixed(72))
 
     # Map
-    ax = map_axis(fig[1, 2]; title = "Click the map to place the release")
+    ax, tiles = map_axis(fig, fig[1, 2], IRELAND_VIEW; title = "Click the map to place the release")
     deactivate_interaction!(ax, :rectanglezoom)
+    zoom_layout = GridLayout(fig[1, 2]; tellwidth = false, tellheight = false,
+                             halign = :left, valign = :top, alignmode = Outside(12))
+    zoom_in = Button(zoom_layout[1, 1]; label = "+", width = 30, height = 30, fontsize = 18)
+    zoom_out = Button(zoom_layout[2, 1]; label = "−", width = 30, height = 30, fontsize = 18)
+    zoom_fit = Button(zoom_layout[3, 1]; label = "Fit", width = 30, height = 30, fontsize = 10)
+    rowgap!(zoom_layout, 4)
     domain_pts = Observable([Point2f(NaN, NaN)])
     dl = lines!(ax, domain_pts; color = DOMAIN_COLOR, linestyle = :dash, linewidth = 1.5)
     translate!(dl, 0, 0, 30)
     draw_npp!(ax)
-    release_pt = Observable(Point2f(NaN, NaN))
-    draw_release!(ax, release_pt)
+    release_pt = Observable(Point2f(NaN, NaN))  # lon/lat
+    draw_release!(ax, lift(merc, release_pt))
 
     cb_layout = GridLayout(fig[1, 2]; tellwidth = false, tellheight = false,
                            halign = :right, valign = :top, alignmode = Outside(14))
@@ -896,8 +986,8 @@ function build_gui(; size = (1500, 960))
 
     cursor_text = Observable("")
     Label(fig[2, 2], cursor_text; halign = :left, color = MUTED_COLOR, tellwidth = false)
-    Label(fig[2, 2], "Left-click: place release or pick an NPP site · Scroll: zoom · " *
-                     "Right-drag: pan · Ctrl+click: reset view";
+    Label(fig[2, 2], "Drag to pan · Scroll or +/− to zoom · Click to place the release or pick " *
+                     "an NPP site · $TILE_ATTRIBUTION";
           halign = :right, color = MUTED_COLOR, tellwidth = false)
 
     w = (; dataset, release, weather, arl_path, arl_load, lat, lon, date, hour, duration,
@@ -908,7 +998,7 @@ function build_gui(; size = (1500, 960))
             prediction, prediction_color, results_text, time_text, cursor_text,
             release_pt, domain_pts, "nancy", nothing, nothing, nothing, Any[], nothing,
             Any[], nothing, nothing, nothing, Observable(zeros(Float32, 1, 1)), nothing,
-            Observable(1), false, cb, cb_box)
+            Observable(1), false, cb, cb_box, tiles)
 
     # --- Callbacks ---
     on(_ -> run_clicked!(g), run.clicks)
@@ -942,13 +1032,13 @@ function build_gui(; size = (1500, 960))
         event isa Makie.MouseEvent || return Makie.Consume(false)
         event.type === Makie.MouseEventTypes.leftclick || return Makie.Consume(false)
         ispressed(axis.scene, Keyboard.left_control) && return Makie.Consume(false)
-        on_map_click!(g, event.data[1], event.data[2])
+        on_map_click!(g, lon_of(event.data[1]), lat_of(event.data[2]))
         return Makie.Consume(false)
     end
     on(events(fig).mouseposition) do _
         if Makie.is_mouseinside(ax.scene)
             x, y = mouseposition(ax.scene)
-            cursor_text[] = "$(_lat_label(round(y, digits = 3)))  $(_lon_label(round(x, digits = 3)))"
+            cursor_text[] = "$(_lat_label(round(lat_of(y), digits = 3)))  $(_lon_label(round(lon_of(x), digits = 3)))"
         end
         return Makie.Consume(false)
     end
@@ -981,6 +1071,9 @@ function build_gui(; size = (1500, 960))
     on(_ -> export_animation!(g, "gif"), gif.clicks)
     on(_ -> export_animation!(g, "mp4"), mp4.clicks)
     on(_ -> open_output_folder(g), open_dir.clicks)
+    on(_ -> zoom_map!(ax, 0.5), zoom_in.clicks)
+    on(_ -> zoom_map!(ax, 2.0), zoom_out.clicks)
+    on(_ -> reset_limits!(ax), zoom_fit.clicks)
 
     return g
 end
