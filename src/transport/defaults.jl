@@ -1,6 +1,7 @@
 # Default optimised parameter configurations
-# Best-fit parameters from BIPOP-CMA-ES optimisation against Nancy observations
-# Current best OU score: 76.8% combined (FMS=0.370, Shape=0.860, Extent=1.0, TOA=1.0)
+# Nancy: BIPOP-CMA-ES on the GPU forward model (10k particles, 6000 evaluations),
+# refitted 2026-10-09 after the met-window fix. Held-out score 82.2 +/- 1.0%
+# (8 seeds); 82.4 +/- 0.4% through Transport.run_simulation! itself.
 
 export nancy_optimised_config, etex_optimised_config
 
@@ -10,9 +11,15 @@ export nancy_optimised_config, etex_optimised_config
 Return optimised HannaTurbulenceConfig and associated physics scaling parameters
 for the Upshot-Knothole Nancy nuclear test (24 kT, 24 March 1953).
 
-These parameters were obtained via BIPOP-CMA-ES optimisation against digitised
-historical fallout observations. The optimisation is ongoing; these represent
-the current best checkpoint values.
+Fitted by BIPOP-CMA-ES against digitised historical fallout observations (dose-rate
+contours at H+12 and arrival times; combined FMS / shape / bearing / extent / TOA
+score), with the release at 13:00 UTC and the met windows stepped continuously
+across ERA5 files. Re-scored on 8 held-out seeds: 82.2 +/- 1.0%.
+
+The data constrain these parameters only jointly: a surrogate-assisted CMA-ES fit
+(champion5, `nancy-recalibration` branch) scores the same 82.2% with quite
+different values. Treat them as a calibrated set, not as measured physical
+quantities. `h_diff_scale` and `tmix_scale` are not read by the transport model.
 
 # Returns
 - `NamedTuple` with fields:
@@ -40,39 +47,39 @@ function nancy_optimised_config()
     )
 
     # Bimodal particle size distribution (fine + coarse modes)
-    # Fine mode: d_median = 127.6 μm, σ_g = 2.67
-    # Coarse mode: d_median = 141.9 μm, σ_g = 2.52
-    # Fine fraction: 86.5%
+    # Fine mode: d_median = 37.7 μm, σ_g = 1.83
+    # Coarse mode: d_median = 280.4 μm, σ_g = 2.00
+    # Fine fraction: 30.3%
     particle_size_config = (
-        d_median_fine_μm = 127.552,
-        sigma_g_fine = 2.669,
-        d_median_coarse_μm = 141.861,
-        sigma_g_coarse = 2.523,
-        frac_fine = 0.8652,
+        d_median_fine_μm = 37.692,
+        sigma_g_fine = 1.826,
+        d_median_coarse_μm = 280.441,
+        sigma_g_coarse = 1.999,
+        frac_fine = 0.3035,
     )
 
     # Release layer fractions (NOAA 1984 three-layer model)
-    # Lower (0–3,800 m): 5.6%, Middle (3,800–6,100 m): 35.1%, Upper (6,100–12,500 m): 59.3%
+    # Lower (0–3,800 m): 18.2%, Middle (3,800–6,100 m): 23.1%, Upper (6,100–12,500 m): 58.7%
     layer_fractions = (
-        lower = 0.05617,
-        middle = 0.35074,
-        upper = 1.0 - 0.05617 - 0.35074,
+        lower = 0.18243,
+        middle = 0.23104,
+        upper = 1.0 - 0.18243 - 0.23104,
     )
 
-    # Physics scaling factors (from BIPOP-CMA-ES OU, 76.8%)
+    # Physics scaling factors
     physics_scales = (
-        sigma_w_scale = 4.028,              # Vertical diffusivity
-        sigma_h_scale = 2.220,              # Horizontal diffusivity
-        h_diff_scale = 0.2055,              # Horizontal diffusion in BL
-        tl_scale = 4.458,                   # Lagrangian timescale
-        vd_scale = 4.397,                   # Dry deposition velocity
-        vgrav_scale = 0.5532,               # Gravitational settling
-        omega_scale = 2.557,                # Vertical velocity
-        mixing_height_scale = 4.105,        # BL mixing height
-        tmix_scale = 1.290,                 # Mixing timescale
-        surface_height_scale = 1.554,       # Surface height
-        roughness_scale = 1.174,            # Surface roughness
-        smooth_sigma = 2.172,               # Gaussian smoothing (grid cells)
+        sigma_w_scale = 4.233,              # Vertical diffusivity
+        sigma_h_scale = 5.137,              # Horizontal diffusivity
+        h_diff_scale = 0.1810,              # Horizontal diffusion in BL (unused by the model)
+        tl_scale = 1.677,                   # Lagrangian timescale
+        vd_scale = 5.060,                   # Dry deposition velocity
+        vgrav_scale = 0.6608,               # Gravitational settling
+        omega_scale = 2.906,                # Vertical velocity
+        mixing_height_scale = 0.4477,       # BL mixing height
+        tmix_scale = 0.3645,                # Mixing timescale (unused by the model)
+        surface_height_scale = 2.702,       # Surface height
+        roughness_scale = 0.1758,           # Surface roughness
+        smooth_sigma = 1.071,               # Gaussian smoothing (grid cells)
     )
 
     return (
@@ -80,7 +87,7 @@ function nancy_optimised_config()
         particle_size_config = particle_size_config,
         layer_fractions = layer_fractions,
         physics_scales = physics_scales,
-        activity_Bq = 48.418e15,
+        activity_Bq = 59.736e15,
     )
 end
 
@@ -97,6 +104,8 @@ size distribution or gravitational settling parameters are included.
 
 Parameters were obtained via CMA-ES optimisation (FMS = 0.572, 400 evaluations)
 using gridded Figure of Merit in Space scoring against observed PMCH concentrations.
+They were fitted before the met-window fix (2026-10-09), when the hour between
+consecutive ERA5 files was skipped, and have not been refitted since.
 
 # Returns
 - `NamedTuple` with fields:
