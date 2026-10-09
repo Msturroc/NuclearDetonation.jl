@@ -1564,6 +1564,9 @@ Run complete atmospheric transport simulation.
 - `decay_params`: Radioactive decay parameters
 - `config`: General simulation configuration
 - `bomb_state`: Bomb decay state for Way-Wigner decay (optional)
+- `release_times_s`: Optional per-particle release time (seconds after the start).
+  Particles with a later release time are held inactive — no transport, decay or
+  deposition — until the model clock reaches it. Use for releases spread over time.
 
 # Returns
 - `snapshots::Vector{SimulationSnapshot}`: Saved simulation snapshots
@@ -1612,7 +1615,8 @@ function run_simulation!(state::SimulationState{T},
                         met_format_override::Union{Nothing, MetFormat}=nothing,
                         met_dimensions::Union{Nothing, Tuple{Int,Int,Int}}=nothing,
                         cache_init_file_idx::Int=1,
-                        cache_init_time_idx::Int=1) where T<:Real
+                        cache_init_time_idx::Int=1,
+                        release_times_s::Union{Nothing,AbstractVector{<:Real}}=nothing) where T<:Real
 
     if config.verbose
         println("="^70)
@@ -1900,6 +1904,17 @@ function run_simulation!(state::SimulationState{T},
         end
     end
 
+    # Hold back particles that are released later. Held particles are inactivated
+    # (negated activity) so every physics step skips them, and reactivated once
+    # the model clock passes their release time.
+    pending = Int[]
+    if release_times_s !== nothing
+        length(release_times_s) == length(state.ensemble.particles) ||
+            error("release_times_s must have one entry per particle")
+        pending = sort!(findall(>(0), release_times_s); by = i -> release_times_s[i], rev = true)
+        foreach(i -> inactivate!(state.ensemble.particles[i]), pending)
+    end
+
     # PARITY FIX: Perform "istep=0" integration step before main loop
     # Reference integrates at istep=0 and writes trace at t=istep*tstep=0.
     # Without this step, Julia does N integrations while the reference does N+1.
@@ -1959,8 +1974,11 @@ function run_simulation!(state::SimulationState{T},
             end
         end
 
-        # Process time windows for this file
-        for window_idx in 1:n_time_windows_file
+        # Process time windows for this file. A cached run may start part-way
+        # through its first file, at the window its init fields came from.
+        first_window = file_idx == init_file_idx && !isnothing(met_data_cache) &&
+                       !isempty(met_data_cache) ? init_time_idx1 : 1
+        for window_idx in first_window:n_time_windows_file
             # Load met fields from cache or file
             if !isnothing(met_data_cache) && haskey(met_data_cache, (file_idx, window_idx))
                 if !(file_idx == init_file_idx && window_idx == init_time_idx1)
@@ -2076,10 +2094,16 @@ function run_simulation!(state::SimulationState{T},
                     end
                     prepare_decay_rates!(decay_params, dt_sub, bomb_state=bomb_state)
 
+                    # Release held particles that are due
+                    while !isempty(pending) && release_times_s[last(pending)] <= current_time
+                        p = state.ensemble.particles[pop!(pending)]
+                        p.rad .= .-p.rad
+                    end
+
                     # Count active particles
                     n_active_before = count(is_active(p) for p in state.ensemble.particles)
 
-                    if n_active_before == 0
+                    if n_active_before == 0 && isempty(pending)
                         if config.verbose
                             println("  All particles deposited or left domain!")
                         end
