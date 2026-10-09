@@ -492,7 +492,7 @@ function generate_shadow_particles(params::Vector{Float64}, gen_seed::UInt64)
                                 [total_activity * frac_upper],  max(n_upper, 1)),
     ]
 
-    init_met = MET_CACHE[(CACHE_START_FILE, 1)]
+    init_met = MET_CACHE[(CACHE_START_FILE, _start_time_idx())]
 
     positions_m = Tuple{Float64,Float64,Float64}[]
     activities  = Float64[]
@@ -552,6 +552,35 @@ end
 # ============================================================================
 # Main host shadow driver
 # ============================================================================
+# ---------------------------------------------------------------------------
+# Met window sequence (shared with met_upload.jl)
+# ---------------------------------------------------------------------------
+# Hourly windows in run order, as Transport.run_simulation! steps them: from the
+# start window through each cached file's windows, then a bridging window from
+# the file's last time step to the next file's first (Transport.bridge_met_fields).
+# Without the bridge the hour between files is skipped and the weather runs 1.5x
+# ahead of the model clock (3-hourly files give 2 windows each).
+# Env overrides reproduce older runs: BRIDGE_MET_FILES=0, NANCY_START_TIME_IDX=1.
+_bridge_met_files() = get(ENV, "BRIDGE_MET_FILES", "1") != "0"
+_start_time_idx() = parse(Int, get(ENV, "NANCY_START_TIME_IDX",
+                                   string(@isdefined(CACHE_START_TIME_IDX) ? CACHE_START_TIME_IDX : 1)))
+
+function met_window_sequence()
+    n_times(f) = maximum((k[2] for k in keys(MET_CACHE) if k[1] == f); init = 0)
+    seq = Transport.MeteoFields[]
+    for f in CACHE_START_FILE:CACHE_END_FILE
+        n = n_times(f)
+        for w in (f == CACHE_START_FILE ? _start_time_idx() : 1):(n - 1)
+            push!(seq, MET_CACHE[(f, w)])
+        end
+        if _bridge_met_files() && f < CACHE_END_FILE && n > 0 && haskey(MET_CACHE, (f + 1, 1))
+            push!(seq, Transport.bridge_met_fields(MET_CACHE[(f, n)], MET_CACHE[(f + 1, 1)]))
+        end
+    end
+    return seq
+end
+
+
 """
     run_host_shadow(params::Vector{Float64}, gen_seed::UInt64; rng_seed=gen_seed)
         → (deposition_grid, hourly_dep, n_active_final)
@@ -616,68 +645,71 @@ function run_host_shadow(params::Vector{Float64}, gen_seed::UInt64; rng_seed::UI
     next_hour_idx = 1
     next_hour_time = 3600.0f0
 
-    file_range_start = CACHE_START_FILE
-    file_range_end = CACHE_END_FILE
+    # =====================================================================
+    # MAIN MET LOOP — one hourly window at a time
+    # =====================================================================
+    for mf in met_window_sequence()
+        # Build Float32 tape for THIS window
+        tape = build_wind_tape(mf, 0.0, 3600.0)
+        local_time = 0.0f0
 
-    # =====================================================================
-    # MAIN MET LOOP
-    # =====================================================================
-    for file_idx in file_range_start:file_range_end
-        # Count windows for this file
-        n_windows = 0
-        for k in keys(MET_CACHE)
-            if k[1] == file_idx
-                n_windows = max(n_windows, k[2])
+        for sub_idx in 1:n_substeps_per_window
+            if current_time >= max_duration
+                break
             end
-        end
-        n_windows = max(0, n_windows - 1)
-        n_windows == 0 && continue
 
-        for window_idx in 1:n_windows
-            # Build Float32 tape for THIS window
-            mf = MET_CACHE[(file_idx, window_idx)]
-            tape = build_wind_tape(mf, 0.0, 3600.0)
-            local_time = 0.0f0
+            # tfrac for the current step in the [0, 3600] window
+            t_eval_f = local_time / 3600.0f0
+            t_end_f  = (local_time + dt) / 3600.0f0
 
-            for sub_idx in 1:n_substeps_per_window
-                if current_time >= max_duration
-                    break
-                end
+            @inbounds for i in 1:pts.n
+                pts.active[i] || continue
 
-                # tfrac for the current step in the [0, 3600] window
-                t_eval_f = local_time / 3600.0f0
-                t_end_f  = (local_time + dt) / 3600.0f0
+                # ---------- Particle current state ----------
+                x_dom = pts.xs[i]
+                y_dom = pts.ys[i]
+                σ_p = clamp(pts.σs[i], 0.0f0, 1.0f0)
+                x_met, y_met = dom_to_met(geom, x_dom, y_dom)
 
-                @inbounds for i in 1:pts.n
-                    pts.active[i] || continue
+                # Build hybrid profile at start position
+                build_profile_f32!(profile_buf, tape.hlevel, x_met, y_met,
+                                   t_eval_f, geom.nx_met, geom.ny_met, geom.nk)
+                z_height = height_from_sigma_f32(profile_buf, tape.z_grid, σ_p)
+                z_sigma = sigma_from_height_f32(profile_buf, tape.z_grid, z_height, σ_p)
+                z_sigma = clamp(z_sigma, 0.0f0, 1.0f0)
 
-                    # ---------- Particle current state ----------
-                    x_dom = pts.xs[i]
-                    y_dom = pts.ys[i]
-                    σ_p = clamp(pts.σs[i], 0.0f0, 1.0f0)
-                    x_met, y_met = dom_to_met(geom, x_dom, y_dom)
+                # ---------- STEP 1: Dry deposition (always-on for Nancy) ----------
+                if z_sigma > 0.996f0
+                    vg_ms = pts.grav[i]
+                    vd_simple = simple_dep_velocity + vg_ms
+                    k_dep = vd_simple / h_surface_m
+                    decay_factor = exp(-k_dep * dt)
 
-                    # Build hybrid profile at start position
-                    build_profile_f32!(profile_buf, tape.hlevel, x_met, y_met,
-                                       t_eval_f, geom.nx_met, geom.ny_met, geom.nk)
-                    z_height = height_from_sigma_f32(profile_buf, tape.z_grid, σ_p)
-                    z_sigma = sigma_from_height_f32(profile_buf, tape.z_grid, z_height, σ_p)
-                    z_sigma = clamp(z_sigma, 0.0f0, 1.0f0)
+                    mass = pts.masses[i]
+                    if mass > 0.0f0
+                        new_mass = mass * decay_factor
+                        deposited = mass - new_mass
+                        pts.masses[i] = new_mass
 
-                    # ---------- STEP 1: Dry deposition (always-on for Nancy) ----------
-                    if z_sigma > 0.996f0
-                        vg_ms = pts.grav[i]
-                        vd_simple = simple_dep_velocity + vg_ms
-                        k_dep = vd_simple / h_surface_m
-                        decay_factor = exp(-k_dep * dt)
+                        # Bin deposition into observation grid
+                        lon = geom.lon_min + (x_dom - 1.0f0) *
+                              (geom.lon_max - geom.lon_min) / Float32(geom.nx_dom - 1)
+                        lat = geom.lat_min + (y_dom - 1.0f0) *
+                              (geom.lat_max - geom.lat_min) / Float32(geom.ny_dom - 1)
+                        if lon > 180.0f0
+                            lon -= 360.0f0
+                        end
+                        i_obs = searchsortedlast(lon_grid_f32, lon)
+                        j_obs = searchsortedlast(lat_grid_f32, lat)
+                        if 1 <= i_obs <= nx_obs && 1 <= j_obs <= ny_obs
+                            dep_grid[i_obs, j_obs] += deposited
+                        end
+                    end
 
+                    # Complete deposition for ≥20 μm at z_sigma ≥ 0.999
+                    if z_sigma >= 0.999f0 && pts.diameter[i] >= 20.0f0
                         mass = pts.masses[i]
                         if mass > 0.0f0
-                            new_mass = mass * decay_factor
-                            deposited = mass - new_mass
-                            pts.masses[i] = new_mass
-
-                            # Bin deposition into observation grid
                             lon = geom.lon_min + (x_dom - 1.0f0) *
                                   (geom.lon_max - geom.lon_min) / Float32(geom.nx_dom - 1)
                             lat = geom.lat_min + (y_dom - 1.0f0) *
@@ -688,281 +720,261 @@ function run_host_shadow(params::Vector{Float64}, gen_seed::UInt64; rng_seed::UI
                             i_obs = searchsortedlast(lon_grid_f32, lon)
                             j_obs = searchsortedlast(lat_grid_f32, lat)
                             if 1 <= i_obs <= nx_obs && 1 <= j_obs <= ny_obs
-                                dep_grid[i_obs, j_obs] += deposited
-                            end
-                        end
-
-                        # Complete deposition for ≥20 μm at z_sigma ≥ 0.999
-                        if z_sigma >= 0.999f0 && pts.diameter[i] >= 20.0f0
-                            mass = pts.masses[i]
-                            if mass > 0.0f0
-                                lon = geom.lon_min + (x_dom - 1.0f0) *
-                                      (geom.lon_max - geom.lon_min) / Float32(geom.nx_dom - 1)
-                                lat = geom.lat_min + (y_dom - 1.0f0) *
-                                      (geom.lat_max - geom.lat_min) / Float32(geom.ny_dom - 1)
-                                if lon > 180.0f0
-                                    lon -= 360.0f0
-                                end
-                                i_obs = searchsortedlast(lon_grid_f32, lon)
-                                j_obs = searchsortedlast(lat_grid_f32, lat)
-                                if 1 <= i_obs <= nx_obs && 1 <= j_obs <= ny_obs
-                                    dep_grid[i_obs, j_obs] += mass
-                                end
-                            end
-                            pts.masses[i] = 0.0f0
-                            pts.active[i] = false
-                            continue
-                        end
-
-                        if pts.masses[i] < 1.0f-10
-                            pts.active[i] = false
-                            continue
-                        end
-                    end
-
-                    # ---------- STEP 2: Heun 2-stage advection ----------
-                    # First evaluation at (x_met, y_met, σ, t_eval_f)
-                    u1_w = interp4d_f32(tape.u, x_met, y_met, σ_p, t_eval_f, tape.z_grid, geom.nx_met, geom.ny_met)
-                    v1_w = interp4d_f32(tape.v, x_met, y_met, σ_p, t_eval_f, tape.z_grid, geom.nx_met, geom.ny_met)
-                    w1_w = interp4d_f32(tape.w, x_met, y_met, σ_p, t_eval_f, tape.z_grid, geom.nx_met, geom.ny_met) * omega_scale
-
-                    # vg → σ tendency from layer thickness around σ_p
-                    vg_ms = pts.grav[i]
-                    # Avoid double settling at surface (dry deposition handles it)
-                    vg_sigma1 = if σ_p > 0.996f0
-                        0.0f0
-                    else
-                        z_clamped = clamp(σ_p, tape.z_grid[1] + Float32(eps(Float32)),
-                                          tape.z_grid[end] - Float32(eps(Float32)))
-                        idx_g, _ = locate_f32(tape.z_grid, z_clamped)
-                        σ_up = tape.z_grid[idx_g]
-                        σ_dn = tape.z_grid[idx_g + 1]
-                        h_up = profile_buf[idx_g]
-                        h_dn = profile_buf[idx_g + 1]
-                        dsig = σ_dn - σ_up
-                        dz = h_up - h_dn
-                        if abs(dz) < Float32(eps(Float32))
-                            vg_ms / geom.z_max_m
-                        else
-                            vg_ms * dsig / dz
-                        end
-                    end
-
-                    lat_deg = lat_at_y(geom, y_met)
-                    clat = max(cos(lat_deg * Float32(π) / 180.0f0), 0.01745f0)
-                    xm_factor = 1.0f0 / clat
-
-                    du1_x = u1_w * geom.map_ratio_x * xm_factor
-                    du1_y = v1_w * geom.map_ratio_y
-                    du1_z = w1_w + vg_sigma1
-
-                    # Predictor in met coords
-                    x_met_pred = x_met + du1_x * dt
-                    y_met_pred = y_met + du1_y * dt
-                    σ_pred = clamp(σ_p + du1_z * dt, 0.0f0, 1.0f0)
-
-                    # Profile at predictor (NB: package rebuilds profile_local inside the RHS,
-                    # but the same buffer is shared. We rebuild here for the eval2 settling.)
-                    build_profile_f32!(profile_buf, tape.hlevel, x_met_pred, y_met_pred,
-                                       t_end_f, geom.nx_met, geom.ny_met, geom.nk)
-
-                    u2_w = interp4d_f32(tape.u, x_met_pred, y_met_pred, σ_pred, t_end_f, tape.z_grid, geom.nx_met, geom.ny_met)
-                    v2_w = interp4d_f32(tape.v, x_met_pred, y_met_pred, σ_pred, t_end_f, tape.z_grid, geom.nx_met, geom.ny_met)
-                    w2_w = interp4d_f32(tape.w, x_met_pred, y_met_pred, σ_pred, t_end_f, tape.z_grid, geom.nx_met, geom.ny_met) * omega_scale
-
-                    vg_sigma2 = if σ_pred > 0.996f0
-                        0.0f0
-                    else
-                        z_clamped = clamp(σ_pred, tape.z_grid[1] + Float32(eps(Float32)),
-                                          tape.z_grid[end] - Float32(eps(Float32)))
-                        idx_g, _ = locate_f32(tape.z_grid, z_clamped)
-                        σ_up = tape.z_grid[idx_g]
-                        σ_dn = tape.z_grid[idx_g + 1]
-                        h_up = profile_buf[idx_g]
-                        h_dn = profile_buf[idx_g + 1]
-                        dsig = σ_dn - σ_up
-                        dz = h_up - h_dn
-                        if abs(dz) < Float32(eps(Float32))
-                            vg_ms / geom.z_max_m
-                        else
-                            vg_ms * dsig / dz
-                        end
-                    end
-
-                    lat_deg2 = lat_at_y(geom, y_met_pred)
-                    clat2 = max(cos(lat_deg2 * Float32(π) / 180.0f0), 0.01745f0)
-                    xm2 = 1.0f0 / clat2
-
-                    du2_x = u2_w * geom.map_ratio_x * xm2
-                    du2_y = v2_w * geom.map_ratio_y
-                    du2_z = w2_w + vg_sigma2
-
-                    half_dt = dt * 0.5f0
-                    x_met_final = x_met + (du1_x + du2_x) * half_dt
-                    y_met_final = y_met + (du1_y + du2_y) * half_dt
-                    σ_after_adv = clamp(σ_p + (du1_z + du2_z) * half_dt, 0.0f0, 1.0f0)
-
-                    # Convert final met coords back to domain
-                    x_dom_final, y_dom_final = met_to_dom(geom, x_met_final, y_met_final)
-
-                    # Profile at the final post-advection position (used by turbulence)
-                    build_profile_f32!(profile_buf, tape.hlevel, x_met_final, y_met_final,
-                                       t_end_f, geom.nx_met, geom.ny_met, geom.nk)
-
-                    z_sigma_dep = clamp(σ_after_adv, 0.0f0, 1.0f0)
-
-                    # Particle below ground after advection — surface deposit + kill
-                    z_height_after = height_from_sigma_f32(profile_buf, tape.z_grid, z_sigma_dep)
-                    if z_height_after < 0.0f0
-                        mass = pts.masses[i]
-                        if mass > 0.0f0
-                            lon = geom.lon_min + (x_dom_final - 1.0f0) *
-                                  (geom.lon_max - geom.lon_min) / Float32(geom.nx_dom - 1)
-                            lat = geom.lat_min + (y_dom_final - 1.0f0) *
-                                  (geom.lat_max - geom.lat_min) / Float32(geom.ny_dom - 1)
-                            if lon > 180.0f0
-                                lon -= 360.0f0
-                            end
-                            i_obs = searchsortedlast(lon_grid_f32, lon)
-                            j_obs = searchsortedlast(lat_grid_f32, lat)
-                            if 1 <= i_obs <= nx_obs && 1 <= j_obs <= ny_obs
                                 dep_grid[i_obs, j_obs] += mass
                             end
                         end
+                        pts.masses[i] = 0.0f0
                         pts.active[i] = false
                         continue
                     end
 
-                    # ---------- STEP 3: Hanna turbulence (NEUTRAL only) ----------
-                    # h, ust at current met position (after advection)
-                    h_dynamic = interp3d_f32(tape.hbl, x_met_final, y_met_final, t_eval_f,
-                                             geom.nx_met, geom.ny_met)
-                    h_pbl = max(if h_dynamic > 0.0f0; h_dynamic else 1000.0f0 * mixing_height_scale end, 50.0f0)
+                    if pts.masses[i] < 1.0f-10
+                        pts.active[i] = false
+                        continue
+                    end
+                end
 
-                    u_surf = interp4d_f32(tape.u, x_met_final, y_met_final, 1.0f0, t_eval_f,
-                                          tape.z_grid, geom.nx_met, geom.ny_met)
-                    v_surf = interp4d_f32(tape.v, x_met_final, y_met_final, 1.0f0, t_eval_f,
-                                          tape.z_grid, geom.nx_met, geom.ny_met)
-                    u_mag = sqrt(u_surf * u_surf + v_surf * v_surf)
-                    ust = max(drag_coef * u_mag, 0.01f0)
+                # ---------- STEP 2: Heun 2-stage advection ----------
+                # First evaluation at (x_met, y_met, σ, t_eval_f)
+                u1_w = interp4d_f32(tape.u, x_met, y_met, σ_p, t_eval_f, tape.z_grid, geom.nx_met, geom.ny_met)
+                v1_w = interp4d_f32(tape.v, x_met, y_met, σ_p, t_eval_f, tape.z_grid, geom.nx_met, geom.ny_met)
+                w1_w = interp4d_f32(tape.w, x_met, y_met, σ_p, t_eval_f, tape.z_grid, geom.nx_met, geom.ny_met) * omega_scale
 
-                    # Convert post-advection sigma to height for the turbulence loop
-                    z_m_current = clamp(z_height_after, 0.0f0, geom.z_max_m)
-
-                    sigu, sigv, sigw, dsigwdz, tlu, tlv, tlw =
-                        hanna_neutral_inline(z_m_current, ust, sigma_h_scale, sigma_w_scale, tl_scale)
-
-                    # Horizontal OU (always)
-                    rnd_u = randn(rng, Float32)
-                    rnd_v = randn(rng, Float32)
-                    pts.u_turbs[i] = ou_step_inline(pts.u_turbs[i], sigu, tlu, dt, rnd_u)
-                    pts.v_turbs[i] = ou_step_inline(pts.v_turbs[i], sigv, tlv, dt, rnd_v)
-
-                    at_ground = z_sigma_dep >= 0.9999f0
-                    z_sigma_current = z_sigma_dep
-
-                    if at_ground
-                        pts.w_turbs[i] = 0.0f0
+                # vg → σ tendency from layer thickness around σ_p
+                vg_ms = pts.grav[i]
+                # Avoid double settling at surface (dry deposition handles it)
+                vg_sigma1 = if σ_p > 0.996f0
+                    0.0f0
+                else
+                    z_clamped = clamp(σ_p, tape.z_grid[1] + Float32(eps(Float32)),
+                                      tape.z_grid[end] - Float32(eps(Float32)))
+                    idx_g, _ = locate_f32(tape.z_grid, z_clamped)
+                    σ_up = tape.z_grid[idx_g]
+                    σ_dn = tape.z_grid[idx_g + 1]
+                    h_up = profile_buf[idx_g]
+                    h_dn = profile_buf[idx_g + 1]
+                    dsig = σ_dn - σ_up
+                    dz = h_up - h_dn
+                    if abs(dz) < Float32(eps(Float32))
+                        vg_ms / geom.z_max_m
                     else
-                        # Density at current sigma
-                        T_k = interp4d_f32(tape.t, x_met, y_met, z_sigma_current, t_eval_f,
-                                           tape.z_grid, geom.nx_met, geom.ny_met)
-                        ps_pa = interp3d_f32(tape.ps, x_met, y_met, t_eval_f,
-                                             geom.nx_met, geom.ny_met) * 100.0f0
-                        P_pa = ps_pa * z_sigma_current
-                        R_air = 287.0f0
-                        g = 9.81f0
-                        rhoa = P_pa / (R_air * T_k)
-                        rhograd = -rhoa * g / (R_air * T_k)
+                        vg_ms * dsig / dz
+                    end
+                end
 
-                        for i_sub in 1:ifine
-                            sigu_s, sigv_s, sigw_s, dsigwdz_s, tlu_s, tlv_s, tlw_s = if i_sub == 1
-                                (sigu, sigv, sigw, dsigwdz, tlu, tlv, tlw)
-                            else
-                                hanna_neutral_inline(z_m_current, ust,
-                                                     sigma_h_scale, sigma_w_scale, tl_scale)
-                            end
+                lat_deg = lat_at_y(geom, y_met)
+                clat = max(cos(lat_deg * Float32(π) / 180.0f0), 0.01745f0)
+                xm_factor = 1.0f0 / clat
 
-                            rnd_w = randn(rng, Float32)
+                du1_x = u1_w * geom.map_ratio_x * xm_factor
+                du1_y = v1_w * geom.map_ratio_y
+                du1_z = w1_w + vg_sigma1
 
-                            # Original mode: OU then drift correction (no CBL since L = 1e10)
-                            w_old = pts.w_turbs[i]
-                            w_new = ou_step_inline(w_old, sigw_s, tlw_s, dt_sub, rnd_w)
-                            pts.w_turbs[i] = w_new
+                # Predictor in met coords
+                x_met_pred = x_met + du1_x * dt
+                y_met_pred = y_met + du1_y * dt
+                σ_pred = clamp(σ_p + du1_z * dt, 0.0f0, 1.0f0)
 
-                            w_drift_grad = sigw_s * dsigwdz_s
-                            w_drift_skew = if abs(sigw_s) > 0.01f0
-                                (w_new * w_new / sigw_s) * dsigwdz_s
-                            else
-                                0.0f0
-                            end
-                            w_drift_dens = if abs(rhoa) > 0.01f0
-                                (sigw_s * sigw_s / rhoa) * rhograd
-                            else
-                                0.0f0
-                            end
-                            w_drift = w_drift_grad + w_drift_skew + w_drift_dens
-                            w_total = w_new + w_drift
+                # Profile at predictor (NB: package rebuilds profile_local inside the RHS,
+                # but the same buffer is shared. We rebuild here for the eval2 settling.)
+                build_profile_f32!(profile_buf, tape.hlevel, x_met_pred, y_met_pred,
+                                   t_end_f, geom.nx_met, geom.ny_met, geom.nk)
 
-                            delz_m = w_total * dt_sub
-                            z_m_new = z_m_current + delz_m
-                            z_m_new = clamp(z_m_new, 0.0f0, geom.z_max_m)
+                u2_w = interp4d_f32(tape.u, x_met_pred, y_met_pred, σ_pred, t_end_f, tape.z_grid, geom.nx_met, geom.ny_met)
+                v2_w = interp4d_f32(tape.v, x_met_pred, y_met_pred, σ_pred, t_end_f, tape.z_grid, geom.nx_met, geom.ny_met)
+                w2_w = interp4d_f32(tape.w, x_met_pred, y_met_pred, σ_pred, t_end_f, tape.z_grid, geom.nx_met, geom.ny_met) * omega_scale
 
-                            z_sigma_new = sigma_from_height_f32(profile_buf, tape.z_grid, z_m_new, z_sigma_current)
-                            z_sigma_current = clamp(z_sigma_new, 0.0f0, 1.0f0)
+                vg_sigma2 = if σ_pred > 0.996f0
+                    0.0f0
+                else
+                    z_clamped = clamp(σ_pred, tape.z_grid[1] + Float32(eps(Float32)),
+                                      tape.z_grid[end] - Float32(eps(Float32)))
+                    idx_g, _ = locate_f32(tape.z_grid, z_clamped)
+                    σ_up = tape.z_grid[idx_g]
+                    σ_dn = tape.z_grid[idx_g + 1]
+                    h_up = profile_buf[idx_g]
+                    h_dn = profile_buf[idx_g + 1]
+                    dsig = σ_dn - σ_up
+                    dz = h_up - h_dn
+                    if abs(dz) < Float32(eps(Float32))
+                        vg_ms / geom.z_max_m
+                    else
+                        vg_ms * dsig / dz
+                    end
+                end
 
-                            z_m_current = height_from_sigma_f32(profile_buf, tape.z_grid, z_sigma_current)
-                            z_m_current = clamp(z_m_current, 0.0f0, geom.z_max_m)
+                lat_deg2 = lat_at_y(geom, y_met_pred)
+                clat2 = max(cos(lat_deg2 * Float32(π) / 180.0f0), 0.01745f0)
+                xm2 = 1.0f0 / clat2
 
-                            if i_sub < ifine
-                                T_k = interp4d_f32(tape.t, x_met, y_met, z_sigma_current, t_eval_f,
-                                                   tape.z_grid, geom.nx_met, geom.ny_met)
-                                ps_pa = interp3d_f32(tape.ps, x_met, y_met, t_eval_f,
-                                                     geom.nx_met, geom.ny_met) * 100.0f0
-                                P_pa = ps_pa * z_sigma_current
-                                rhoa = P_pa / (R_air * T_k)
-                                rhograd = -rhoa * g / (R_air * T_k)
-                            end
+                du2_x = u2_w * geom.map_ratio_x * xm2
+                du2_y = v2_w * geom.map_ratio_y
+                du2_z = w2_w + vg_sigma2
+
+                half_dt = dt * 0.5f0
+                x_met_final = x_met + (du1_x + du2_x) * half_dt
+                y_met_final = y_met + (du1_y + du2_y) * half_dt
+                σ_after_adv = clamp(σ_p + (du1_z + du2_z) * half_dt, 0.0f0, 1.0f0)
+
+                # Convert final met coords back to domain
+                x_dom_final, y_dom_final = met_to_dom(geom, x_met_final, y_met_final)
+
+                # Profile at the final post-advection position (used by turbulence)
+                build_profile_f32!(profile_buf, tape.hlevel, x_met_final, y_met_final,
+                                   t_end_f, geom.nx_met, geom.ny_met, geom.nk)
+
+                z_sigma_dep = clamp(σ_after_adv, 0.0f0, 1.0f0)
+
+                # Particle below ground after advection — surface deposit + kill
+                z_height_after = height_from_sigma_f32(profile_buf, tape.z_grid, z_sigma_dep)
+                if z_height_after < 0.0f0
+                    mass = pts.masses[i]
+                    if mass > 0.0f0
+                        lon = geom.lon_min + (x_dom_final - 1.0f0) *
+                              (geom.lon_max - geom.lon_min) / Float32(geom.nx_dom - 1)
+                        lat = geom.lat_min + (y_dom_final - 1.0f0) *
+                              (geom.lat_max - geom.lat_min) / Float32(geom.ny_dom - 1)
+                        if lon > 180.0f0
+                            lon -= 360.0f0
+                        end
+                        i_obs = searchsortedlast(lon_grid_f32, lon)
+                        j_obs = searchsortedlast(lat_grid_f32, lat)
+                        if 1 <= i_obs <= nx_obs && 1 <= j_obs <= ny_obs
+                            dep_grid[i_obs, j_obs] += mass
                         end
                     end
-
-                    # Apply turbulent horizontal displacements
-                    x_dom_final += pts.u_turbs[i] * dt * geom.map_ratio_x
-                    y_dom_final += pts.v_turbs[i] * dt * geom.map_ratio_y
-
-                    z_sigma_final = z_sigma_current
-                    if z_sigma_final >= 0.996f0
-                        pts.w_turbs[i] = 0.0f0
-                    end
-                    z_sigma_final = clamp(z_sigma_final, 0.0f0, 1.0f0)
-
-                    # Bounds check
-                    if !(1.0f0 <= x_dom_final <= Float32(geom.nx_dom)) ||
-                       !(1.0f0 <= y_dom_final <= Float32(geom.ny_dom))
-                        pts.active[i] = false
-                        continue
-                    end
-
-                    pts.xs[i] = x_dom_final
-                    pts.ys[i] = y_dom_final
-                    pts.σs[i] = z_sigma_final
+                    pts.active[i] = false
+                    continue
                 end
 
-                current_time += dt
-                local_time   += dt
+                # ---------- STEP 3: Hanna turbulence (NEUTRAL only) ----------
+                # h, ust at current met position (after advection)
+                h_dynamic = interp3d_f32(tape.hbl, x_met_final, y_met_final, t_eval_f,
+                                         geom.nx_met, geom.ny_met)
+                h_pbl = max(if h_dynamic > 0.0f0; h_dynamic else 1000.0f0 * mixing_height_scale end, 50.0f0)
 
-                # Hourly snapshot
-                while next_hour_idx <= 12 && current_time >= next_hour_time - 0.5f0
-                    @inbounds for jj in 1:ny_obs, ii in 1:nx_obs
-                        hourly_dep[ii, jj, next_hour_idx] = dep_grid[ii, jj]
+                u_surf = interp4d_f32(tape.u, x_met_final, y_met_final, 1.0f0, t_eval_f,
+                                      tape.z_grid, geom.nx_met, geom.ny_met)
+                v_surf = interp4d_f32(tape.v, x_met_final, y_met_final, 1.0f0, t_eval_f,
+                                      tape.z_grid, geom.nx_met, geom.ny_met)
+                u_mag = sqrt(u_surf * u_surf + v_surf * v_surf)
+                ust = max(drag_coef * u_mag, 0.01f0)
+
+                # Convert post-advection sigma to height for the turbulence loop
+                z_m_current = clamp(z_height_after, 0.0f0, geom.z_max_m)
+
+                sigu, sigv, sigw, dsigwdz, tlu, tlv, tlw =
+                    hanna_neutral_inline(z_m_current, ust, sigma_h_scale, sigma_w_scale, tl_scale)
+
+                # Horizontal OU (always)
+                rnd_u = randn(rng, Float32)
+                rnd_v = randn(rng, Float32)
+                pts.u_turbs[i] = ou_step_inline(pts.u_turbs[i], sigu, tlu, dt, rnd_u)
+                pts.v_turbs[i] = ou_step_inline(pts.v_turbs[i], sigv, tlv, dt, rnd_v)
+
+                at_ground = z_sigma_dep >= 0.9999f0
+                z_sigma_current = z_sigma_dep
+
+                if at_ground
+                    pts.w_turbs[i] = 0.0f0
+                else
+                    # Density at current sigma
+                    T_k = interp4d_f32(tape.t, x_met, y_met, z_sigma_current, t_eval_f,
+                                       tape.z_grid, geom.nx_met, geom.ny_met)
+                    ps_pa = interp3d_f32(tape.ps, x_met, y_met, t_eval_f,
+                                         geom.nx_met, geom.ny_met) * 100.0f0
+                    P_pa = ps_pa * z_sigma_current
+                    R_air = 287.0f0
+                    g = 9.81f0
+                    rhoa = P_pa / (R_air * T_k)
+                    rhograd = -rhoa * g / (R_air * T_k)
+
+                    for i_sub in 1:ifine
+                        sigu_s, sigv_s, sigw_s, dsigwdz_s, tlu_s, tlv_s, tlw_s = if i_sub == 1
+                            (sigu, sigv, sigw, dsigwdz, tlu, tlv, tlw)
+                        else
+                            hanna_neutral_inline(z_m_current, ust,
+                                                 sigma_h_scale, sigma_w_scale, tl_scale)
+                        end
+
+                        rnd_w = randn(rng, Float32)
+
+                        # Original mode: OU then drift correction (no CBL since L = 1e10)
+                        w_old = pts.w_turbs[i]
+                        w_new = ou_step_inline(w_old, sigw_s, tlw_s, dt_sub, rnd_w)
+                        pts.w_turbs[i] = w_new
+
+                        w_drift_grad = sigw_s * dsigwdz_s
+                        w_drift_skew = if abs(sigw_s) > 0.01f0
+                            (w_new * w_new / sigw_s) * dsigwdz_s
+                        else
+                            0.0f0
+                        end
+                        w_drift_dens = if abs(rhoa) > 0.01f0
+                            (sigw_s * sigw_s / rhoa) * rhograd
+                        else
+                            0.0f0
+                        end
+                        w_drift = w_drift_grad + w_drift_skew + w_drift_dens
+                        w_total = w_new + w_drift
+
+                        delz_m = w_total * dt_sub
+                        z_m_new = z_m_current + delz_m
+                        z_m_new = clamp(z_m_new, 0.0f0, geom.z_max_m)
+
+                        z_sigma_new = sigma_from_height_f32(profile_buf, tape.z_grid, z_m_new, z_sigma_current)
+                        z_sigma_current = clamp(z_sigma_new, 0.0f0, 1.0f0)
+
+                        z_m_current = height_from_sigma_f32(profile_buf, tape.z_grid, z_sigma_current)
+                        z_m_current = clamp(z_m_current, 0.0f0, geom.z_max_m)
+
+                        if i_sub < ifine
+                            T_k = interp4d_f32(tape.t, x_met, y_met, z_sigma_current, t_eval_f,
+                                               tape.z_grid, geom.nx_met, geom.ny_met)
+                            ps_pa = interp3d_f32(tape.ps, x_met, y_met, t_eval_f,
+                                                 geom.nx_met, geom.ny_met) * 100.0f0
+                            P_pa = ps_pa * z_sigma_current
+                            rhoa = P_pa / (R_air * T_k)
+                            rhograd = -rhoa * g / (R_air * T_k)
+                        end
                     end
-                    next_hour_idx += 1
-                    next_hour_time += 3600.0f0
                 end
+
+                # Apply turbulent horizontal displacements
+                x_dom_final += pts.u_turbs[i] * dt * geom.map_ratio_x
+                y_dom_final += pts.v_turbs[i] * dt * geom.map_ratio_y
+
+                z_sigma_final = z_sigma_current
+                if z_sigma_final >= 0.996f0
+                    pts.w_turbs[i] = 0.0f0
+                end
+                z_sigma_final = clamp(z_sigma_final, 0.0f0, 1.0f0)
+
+                # Bounds check
+                if !(1.0f0 <= x_dom_final <= Float32(geom.nx_dom)) ||
+                   !(1.0f0 <= y_dom_final <= Float32(geom.ny_dom))
+                    pts.active[i] = false
+                    continue
+                end
+
+                pts.xs[i] = x_dom_final
+                pts.ys[i] = y_dom_final
+                pts.σs[i] = z_sigma_final
             end
 
-            current_time >= max_duration && break
+            current_time += dt
+            local_time   += dt
+
+            # Hourly snapshot
+            while next_hour_idx <= 12 && current_time >= next_hour_time - 0.5f0
+                @inbounds for jj in 1:ny_obs, ii in 1:nx_obs
+                    hourly_dep[ii, jj, next_hour_idx] = dep_grid[ii, jj]
+                end
+                next_hour_idx += 1
+                next_hour_time += 3600.0f0
+            end
         end
+
         current_time >= max_duration && break
     end
 

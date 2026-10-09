@@ -29,26 +29,7 @@ struct GpuMetWindow
 end
 
 function load_nancy_gpu_windows()
-    file_range_start = CACHE_START_FILE
-    file_range_end = CACHE_END_FILE
-
-    windows = GpuMetWindow[]
-    for file_idx in file_range_start:file_range_end
-        n_windows = 0
-        for k in keys(MET_CACHE)
-            if k[1] == file_idx
-                n_windows = max(n_windows, k[2])
-            end
-        end
-        n_windows = max(0, n_windows - 1)
-        n_windows == 0 && continue
-
-        for window_idx in 1:n_windows
-            mf = MET_CACHE[(file_idx, window_idx)]
-            push!(windows, build_gpu_window(mf))
-        end
-    end
-    return windows
+    return [build_gpu_window(mf) for mf in met_window_sequence()]   # host_shadow_v2.jl
 end
 
 function build_gpu_window(mf::Transport.MeteoFields)

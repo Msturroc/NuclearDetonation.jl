@@ -29,6 +29,11 @@ using NuclearDetonation.Transport
 #   LAYER_LOWER, LAYER_MIDDLE, LAYER_UPPER, RELEASE_HEIGHT_M,
 #   generate_bimodal_bins, compute_bimodal_weights
 
+# Same met windows as the GPU path (host_shadow_v2.jl's switches when loaded)
+_ref_start_time_idx() = @isdefined(_start_time_idx) ? _start_time_idx() :
+                        @isdefined(CACHE_START_TIME_IDX) ? CACHE_START_TIME_IDX : 1
+_ref_bridge_met_files() = @isdefined(_bridge_met_files) ? _bridge_met_files() : true
+
 """
     run_reference_simulation(params::Vector{Float64}, gen_seed::UInt64)
 
@@ -107,7 +112,7 @@ function run_reference_simulation(params::Vector{Float64}, gen_seed::UInt64)
     state = Transport.initialize_simulation(DOMAIN, sources, ["MixedFP"], decay_params;
                                             log_depositions=true)
 
-    init_met = MET_CACHE[(CACHE_START_FILE, 1)]
+    init_met = MET_CACHE[(CACHE_START_FILE, _ref_start_time_idx())]
 
     # Generate release particles using the CRN local rng — exactly as rho_core
     positions_m = Tuple{Float64,Float64,Float64}[]
@@ -217,7 +222,8 @@ function run_reference_simulation(params::Vector{Float64}, gen_seed::UInt64)
         met_format_override = MET_FORMAT,
         met_dimensions = (NX, NY, NK),
         cache_init_file_idx = CACHE_START_FILE,
-        cache_init_time_idx = 1,
+        cache_init_time_idx = _ref_start_time_idx(),
+        bridge_met_files = _ref_bridge_met_files(),
         sigma_already_initialized = true)
 
     dep_log = state.deposition_log
