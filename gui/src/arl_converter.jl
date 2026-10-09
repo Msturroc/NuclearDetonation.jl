@@ -20,7 +20,7 @@ Find and sort .ARL files. Accepts a single `.ARL` file path or a directory.
 - Directory: scans for all `.ARL` files
 """
 function scan_arl_directory(path::String)
-    if isfile(path) && uppercase(path)[end-3:end] == ".ARL"
+    if isfile(path) && endswith(uppercase(path), ".ARL")
         # Single file mode
         arl = ARLReader.read_arl(path)
         dt = ARLReader.get_date(arl)
@@ -29,7 +29,7 @@ function scan_arl_directory(path::String)
         entries = ARLFileEntry[]
         for fname in readdir(path)
             length(fname) > 4 || continue
-            uppercase(fname)[end-3:end] == ".ARL" || continue
+            endswith(uppercase(fname), ".ARL") || continue
             fpath = joinpath(path, fname)
             isfile(fpath) || continue
             arl = ARLReader.read_arl(fpath)
@@ -57,13 +57,13 @@ back to reading first+last file headers.
 """
 function get_arl_bounds(path::String)
     # Resolve path to directory + file list
-    if isfile(path) && uppercase(path)[end-3:end] == ".ARL"
+    if isfile(path) && endswith(uppercase(path), ".ARL")
         dir = dirname(path)
         arl_files = [basename(path)]
     elseif isdir(path)
         dir = path
         arl_files = [f for f in readdir(path)
-                     if length(f) > 4 && uppercase(f)[end-3:end] == ".ARL" && isfile(joinpath(path, f))]
+                     if endswith(uppercase(f), ".ARL") && isfile(joinpath(path, f))]
     else
         error("Path is not an .ARL file or directory: $path\n" *
               "Provide either a single .ARL file or a directory containing .ARL files.")
@@ -151,7 +151,7 @@ time range. When given a single file, auto-discovers sibling files from the same
 directory that fall within start_dt to start_dt + duration_hours + 24h buffer.
 """
 function _find_arl_files_for_range(path::String, start_dt::Dates.DateTime, duration_hours::Int)
-    if isfile(path) && uppercase(path)[end-3:end] == ".ARL"
+    if isfile(path) && endswith(uppercase(path), ".ARL")
         dir = dirname(path)
         start_date = Dates.Date(start_dt)
         end_date = Dates.Date(start_dt + Dates.Hour(duration_hours + 24))  # buffer
@@ -160,7 +160,7 @@ function _find_arl_files_for_range(path::String, start_dt::Dates.DateTime, durat
         entries = ARLFileEntry[]
         for fname in readdir(dir)
             length(fname) > 4 || continue
-            uppercase(fname)[end-3:end] == ".ARL" || continue
+            endswith(uppercase(fname), ".ARL") || continue
             fpath = joinpath(dir, fname)
             isfile(fpath) || continue
 

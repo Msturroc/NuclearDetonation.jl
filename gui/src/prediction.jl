@@ -14,6 +14,7 @@ module Prediction
 using Dates
 using Statistics
 using XGBoost
+import ..ARLReader
 
 export load_prediction_models!, predict_impact, extract_features
 
@@ -161,8 +162,8 @@ function extract_features(arl_files::Vector{String}, date::Date, hour::Int;
     # Find the ARL file covering this date
     arl = nothing
     for f in arl_files
-        a = Main.ARLReader.read_arl(f)
-        arl_date = Main.ARLReader.get_date(a)
+        a = ARLReader.read_arl(f)
+        arl_date = ARLReader.get_date(a)
         if arl_date <= date <= arl_date + Day(a.n_timesteps ÷ 8)
             arl = a
             break
@@ -188,8 +189,8 @@ function extract_features(arl_files::Vector{String}, date::Date, hour::Int;
     overall_matrix = zeros(Float64, N_VARS, N_STATS)
 
     for (vi, (_, level, varname)) in enumerate(VARIABLE_SPECS)
-        if Main.ARLReader.has_variable(arl, level, varname)
-            field = Main.ARLReader.load_field(arl, day, hour, level, varname)
+        if ARLReader.has_variable(arl, level, varname)
+            field = ARLReader.load_field(arl, day, hour, level, varname)
         else
             field = zeros(Float32, length(lons), length(lats))
         end
@@ -242,8 +243,8 @@ Convenience function: extract features from ARL files and run prediction.
 function predict_from_arl(site::String, arl_dir::String, date::Date, hour::Int;
                           release_duration::Float64=48.0,
                           release_height::Float64=100.0)
-    arl_files = sort(filter(f -> endswith(f, ".ARL") || endswith(f, ".arl"),
-                            readdir(arl_dir; join=true)))
+    arl_files = isfile(arl_dir) ? [arl_dir] :
+        sort(filter(f -> endswith(lowercase(f), ".arl"), readdir(arl_dir; join=true)))
     isempty(arl_files) && error("No ARL files found in $arl_dir")
 
     features = extract_features(arl_files, date, hour;

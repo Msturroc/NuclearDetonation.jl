@@ -2,10 +2,9 @@
 # Build standalone Windows executable using PackageCompiler
 #
 # Prerequisites:
-#   1. Julia 1.12.5 installed
-#   2. ffmpeg installed and on PATH (winget install ffmpeg)
+#   Julia 1.12.5 installed
 #
-# Usage (from the web/ directory):
+# Usage (from the gui/ directory):
 #   julia --project build_app.jl
 #
 # Output: ../build/NuclearDetonationGUI/ containing the .exe
@@ -43,11 +42,6 @@ if Sys.iswindows()
     end
 end
 
-# Bake the Postgres-disabled stubs into the sysimage. database.jl reads this
-# at module-load time, which is precompile time in a PackageCompiler build —
-# setting it at runtime via the .bat is too late to skip the LibPQ path.
-ENV["NUCDET_DISABLE_DB"] = "1"
-
 println("Installing dependencies (first time may take a while)...")
 Pkg.instantiate()
 
@@ -66,18 +60,17 @@ println()
 
 # Build the app
 create_app(
-    src_dir,           # project directory (web/)
+    src_dir,           # project directory (gui/)
     out_dir;           # output directory
     executables = ["NuclearDetonation" => "julia_main"],
     precompile_execution_file = joinpath(src_dir, "precompile_script.jl"),
     include_lazy_artifacts = true,  # bundle ERA5 data
     cpu_target = "generic",         # single target to reduce memory usage
-    # Don't bake transitive deps into the sysimage. CairoMakie/PlotlyJS are deps
-    # of NuclearDetonation (for examples) but unused by the GUI; pulling them in
-    # crashes Julia 1.12 during sysimage compile (Colors.jl conversions.jl:616).
-    # Only our direct [deps] (HTTP, JSON3, NuclearDetonation, NCDatasets, etc.)
-    # land in the sysimage; the rest stays in the bundled depot, available but
-    # lazy-loaded if anything reaches for it (nothing in julia_main does).
+    # Don't bake transitive deps into the sysimage: pulling in everything
+    # NuclearDetonation depends on (e.g. CairoMakie, for the examples) crashed
+    # Julia 1.12 during sysimage compile (Colors.jl conversions.jl:616). Only our
+    # direct [deps] (GLMakie, NuclearDetonation, NCDatasets, etc.) land in the
+    # sysimage; the rest stays in the bundled depot and loads on demand.
     include_transitive_dependencies = false,
     force = true,
 )
@@ -110,65 +103,29 @@ if isdir(depot_artifacts)
     println("Bundled $n_copied additional artifacts from depot")
 end
 
-# Copy web assets (public/, public_react/, src/, models/) into the output
-web_out = joinpath(out_dir, "web")
-mkpath(web_out)
+# Copy models/ (XGBoost impact prediction). Resolved at runtime as <app>/gui/models.
+gui_out = joinpath(out_dir, "gui")
+mkpath(gui_out)
+cp(joinpath(src_dir, "models"), joinpath(gui_out, "models"); force=true)
+println("Bundled models/ (XGBoost predictors)")
 
-# Copy public/ directory (legacy/static assets)
-cp(joinpath(src_dir, "public"), joinpath(web_out, "public"); force=true)
-
-# Copy public_react/ directory (built React frontend; run `npm run build` in
-# web/frontend/ before this script if the bundle is stale)
-public_react_src = joinpath(src_dir, "public_react")
-if isdir(public_react_src)
-    cp(public_react_src, joinpath(web_out, "public_react"); force=true)
-    println("Bundled public_react/ (React frontend)")
-else
-    println("WARNING: web/public_react/ missing. Run `npm run build` in web/frontend/ first.")
-end
-
-# Copy src/ directory (needed for include() at runtime)
-cp(joinpath(src_dir, "src"), joinpath(web_out, "src"); force=true)
-
-# Copy models/ directory (XGBoost impact prediction)
-models_src = joinpath(src_dir, "models")
-if isdir(models_src)
-    cp(models_src, joinpath(web_out, "models"); force=true)
-    println("Bundled models/ (XGBoost predictors)")
-end
-
-# Copy app.jl
-cp(joinpath(src_dir, "app.jl"), joinpath(web_out, "app.jl"); force=true)
-
-# Copy data/ (Nancy observations, ETEX measurements, etc.). Resolved at runtime
-# by load_nancy_observations and _load_etex_observations against
-# dirname(Sys.BINDIR)/../data/, so layout must match: <bundle>/data/<subdir>/...
+# Copy data/ (basemap, Nancy observations, ETEX measurements). Resolved at
+# runtime against dirname(Sys.BINDIR)/../data/, so layout must match:
+# <bundle>/data/<subdir>/...
 data_src = joinpath(dirname(src_dir), "data")
 if isdir(data_src)
     data_dst = joinpath(out_dir, "data")
     cp(data_src, data_dst; force=true)
     println("Bundled data/ (observation datasets)")
 else
-    println("WARNING: data/ directory missing at $data_src. Observations overlay will fail at runtime.")
+    println("WARNING: data/ directory missing at $data_src. The map background and observations will fail at runtime.")
 end
 
 # Copy LocalPreferences.toml (suppresses CUDA artifact via XGBoost_GPU_jll)
 prefs_src = joinpath(src_dir, "LocalPreferences.toml")
 if isfile(prefs_src)
-    cp(prefs_src, joinpath(web_out, "LocalPreferences.toml"); force=true)
+    cp(prefs_src, joinpath(gui_out, "LocalPreferences.toml"); force=true)
     println("Bundled LocalPreferences.toml")
-end
-
-# Try to bundle ffmpeg alongside the exe (needed for animation export)
-ffmpeg_path = Sys.which("ffmpeg")
-if ffmpeg_path !== nothing
-    bin_dir = joinpath(out_dir, "bin")
-    cp(ffmpeg_path, joinpath(bin_dir, basename(ffmpeg_path)); force=true)
-    println("Bundled ffmpeg from: $ffmpeg_path")
-else
-    println("WARNING: ffmpeg not found on PATH.")
-    println("Animation export (GIF/MP4) will not work without ffmpeg.")
-    println("Install it: winget install ffmpeg")
 end
 
 # Write launcher .bat. Creates a junction at the same FIXED_DEPOT path used at
@@ -193,7 +150,8 @@ open(bat_path, "w") do io
     println(io, ")")
     println(io)
     println(io, "set JULIA_DEPOT_PATH=%FIXED_DEPOT%")
-    println(io, "set NUCDET_DISABLE_DB=1")
+    println(io, "rem A second thread runs simulations so the window stays responsive.")
+    println(io, "set JULIA_NUM_THREADS=2")
     println(io, "\"%APP_DIR%bin\\NuclearDetonation.exe\"")
 end
 println("Wrote launcher: $bat_path")
